@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FOCO · Expo React Native 專案架構</title>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181b;
+    --surface2: #222228;
+    --border: #2e2e35;
+    --border2: #3a3a44;
+    --text: #e4e4ed;
+    --muted: #71717a;
+    --accent: #7c6fff;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --orange: #fb923c;
+    --pink: #f472b6;
+    --sky: #38bdf8;
+    --yellow: #facc15;
+    --radius: 10px;
+    --font: -apple-system, 'SF Pro Display', 'Inter', sans-serif;
+    --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  .header {
+    padding: 24px 32px 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #7c6fff, #a78bfa);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: #fff;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.4px; }
+  .header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .badge {
+    padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: rgba(124,111,255,0.15); color: var(--accent2);
+    border: 1px solid rgba(124,111,255,0.25);
+  }
+
+  /* ── Tabs ────────────────────────────────────────────────── */
+  .tabs-wrap { padding: 20px 32px 0; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 8px 16px; font-size: 13px; font-weight: 500; color: var(--muted);
+    cursor: pointer; border: none; background: transparent;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .15s, border-color .15s; white-space: nowrap;
+    font-family: var(--font);
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* ── Panels ──────────────────────────────────────────────── */
+  .panel { display: none; padding: 28px 32px 40px; }
+  .panel.active { display: block; }
+
+  /* ── Tech Stack panel ────────────────────────────────────── */
+  .stack-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;
+  }
+  .stack-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    transition: border-color .15s, transform .1s;
+  }
+  .stack-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .stack-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .stack-icon {
+    width: 28px; height: 28px; border-radius: 6px; display: flex;
+    align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;
+  }
+  .stack-name { font-size: 13px; font-weight: 600; }
+  .stack-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .stack-version {
+    font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+    background: var(--surface2); color: var(--muted); font-family: var(--mono);
+    margin-left: auto;
+  }
+
+  /* ── Folder Tree ─────────────────────────────────────────── */
+  .tree { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; }
+  .tree-node { display: block; cursor: default; }
+  .tree-node.folder { cursor: pointer; }
+  .tree-node.folder:hover > .tree-label { color: var(--text); }
+  .tree-label {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 1px 0; color: var(--muted);
+    transition: color .1s;
+  }
+  .tree-label .name { color: var(--text); }
+  .tree-label .name.dir { color: var(--sky); font-weight: 600; }
+  .tree-label .name.config { color: var(--orange); }
+  .tree-label .name.store { color: var(--green); }
+  .tree-label .name.hook { color: var(--yellow); }
+  .tree-label .name.comp { color: var(--accent2); }
+  .tree-label .name.screen { color: var(--pink); }
+  .tree-label .name.service { color: var(--orange); }
+  .tree-label .comment { font-size: 11px; color: #4a4a56; }
+  .tree-children { padding-left: 18px; border-left: 1px solid var(--border); margin-left: 6px; overflow: hidden; }
+  .tree-children.collapsed { display: none; }
+  .chevron { display: inline-block; width: 10px; color: var(--muted); transition: transform .15s; font-size: 9px; }
+  .folder.open > .tree-label > .chevron { transform: rotate(90deg); }
+  .tree-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 800px) { .tree-layout { grid-template-columns: 1fr; } }
+
+  /* ── Nav Flow ────────────────────────────────────────────── */
+  .flow-wrap { overflow-x: auto; padding-bottom: 8px; }
+  .flow { display: flex; flex-direction: column; gap: 28px; }
+  .flow-section { }
+  .flow-title {
+    font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.8px;
+    text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .flow-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .flow-screens { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+  .screen-box {
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+  }
+  .screen-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 14px; width: 130px; text-align: center; transition: border-color .15s;
+    cursor: default;
+  }
+  .screen-card:hover { border-color: var(--border2); }
+  .screen-card.auth-card { border-color: rgba(248,113,163,0.3); }
+  .screen-card.app-card  { border-color: rgba(124,111,255,0.3); }
+  .screen-card.tab-card  { border-color: rgba(52,211,153,0.3); }
+  .screen-emoji { font-size: 20px; margin-bottom: 4px; }
+  .screen-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .screen-file { font-size: 10px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .screen-desc { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+  .arrow { padding: 0 6px; color: var(--border2); font-size: 14px; flex-shrink: 0; }
+  .arrow-down { display: flex; justify-content: center; color: var(--border2); font-size: 14px; padding: 2px 0; }
+  .tab-group { display: flex; gap: 12px; align-items: stretch; }
+  .sub-screens { padding-left: 16px; border-left: 2px solid var(--border); margin-left: 65px; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .sub-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .sub-card-name { font-size: 11px; font-weight: 600; }
+  .sub-card-file { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── Components ──────────────────────────────────────────── */
+  .comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .comp-group {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .comp-group-head {
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .comp-item {
+    padding: 7px 14px; display: flex; align-items: baseline; justify-content: space-between;
+    gap: 8px; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .comp-item:last-child { border-bottom: none; }
+  .comp-item-name { font-family: var(--mono); color: var(--accent2); font-size: 11.5px; }
+  .comp-item-desc { font-size: 10.5px; color: var(--muted); text-align: right; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── State ───────────────────────────────────────────────── */
+  .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .store-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .store-head {
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .store-head-name { font-size: 13px; font-weight: 700; font-family: var(--mono); }
+  .store-head-sub { font-size: 10px; color: var(--muted); margin-left: auto; }
+  .store-field { padding: 6px 14px; display: flex; align-items: baseline; gap: 8px; border-bottom: 1px solid rgba(46,46,53,0.5); font-size: 11.5px; }
+  .store-field:last-child { border-bottom: none; }
+  .field-name { font-family: var(--mono); color: var(--yellow); }
+  .field-type { font-family: var(--mono); color: var(--sky); font-size: 10.5px; }
+  .field-req { margin-left: auto; font-size: 10px; color: var(--green); }
+  .field-opt { margin-left: auto; font-size: 10px; color: var(--muted); }
+
+  /* ── Data flow ───────────────────────────────────────────── */
+  .flow-diagram { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .flow-col { display: flex; flex-direction: column; gap: 8px; min-width: 140px; }
+  .flow-col-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; text-align: center; margin-bottom: 4px; }
+  .flow-block {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-size: 11px; font-weight: 500; text-align: center; line-height: 1.3;
+  }
+  .flow-arrow { display: flex; align-items: center; padding-top: 24px; }
+  .flow-arrow-line { font-size: 16px; color: var(--border2); }
+
+  /* ── Section titles ──────────────────────────────────────── */
+  .section-head { margin-bottom: 18px; }
+  .section-head h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
+  .section-head p { font-size: 13px; color: var(--muted); }
+
+  /* ── Scroll ──────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-brand">
+    <div class="logo">F</div>
+    <div>
+      <div class="header h1" style="font-size:18px;font-weight:700;letter-spacing:-0.4px">FOCO · Aura Farming</div>
+      <div class="header-sub">Expo React Native 專案架構設計</div>
+    </div>
+  </div>
+  <span class="badge">Expo SDK 52 · Router v4</span>
+</div>
+
+<!-- Tabs -->
+<div class="tabs-wrap">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('stack')">🧰 技術棧</button>
+    <button class="tab" onclick="switchTab('tree')">📁 資料夾結構</button>
+    <button class="tab" onclick="switchTab('nav')">🗺 畫面導航</button>
+    <button class="tab" onclick="switchTab('comp')">🧩 元件清單</button>
+    <button class="tab" onclick="switchTab('state')">🗄 狀態管理</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- PANEL 1 · Tech Stack -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="panel active" id="panel-stack">
+  <div class="section-head">
+    <h2>技術棧選型</h2>
+    <p>根據 FOCO 的 3D 寵物、計時器、動畫、跨平台需求選定</p>
+  </div>
+  <div class="stack-grid">
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(124,111,255,0.12)">📱</div>
+        <span class="stack-name">Expo SDK</span>
+        <span class="stack-version">52</span>
+      </div>
+      <div class="stack-desc">托管工作流（Managed Workflow），支援 EAS Build / OTA 更新。無需觸碰原生代碼即可使用相機、通知、GL 等原生模組。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(56,189,248,0.12)">🗂</div>
+        <span class="stack-name">Expo Router</span>
+        <span class="stack-version">4.x</span>
+      </div>
+      <div class="stack-desc">File-based routing，對應 app/ 目錄自動生成路由。支援 (groups)、動態路由 [id]、共享 _layout。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(52,211,153,0.12)">🐻</div>
+        <span class="stack-name">Zustand</span>
+        <span class="stack-version">4.x</span>
+      </div>
+      <div class="stack-desc">輕量全域狀態管理。比 Redux 簡潔，比 Context 效能佳。用於 authStore / profileStore / sessionStore / statsStore。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(250,204,21,0.12)">💾</div>
+        <span class="stack-name">MMKV</span>
+        <span class="stack-version">react-native-mmkv</span>
+      </div>
+      <div class="stack-desc">高效能本地持久化（比 AsyncStorage 快 10x）。搭配 Zustand persist middleware 儲存 user/pet 狀態。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(248,113,163,0.12)">🎭</div>
+        <span class="stack-name">Reanimated</span>
+        <span class="stack-version">3.x</span>
+      </div>
+      <div class="stack-desc">UI Thread 原生動畫，60fps。用於寵物浮動動畫、頁面過渡、XP 條填充、成就爆炸粒子效果。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(124,111,255,0.12)">🌐</div>
+        <span class="stack-name">expo-three</span>
+        <span class="stack-version">+ three.js</span>
+      </div>
+      <div class="stack-desc">取代 Web 版的 Three.js Canvas。搭配 expo-gl 渲染 XingWang3D 3D 寵物角色，支援手勢旋轉 / 縮放。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(52,211,153,0.12)">🎨</div>
+        <span class="stack-name">NativeWind</span>
+        <span class="stack-version">4.x</span>
+      </div>
+      <div class="stack-desc">Tailwind CSS 語法用於 React Native。原型設計快速，減少 StyleSheet boilerplate，對應現有 className 體系。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(56,189,248,0.12)">🔥</div>
+        <span class="stack-name">Supabase</span>
+        <span class="stack-version">後端即服務</span>
+      </div>
+      <div class="stack-desc">Auth（Email / Apple / Google SSO）、PostgreSQL 資料庫、Edge Functions。對應 ScreenSignup 的三種登入方式。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(250,204,21,0.12)">🔔</div>
+        <span class="stack-name">expo-notifications</span>
+        <span class="stack-version">Expo</span>
+      </div>
+      <div class="stack-desc">對應 Consent 畫面的「Allow gentle focus reminders」。排程推播提醒用戶開始專注 session。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(248,113,163,0.12)">📊</div>
+        <span class="stack-name">Victory Native XL</span>
+        <span class="stack-version">圖表</span>
+      </div>
+      <div class="stack-desc">用 Skia 渲染高效能圖表。對應 Stats 頁的甜甜圈（時間分類）、長條圖（每日專注）、進度條（干擾源）。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(124,111,255,0.12)">🤝</div>
+        <span class="stack-name">react-native-gesture-handler</span>
+        <span class="stack-version">Expo</span>
+      </div>
+      <div class="stack-desc">原生手勢識別，搭配 Reanimated。用於寵物 3D 旋轉（Pan）、Backpack 橫向滑動（Swipe）。</div>
+    </div>
+
+    <div class="stack-card">
+      <div class="stack-card-head">
+        <div class="stack-icon" style="background:rgba(52,211,153,0.12)">🛡</div>
+        <span class="stack-name">TypeScript</span>
+        <span class="stack-version">5.x strict</span>
+      </div>
+      <div class="stack-desc">strict mode 開啟，確保 store / API 型別安全。搭配 Zod 做執行期 API response 驗證。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- PANEL 2 · Folder Tree -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-tree">
+  <div class="section-head">
+    <h2>資料夾結構</h2>
+    <p>基於 Expo Router 的 file-based routing，點擊資料夾可展開/收合</p>
+  </div>
+  <div class="tree-layout">
+    <!-- Left column -->
+    <div>
+      <div class="tree">
+        <!-- Root -->
+        <div class="tree-node folder open" onclick="toggle(this)">
+          <div class="tree-label">
+            <span class="chevron">▶</span>
+            <span class="name dir">foco/</span>
+            <span class="comment">— Expo Managed project root</span>
+          </div>
+          <div class="tree-children">
+
+            <!-- app/ -->
+            <div class="tree-node folder open" onclick="toggle(this)">
+              <div class="tree-label">
+                <span class="chevron">▶</span>
+                <span class="name dir">app/</span>
+                <span class="comment">— Expo Router 路由根目錄</span>
+              </div>
+              <div class="tree-children">
+                <div class="tree-node"><div class="tree-label"><span class="name screen">_layout.tsx</span><span class="comment">— Root：字型載入、Provider 掛載</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name screen">index.tsx</span><span class="comment">— 入口：判斷登入狀態重導向</span></div></div>
+
+                <!-- (auth) -->
+                <div class="tree-node folder open" onclick="toggle(this)">
+                  <div class="tree-label">
+                    <span class="chevron">▶</span>
+                    <span class="name dir">(auth)/</span>
+                    <span class="comment">— Onboarding 群組（不顯示於 Tab）</span>
+                  </div>
+                  <div class="tree-children">
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">_layout.tsx</span><span class="comment">— Stack Navigator，滑入動畫</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">welcome.tsx</span><span class="comment">— 歡迎頁 · 3D 寵物 + CTA</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">signup.tsx</span><span class="comment">— Email/Password · Apple · Google</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">profile.tsx</span><span class="comment">— 暱稱、身份、干擾來源</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">pet.tsx</span><span class="comment">— 選擇初始寵物蛋（2×2 Grid）</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">consent.tsx</span><span class="comment">— ToS、隱私、行銷、通知</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">done.tsx</span><span class="comment">— 孵化完成 · Meet your buddy</span></div></div>
+                  </div>
+                </div>
+
+                <!-- (main) -->
+                <div class="tree-node folder open" onclick="toggle(this)">
+                  <div class="tree-label">
+                    <span class="chevron">▶</span>
+                    <span class="name dir">(main)/</span>
+                    <span class="comment">— 主 App（需已登入）</span>
+                  </div>
+                  <div class="tree-children">
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">_layout.tsx</span><span class="comment">— Stack，包住 Tabs</span></div></div>
+
+                    <!-- (tabs) -->
+                    <div class="tree-node folder open" onclick="toggle(this)">
+                      <div class="tree-label">
+                        <span class="chevron">▶</span>
+                        <span class="name dir">(tabs)/</span>
+                        <span class="comment">— Bottom Tab 三頁</span>
+                      </div>
+                      <div class="tree-children">
+                        <div class="tree-node"><div class="tree-label"><span class="name screen">_layout.tsx</span><span class="comment">— TabBar 設定（Stats/Home/Farm）</span></div></div>
+                        <div class="tree-node"><div class="tree-label"><span class="name screen">index.tsx</span><span class="comment">— 🏠 Home（寵物 + Start focus）</span></div></div>
+                        <div class="tree-node"><div class="tree-label"><span class="name screen">farm.tsx</span><span class="comment">— 🌱 Farm（寵物詳情 + 圖表）</span></div></div>
+                        <div class="tree-node"><div class="tree-label"><span class="name screen">stats.tsx</span><span class="comment">— 📊 Stats（甜甜圈 + 長條圖）</span></div></div>
+                      </div>
+                    </div>
+
+                    <!-- missions/ -->
+                    <div class="tree-node folder open" onclick="toggle(this)">
+                      <div class="tree-label">
+                        <span class="chevron">▶</span>
+                        <span class="name dir">missions/</span>
+                      </div>
+                      <div class="tree-children">
+                        <div class="tree-node"><div class="tree-label"><span class="name screen">index.tsx</span><span class="comment">— Mission 列表（+ 新增）</span></div></div>
+                        <div class="tree-node"><div class="tree-label"><span class="name screen">[id].tsx</span><span class="comment">— Mission 詳情（動態路由）</span></div></div>
+                      </div>
+                    </div>
+
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">timer.tsx</span><span class="comment">— 專注計時器（Pomodoro）</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">accomplished.tsx</span><span class="comment">— 完成頁（+XP · 獎勵）</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name screen">backpack.tsx</span><span class="comment">— 背包（道具 Grid）</span></div></div>
+                  </div>
+                </div>
+              </div>
+            </div><!-- /app/ -->
+
+            <!-- components/ -->
+            <div class="tree-node folder open" onclick="toggle(this)">
+              <div class="tree-label">
+                <span class="chevron">▶</span>
+                <span class="name dir">components/</span>
+              </div>
+              <div class="tree-children">
+                <div class="tree-node folder open" onclick="toggle(this)">
+                  <div class="tree-label"><span class="chevron">▶</span><span class="name dir">ui/</span><span class="comment">— 基礎 UI Primitives</span></div>
+                  <div class="tree-children">
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">Button.tsx</span><span class="comment">— primary / ghost / disabled</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">TextInput.tsx</span><span class="comment">— email / password / text</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">Chip.tsx</span><span class="comment">— 可選取標籤（role/pain）</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">ProgressDots.tsx</span><span class="comment">— Onboarding 步驟指示</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">ProgressBar.tsx</span><span class="comment">— XP / 血量 進度條</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">Toggle.tsx</span><span class="comment">— Consent 頁勾選行</span></div></div>
+                  </div>
+                </div>
+                <div class="tree-node folder open" onclick="toggle(this)">
+                  <div class="tree-label"><span class="chevron">▶</span><span class="name dir">pet/</span><span class="comment">— 寵物相關元件</span></div>
+                  <div class="tree-children">
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">PetScene.tsx</span><span class="comment">— expo-gl + expo-three（XingWang3D）</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">PetCard.tsx</span><span class="comment">— 選擇寵物卡片（2×2）</span></div></div>
+                    <div class="tree-node"><div class="tree-label"><span class="name comp">PetAvatar.tsx</span><span class="comment">— Home 頁大型互動寵物</span></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div><!-- /foco/ -->
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div>
+      <div class="tree">
+        <div class="tree-node folder open" onclick="toggle(this)">
+          <div class="tree-label">
+            <span class="chevron">▶</span>
+            <span class="name dir">components/ <span style="color:var(--muted)">(續)</span></span>
+          </div>
+          <div class="tree-children">
+            <div class="tree-node folder open" onclick="toggle(this)">
+              <div class="tree-label"><span class="chevron">▶</span><span class="name dir">layout/</span><span class="comment">— 共用版面元件</span></div>
+              <div class="tree-children">
+                <div class="tree-node"><div class="tree-label"><span class="name comp">AppHeader.tsx</span><span class="comment">— Back + Title + Action slot</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name comp">TabBar.tsx</span><span class="comment">— Stats / Home / Farm 底部導航</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name comp">ScreenContainer.tsx</span><span class="comment">— SafeArea + padding 包裹</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name comp">OnboardingHeader.tsx</span><span class="comment">— Back 按鈕 + ProgressDots</span></div></div>
+              </div>
+            </div>
+            <div class="tree-node folder open" onclick="toggle(this)">
+              <div class="tree-label"><span class="chevron">▶</span><span class="name dir">charts/</span><span class="comment">— Victory Native XL 圖表</span></div>
+              <div class="tree-children">
+                <div class="tree-node"><div class="tree-label"><span class="name comp">DonutChart.tsx</span><span class="comment">— 時間分類甜甜圈</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name comp">BarChart.tsx</span><span class="comment">— 每日專注長條圖</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name comp">DistractionBar.tsx</span><span class="comment">— 干擾源進度條清單</span></div></div>
+              </div>
+            </div>
+            <div class="tree-node folder open" onclick="toggle(this)">
+              <div class="tree-label"><span class="chevron">▶</span><span class="name dir">missions/</span></div>
+              <div class="tree-children">
+                <div class="tree-node"><div class="tree-label"><span class="name comp">MissionCard.tsx</span><span class="comment">— 任務列表 row（名稱/tag/XP）</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name comp">RewardItem.tsx</span><span class="comment">— 背包道具格（emoji + qty）</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- store/ -->
+        <div class="tree-node folder open" onclick="toggle(this)" style="margin-top:12px">
+          <div class="tree-label">
+            <span class="chevron">▶</span>
+            <span class="name dir">store/</span>
+            <span class="comment">— Zustand stores（+ MMKV persist）</span>
+          </div>
+          <div class="tree-children">
+            <div class="tree-node"><div class="tree-label"><span class="name store">authStore.ts</span><span class="comment">— 登入狀態 / email / session token</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name store">profileStore.ts</span><span class="comment">— nickname / role / pains / pet 選擇</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name store">sessionStore.ts</span><span class="comment">— 計時器狀態 / 當前 mission</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name store">statsStore.ts</span><span class="comment">— XP / streak / 專注歷史</span></div></div>
+          </div>
+        </div>
+
+        <!-- hooks/ -->
+        <div class="tree-node folder open" onclick="toggle(this)" style="margin-top:12px">
+          <div class="tree-label">
+            <span class="chevron">▶</span>
+            <span class="name dir">hooks/</span>
+          </div>
+          <div class="tree-children">
+            <div class="tree-node"><div class="tree-label"><span class="name hook">useCountdownTimer.ts</span><span class="comment">— Pomodoro 計時邏輯</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name hook">usePetAnimation.ts</span><span class="comment">— 寵物 idle / react 動畫</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name hook">useAuth.ts</span><span class="comment">— 登入 / 登出 / onboarding 流程</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name hook">useMissions.ts</span><span class="comment">— CRUD tasks + Supabase sync</span></div></div>
+          </div>
+        </div>
+
+        <!-- services/ -->
+        <div class="tree-node folder open" onclick="toggle(this)" style="margin-top:12px">
+          <div class="tree-label"><span class="chevron">▶</span><span class="name dir">services/</span></div>
+          <div class="tree-children">
+            <div class="tree-node folder open" onclick="toggle(this)">
+              <div class="tree-label"><span class="chevron">▶</span><span class="name dir">api/</span></div>
+              <div class="tree-children">
+                <div class="tree-node"><div class="tree-label"><span class="name service">auth.ts</span><span class="comment">— Supabase Auth 封裝</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name service">missions.ts</span><span class="comment">— Mission CRUD</span></div></div>
+                <div class="tree-node"><div class="tree-label"><span class="name service">stats.ts</span><span class="comment">— 統計資料 fetch</span></div></div>
+              </div>
+            </div>
+            <div class="tree-node"><div class="tree-label"><span class="name service">storage.ts</span><span class="comment">— MMKV 封裝（型別化 get/set）</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name service">notifications.ts</span><span class="comment">— 推播排程管理</span></div></div>
+          </div>
+        </div>
+
+        <!-- constants/ -->
+        <div class="tree-node folder open" onclick="toggle(this)" style="margin-top:12px">
+          <div class="tree-label"><span class="chevron">▶</span><span class="name dir">constants/</span></div>
+          <div class="tree-children">
+            <div class="tree-node"><div class="tree-label"><span class="name config">pets.ts</span><span class="comment">— sprout/ember/mist/pebble 定義</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name config">colors.ts</span><span class="comment">— Design tokens（#0D0D0D, #F0F0F0…）</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name config">typography.ts</span><span class="comment">— 字體尺度（h-display, body-muted…）</span></div></div>
+            <div class="tree-node"><div class="tree-label"><span class="name config">theme.ts</span><span class="comment">— 組合主題物件</span></div></div>
+          </div>
+        </div>
+
+        <!-- Config files -->
+        <div style="margin-top:12px">
+          <div class="tree-node"><div class="tree-label"><span class="name config">app.json</span><span class="comment">— Expo config（bundleId, icon, splash）</span></div></div>
+          <div class="tree-node"><div class="tree-label"><span class="name config">eas.json</span><span class="comment">— EAS Build profiles</span></div></div>
+          <div class="tree-node"><div class="tree-label"><span class="name config">tailwind.config.js</span><span class="comment">— NativeWind theme 擴充</span></div></div>
+          <div class="tree-node"><div class="tree-label"><span class="name config">tsconfig.json</span><span class="comment">— strict mode + path aliases</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- PANEL 3 · Navigation Flow -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-nav">
+  <div class="section-head">
+    <h2>畫面導航流程</h2>
+    <p>Expo Router v4 · Stack + Tabs 混合導航架構</p>
+  </div>
+  <div class="flow">
+
+    <!-- Auth flow -->
+    <div class="flow-section">
+      <div class="flow-title" style="color:#f472b6">🔐 Auth / Onboarding Flow — (auth)/ Stack</div>
+      <div class="flow-screens">
+        <div class="screen-box">
+          <div class="screen-card auth-card">
+            <div class="screen-emoji">✨</div>
+            <div class="screen-name">Welcome</div>
+            <div class="screen-file">welcome.tsx</div>
+            <div class="screen-desc">3D 寵物 + Get started</div>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="screen-box">
+          <div class="screen-card auth-card">
+            <div class="screen-emoji">📧</div>
+            <div class="screen-name">Signup</div>
+            <div class="screen-file">signup.tsx</div>
+            <div class="screen-desc">Email / Apple / Google</div>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="screen-box">
+          <div class="screen-card auth-card">
+            <div class="screen-emoji">👤</div>
+            <div class="screen-name">Profile</div>
+            <div class="screen-file">profile.tsx</div>
+            <div class="screen-desc">暱稱 + 身份 + 干擾</div>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="screen-box">
+          <div class="screen-card auth-card">
+            <div class="screen-emoji">🥚</div>
+            <div class="screen-name">Pet</div>
+            <div class="screen-file">pet.tsx</div>
+            <div class="screen-desc">選擇寵物蛋 (4種)</div>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="screen-box">
+          <div class="screen-card auth-card">
+            <div class="screen-emoji">📋</div>
+            <div class="screen-name">Consent</div>
+            <div class="screen-file">consent.tsx</div>
+            <div class="screen-desc">ToS / 隱私 / 通知</div>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="screen-box">
+          <div class="screen-card auth-card">
+            <div class="screen-emoji">🎉</div>
+            <div class="screen-name">Done</div>
+            <div class="screen-file">done.tsx</div>
+            <div class="screen-desc">Meet your buddy!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main app tabs -->
+    <div class="flow-section">
+      <div class="flow-title" style="color:#34d399">📱 Main App — (main)/ Stack → (tabs)/ Bottom Tabs</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+
+        <!-- Tab: Stats -->
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <div class="screen-card tab-card" style="width:120px;border-color:rgba(52,211,153,0.4)">
+            <div class="screen-emoji">📊</div>
+            <div class="screen-name">Stats</div>
+            <div class="screen-file">stats.tsx</div>
+            <div class="screen-desc">甜甜圈 + 長條圖</div>
+          </div>
+        </div>
+
+        <!-- Tab: Home (center) -->
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <div class="screen-card tab-card" style="width:130px;border-color:rgba(124,111,255,0.5);background:rgba(124,111,255,0.05)">
+            <div class="screen-emoji">🏠</div>
+            <div class="screen-name" style="color:var(--accent2)">Home</div>
+            <div class="screen-file">index.tsx</div>
+            <div class="screen-desc">寵物 + Start focus</div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);text-align:center">預設 Tab</div>
+
+          <!-- From home: stack pushes -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="color:var(--border2);font-size:11px">→ push</div>
+              <div class="screen-card app-card" style="width:110px">
+                <div class="screen-emoji">📋</div>
+                <div class="screen-name" style="font-size:11px">Missions</div>
+                <div class="screen-file">missions/index.tsx</div>
+              </div>
+              <div style="color:var(--border2);font-size:11px">↓ tap item</div>
+              <div class="screen-card app-card" style="width:110px">
+                <div class="screen-emoji">📝</div>
+                <div class="screen-name" style="font-size:11px">Mission Detail</div>
+                <div class="screen-file">missions/[id].tsx</div>
+              </div>
+              <div style="color:var(--border2);font-size:11px">↓ Start</div>
+              <div class="screen-card app-card" style="width:110px">
+                <div class="screen-emoji">⏱</div>
+                <div class="screen-name" style="font-size:11px">Timer</div>
+                <div class="screen-file">timer.tsx</div>
+              </div>
+              <div style="color:var(--border2);font-size:11px">↓ Done</div>
+              <div class="screen-card app-card" style="width:110px">
+                <div class="screen-emoji">🏆</div>
+                <div class="screen-name" style="font-size:11px">Accomplished</div>
+                <div class="screen-file">accomplished.tsx</div>
+              </div>
+              <div style="color:var(--border2);font-size:11px">↓ Backpack</div>
+              <div class="screen-card app-card" style="width:110px">
+                <div class="screen-emoji">🎒</div>
+                <div class="screen-name" style="font-size:11px">Backpack</div>
+                <div class="screen-file">backpack.tsx</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Farm -->
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <div class="screen-card tab-card" style="width:120px;border-color:rgba(52,211,153,0.4)">
+            <div class="screen-emoji">🌱</div>
+            <div class="screen-name">Farm</div>
+            <div class="screen-file">farm.tsx</div>
+            <div class="screen-desc">寵物詳情 + 7天圖表</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+        <div style="width:12px;height:12px;border-radius:3px;background:rgba(248,113,163,0.15);border:1px solid rgba(248,113,163,0.3)"></div>
+        Auth / Onboarding
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+        <div style="width:12px;height:12px;border-radius:3px;background:rgba(124,111,255,0.08);border:1px solid rgba(124,111,255,0.3)"></div>
+        Main Stack Screen
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+        <div style="width:12px;height:12px;border-radius:3px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3)"></div>
+        Tab Screen
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- PANEL 4 · Components -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-comp">
+  <div class="section-head">
+    <h2>元件清單</h2>
+    <p>從原始 JSX 映射到 React Native 對應元件</p>
+  </div>
+  <div class="comp-grid">
+
+    <div class="comp-group">
+      <div class="comp-group-head">
+        <div class="dot" style="background:#38bdf8"></div>
+        <span style="color:var(--sky)">UI Primitives</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto">components/ui/</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">Button</span>
+        <span class="comp-item-desc">primary / ghost / disabled</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">TextInput</span>
+        <span class="comp-item-desc">email / password / text</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">Chip</span>
+        <span class="comp-item-desc">可選取標籤（role / pain）</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">ProgressDots</span>
+        <span class="comp-item-desc">Onboarding 步驟指示（4步）</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">ProgressBar</span>
+        <span class="comp-item-desc">XP / 血量 水平進度條</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">Toggle</span>
+        <span class="comp-item-desc">Consent 頁 checkbox row</span>
+      </div>
+    </div>
+
+    <div class="comp-group">
+      <div class="comp-group-head">
+        <div class="dot" style="background:#a78bfa"></div>
+        <span style="color:var(--accent2)">Pet System</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto">components/pet/</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">PetScene</span>
+        <span class="comp-item-desc">expo-gl + expo-three 3D 寵物</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">PetCard</span>
+        <span class="comp-item-desc">2×2 選擇卡（sprout/ember/mist/pebble）</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">PetAvatar</span>
+        <span class="comp-item-desc">Home 頁互動大型寵物</span>
+      </div>
+    </div>
+
+    <div class="comp-group">
+      <div class="comp-group-head">
+        <div class="dot" style="background:#34d399"></div>
+        <span style="color:var(--green)">Layout / Chrome</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto">components/layout/</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">AppHeader</span>
+        <span class="comp-item-desc">Back btn + Title + Action slot</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">TabBar</span>
+        <span class="comp-item-desc">📊 Stats / 🏠 Home / 🌱 Farm</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">ScreenContainer</span>
+        <span class="comp-item-desc">SafeAreaView + padding</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">OnboardingHeader</span>
+        <span class="comp-item-desc">Back + ProgressDots (step/4)</span>
+      </div>
+    </div>
+
+    <div class="comp-group">
+      <div class="comp-group-head">
+        <div class="dot" style="background:#fb923c"></div>
+        <span style="color:var(--orange)">Charts</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto">components/charts/</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">DonutChart</span>
+        <span class="comp-item-desc">任務類別甜甜圈（Study/Work/...）</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">BarChart</span>
+        <span class="comp-item-desc">7/14天每日專注長條圖</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">DistractionBar</span>
+        <span class="comp-item-desc">干擾源百分比清單</span>
+      </div>
+    </div>
+
+    <div class="comp-group">
+      <div class="comp-group-head">
+        <div class="dot" style="background:#f472b6"></div>
+        <span style="color:var(--pink)">Missions</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto">components/missions/</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">MissionCard</span>
+        <span class="comp-item-desc">任務列表 row（名稱/tag/focus/XP）</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">RewardItem</span>
+        <span class="comp-item-desc">背包道具格（emoji + 數量）</span>
+      </div>
+    </div>
+
+    <div class="comp-group">
+      <div class="comp-group-head">
+        <div class="dot" style="background:#facc15"></div>
+        <span style="color:var(--yellow)">Screens（葉節點）</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto">app/</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">welcome / done</span>
+        <span class="comp-item-desc">Onboarding 書端點</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">signup / profile / pet / consent</span>
+        <span class="comp-item-desc">4 步驟表單</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">home / farm / stats</span>
+        <span class="comp-item-desc">Tab 根頁</span>
+      </div>
+      <div class="comp-item">
+        <span class="comp-item-name">timer / accomplished / backpack</span>
+        <span class="comp-item-desc">任務子頁</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- PANEL 5 · State Management -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-state">
+  <div class="section-head">
+    <h2>狀態管理設計</h2>
+    <p>Zustand + MMKV persist — 4 個獨立 store，對應畫面原始 state 物件</p>
+  </div>
+
+  <div class="store-grid">
+
+    <!-- authStore -->
+    <div class="store-card">
+      <div class="store-head">
+        <div class="dot" style="background:#f472b6"></div>
+        <span class="store-head-name">authStore</span>
+        <span class="store-head-sub">auth.ts · persist</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">email</span>
+        <span class="field-type">string</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">password</span>
+        <span class="field-type">string</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">isLoggedIn</span>
+        <span class="field-type">boolean</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">sessionToken</span>
+        <span class="field-type">string | null</span>
+        <span class="field-opt">○</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">onboardingDone</span>
+        <span class="field-type">boolean</span>
+        <span class="field-req">●</span>
+      </div>
+    </div>
+
+    <!-- profileStore -->
+    <div class="store-card">
+      <div class="store-head">
+        <div class="dot" style="background:#a78bfa"></div>
+        <span class="store-head-name">profileStore</span>
+        <span class="store-head-sub">profile.ts · persist</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">nickname</span>
+        <span class="field-type">string</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">role</span>
+        <span class="field-type">'Student' | 'Working pro' | 'Creator' | 'Other'</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">pains</span>
+        <span class="field-type">string[]</span>
+        <span class="field-opt">○</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">pet</span>
+        <span class="field-type">'sprout' | 'ember' | 'mist' | 'pebble'</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">tos</span>
+        <span class="field-type">boolean</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">privacy</span>
+        <span class="field-type">boolean</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">marketing</span>
+        <span class="field-type">boolean</span>
+        <span class="field-opt">○</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">notifs</span>
+        <span class="field-type">boolean</span>
+        <span class="field-req">●</span>
+      </div>
+    </div>
+
+    <!-- sessionStore -->
+    <div class="store-card">
+      <div class="store-head">
+        <div class="dot" style="background:#38bdf8"></div>
+        <span class="store-head-name">sessionStore</span>
+        <span class="store-head-sub">session.ts · 不持久化</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">activeMissionId</span>
+        <span class="field-type">string | null</span>
+        <span class="field-opt">○</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">timerSeconds</span>
+        <span class="field-type">number</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">isRunning</span>
+        <span class="field-type">boolean</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">distractionCount</span>
+        <span class="field-type">number</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">earnedXP</span>
+        <span class="field-type">number</span>
+        <span class="field-opt">○</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">rewards</span>
+        <span class="field-type">RewardItem[]</span>
+        <span class="field-opt">○</span>
+      </div>
+    </div>
+
+    <!-- statsStore -->
+    <div class="store-card">
+      <div class="store-head">
+        <div class="dot" style="background:#34d399"></div>
+        <span class="store-head-name">statsStore</span>
+        <span class="store-head-sub">stats.ts · persist</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">totalXP</span>
+        <span class="field-type">number</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">level</span>
+        <span class="field-type">number</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">streak</span>
+        <span class="field-type">number</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">totalFocusMinutes</span>
+        <span class="field-type">number</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">dailyFocusLog</span>
+        <span class="field-type">DayLog[]</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">categoryBreakdown</span>
+        <span class="field-type">Record&lt;string, number&gt;</span>
+        <span class="field-req">●</span>
+      </div>
+      <div class="store-field">
+        <span class="field-name">backpackItems</span>
+        <span class="field-type">BackpackItem[]</span>
+        <span class="field-req">●</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Data flow -->
+  <div style="margin-top:28px">
+    <div class="flow-title" style="margin-bottom:16px">資料流向</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="flow-block" style="background:rgba(248,113,163,0.08);border-color:rgba(248,113,163,0.2)">
+        📱 Screen<br><span style="font-size:10px;color:var(--muted)">UI 事件</span>
+      </div>
+      <div style="color:var(--border2);font-size:18px">→</div>
+      <div class="flow-block" style="background:rgba(250,204,21,0.08);border-color:rgba(250,204,21,0.2)">
+        🪝 Hook<br><span style="font-size:10px;color:var(--muted)">useAuth / useMissions</span>
+      </div>
+      <div style="color:var(--border2);font-size:18px">→</div>
+      <div class="flow-block" style="background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.2)">
+        🐻 Store<br><span style="font-size:10px;color:var(--muted)">Zustand action</span>
+      </div>
+      <div style="color:var(--border2);font-size:18px">⇄</div>
+      <div class="flow-block" style="background:rgba(56,189,248,0.08);border-color:rgba(56,189,248,0.2)">
+        🌐 Service<br><span style="font-size:10px;color:var(--muted)">Supabase API</span>
+      </div>
+      <div style="color:var(--border2);font-size:18px">⇄</div>
+      <div class="flow-block" style="background:rgba(124,111,255,0.08);border-color:rgba(124,111,255,0.2)">
+        💾 MMKV<br><span style="font-size:10px;color:var(--muted)">本地持久化</span>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);line-height:1.7">
+      ● <strong style="color:var(--text)">必填欄位</strong> — 由 onboarding 流程收集，儲存至 Supabase + MMKV<br>
+      ○ <strong style="color:var(--text)">選填欄位</strong> — 用戶選擇性填寫，不強制<br>
+      sessionStore 不持久化 — 每次 session 結束後清空，避免殘留計時器狀態
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+function toggle(el) {
+  event.stopPropagation();
+  el.classList.toggle('open');
+  const children = el.querySelector(':scope > .tree-children');
+  if (children) children.classList.toggle('collapsed');
+}
+</script>
+</body>
+</html>
