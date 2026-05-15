@@ -25,9 +25,11 @@ export function Input({
   hint,
   isPassword = false,
   style,
+  accessibilityLabel,
   ...props
 }: InputProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const inputAccessibilityLabel = accessibilityLabel ?? label ?? props.placeholder;
 
   return (
     <View style={styles.container}>
@@ -37,12 +39,15 @@ export function Input({
           style={[styles.input, style]}
           secureTextEntry={isPassword && !showPassword}
           placeholderTextColor={Colors.textDisabled}
+          accessibilityLabel={inputAccessibilityLabel}
           {...props}
         />
         {isPassword && (
           <TouchableOpacity
             onPress={() => setShowPassword((v) => !v)}
             style={styles.eyeBtn}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
           >
             <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
           </TouchableOpacity>
