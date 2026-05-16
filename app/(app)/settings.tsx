@@ -26,7 +26,7 @@ export default function SettingsScreen() {
   const { logout, userEmail, userName } = useAuthStore();
   const { reset: resetPets } = usePetStore();
 
-  const { playToggle } = useSound();
+  const { play, playToggle } = useSound();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [notifEnabled, setNotifEnabled] = useState(true);
 
@@ -116,7 +116,7 @@ export default function SettingsScreen() {
         {/* ── 登出 ── */}
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={handleLogout}
+          onPress={() => { play('tap'); handleLogout(); }}
           activeOpacity={0.8}
         >
           <Text style={styles.logoutText}>登出</Text>

@@ -100,7 +100,7 @@ export default function HomeScreen() {
           <View style={styles.selectorHeader}>
             <Text style={styles.selectorEyebrow}>今天的夥伴</Text>
             <TouchableOpacity
-              onPress={() => router.push('/(app)/pet-collection' as any)}
+              onPress={() => { play('tap'); router.push('/(app)/pet-collection' as any); }}
               activeOpacity={0.7}
             >
               <Text style={styles.selectorAll}>全部 →</Text>
@@ -123,11 +123,11 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={def.id}
                   style={[styles.petCard, { width: PET_CARD_W }]}
-                  onPress={() => router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } })}
+                  onPress={() => { play('transition_up'); router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } }); }}
                   activeOpacity={0.88}
                 >
                   <View style={styles.petPreview}>
-                    <PetRenderer pet={def} size={150} interactive={false} />
+                    <PetRenderer pet={def} size={150} interactive />
                   </View>
                   <Text style={styles.petCardName}>{def.name}</Text>
                   <View style={styles.levelPill}>

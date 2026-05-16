@@ -22,6 +22,7 @@ import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
+import { useSound } from '@/components/SoundProvider';
 import { mockPets } from '@/data/mockData';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -36,12 +37,14 @@ export default function PetCollectionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { pets } = usePetStore();
+  const { play } = useSound();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const searchPool = pets.length > 0 ? pets : mockPets;
 
   const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const page = Math.round(e.nativeEvent.contentOffset.x / W);
+    if (page !== currentIndex) play('tap');
     setCurrentIndex(page);
   };
 
@@ -81,14 +84,15 @@ export default function PetCollectionScreen() {
 
           return (
             <View key={petDef.id} style={styles.page}>
-              {/* 3D pet */}
+              {/* 3D pet — 留左右各 10% 寬度讓 ScrollView 捕捉換頁手勢 */}
               <View
+                pointerEvents="box-none"
                 style={[
                   styles.petArea,
                   { top: 80 + insets.top, bottom: CARD_H + 12 },
                 ]}
               >
-                <PetRenderer pet={petDef} size={300} interactive />
+                <PetRenderer pet={petDef} size={260} interactive />
               </View>
 
               {/* Bottom info card */}
@@ -127,12 +131,13 @@ export default function PetCollectionScreen() {
                     <TouchableOpacity
                       style={styles.detailBtn}
                       activeOpacity={0.8}
-                      onPress={() =>
+                      onPress={() => {
+                        play('transition_up');
                         router.push({
                           pathname: '/(app)/pet-info',
                           params: { petId: petDef.id },
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Text style={styles.detailBtnText}>查看詳情 →</Text>
                     </TouchableOpacity>
@@ -180,7 +185,9 @@ const styles = StyleSheet.create({
 
   petArea: {
     position: 'absolute',
-    left: 0, right: 0,
+    // 留左右各 ~65px 讓 ScrollView 捕捉換頁手勢
+    left: Math.round(W * 0.16),
+    right: Math.round(W * 0.16),
     alignItems: 'center',
     justifyContent: 'center',
   },
