@@ -18,7 +18,6 @@ import { AppBackground } from '@/components/ui/AppBackground';
 import { Glass } from '@/components/ui/Glass';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { TabBar } from '@/components/layout/TabBar';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { getTasks, createTask } from '@/services/focoService';
@@ -174,8 +173,6 @@ export default function MissionsScreen() {
           </View>
         )}
       </ScrollView>
-
-      <TabBar />
 
       {/* ── 新增 Task Modal ──────────────────── */}
       <Modal visible={showModal} transparent animationType="slide">

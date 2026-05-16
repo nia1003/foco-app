@@ -76,9 +76,15 @@ interface TabBarProps {
   dark?: boolean;
 }
 
+// 這些路由不顯示 tab bar
+const HIDDEN_ROUTES = ['/focus', '/reward', '/analysis', '/pet-info'];
+
 export function TabBar({ dark = false }: TabBarProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // focus / reward / analysis 頁面隱藏 tab bar
+  if (HIDDEN_ROUTES.some((r) => pathname.includes(r))) return null;
 
   const fg = dark ? '#fff' : Colors.ink;
   const muted = dark ? 'rgba(255,255,255,0.55)' : Colors.inkSoft;

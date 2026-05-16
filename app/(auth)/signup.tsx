@@ -47,8 +47,11 @@ export default function SignupScreen() {
             <Text style={styles.hint}>This is what your companion will call you.</Text>
 
             <TouchableOpacity
-              style={styles.continueBtn}
-              onPress={() => router.push('/(auth)/profile')}
+              style={[styles.continueBtn, !name.trim() && styles.disabled]}
+              onPress={() => {
+                if (!name.trim()) return;
+                router.push({ pathname: '/(auth)/profile', params: { name: name.trim() } });
+              }}
               activeOpacity={0.85}
             >
               <Text style={styles.continueBtnText}>CONTINUE</Text>
@@ -95,4 +98,5 @@ const styles = StyleSheet.create({
   continueBtnText: {
     fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 3,
   },
+  disabled: { opacity: 0.4 },
 });

@@ -18,7 +18,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { Glass } from '@/components/ui/Glass';
-import { TabBar } from '@/components/layout/TabBar';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { useTimer } from '@/hooks/useTimer';
@@ -193,8 +192,6 @@ export default function FocusScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <TabBar />
 
       {/* 提前放棄確認 Modal */}
       <Modal visible={showQuitModal} transparent animationType="fade">

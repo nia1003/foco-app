@@ -10,7 +10,6 @@ import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { TabBar } from '@/components/layout/TabBar';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
@@ -148,8 +147,6 @@ export default function HomeScreen() {
           </FrostCard>
         </View>
       </ScrollView>
-
-      <TabBar />
     </View>
   );
 }
