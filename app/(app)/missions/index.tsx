@@ -5,13 +5,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -19,25 +15,17 @@ import { Trash2 } from 'lucide-react-native';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { DurationSlider } from '@/components/ui/DurationSlider';
-import { FocusSetupModal } from '@/components/FocusSetupModal';
+import { FocusSetupSheet } from '@/components/FocusSetupSheet';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { useSound } from '@/components/SoundProvider';
-import { getTasks, createTask, deleteTask } from '@/services/focoService';
+import { getTasks, deleteTask } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
 const PINK      = '#F2CEDC';
 const PINK_TEXT = '#b5607a';
-
-const EMOJI_OPTIONS = [
-  '📚', '✏️', '💻', '🎯',
-  '💼', '🎨', '🎵', '🏃',
-  '🔬', '🌱', '☕', '💡',
-  '📝', '🎤', '🏋️', '⭐',
-];
 
 type TabType = 'active' | 'daily' | 'special';
 
@@ -76,22 +64,14 @@ export default function MissionsScreen() {
 
   // My Tasks state
   const [tasks, setTasks] = useState<Task[]>(mockTasks.tasks);
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Quest state (local only)
   const [questsState, setQuestsState] = useState<QuestsState>(INITIAL_QUESTS);
 
-  // New task form
-  const [newTitle, setNewTitle] = useState('');
-  const [newDuration, setNewDuration] = useState(25);
-  const [newEmoji, setNewEmoji] = useState('📚');
-  const [newMemo, setNewMemo] = useState('');
-  const [creating, setCreating] = useState(false);
-
-  // Focus setup modal (shared with home)
-  const [focusModalVisible, setFocusModalVisible] = useState(false);
-  const [focusInitialDuration, setFocusInitialDuration] = useState(25);
-  const [focusInitialTaskId, setFocusInitialTaskId] = useState<string | null>(null);
+  // Focus setup sheet (covers both "start" and "create task" flows)
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetInitialDuration, setSheetInitialDuration] = useState(25);
+  const [sheetInitialTaskId, setSheetInitialTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -99,29 +79,6 @@ export default function MissionsScreen() {
       .then((res) => setTasks(res.tasks))
       .catch(() => {});
   }, [userId]);
-
-  const resetCreateModal = () => {
-    setNewTitle('');
-    setNewDuration(25);
-    setNewEmoji('📚');
-    setNewMemo('');
-  };
-
-  const handleCreate = async () => {
-    if (!newTitle.trim() || !userId) return;
-    try {
-      setCreating(true);
-      const task = await createTask(userId, newTitle.trim(), newDuration);
-      const enriched: Task = { ...task, emoji: newEmoji, memo: newMemo.trim() || undefined };
-      setTasks((prev) => [enriched, ...prev]);
-      resetCreateModal();
-      setShowCreateModal(false);
-    } catch {
-      Alert.alert('建立失敗', '請稍後再試');
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleDeleteTask = (taskId: string, taskTitle: string) => {
     Alert.alert(
@@ -168,11 +125,11 @@ export default function MissionsScreen() {
     );
   };
 
-  const openFocusModal = (durationMin: number, taskId: string | null) => {
+  const openFocusSheet = (durationMin: number, taskId: string | null) => {
     play('tap');
-    setFocusInitialDuration(durationMin);
-    setFocusInitialTaskId(taskId);
-    setFocusModalVisible(true);
+    setSheetInitialDuration(durationMin);
+    setSheetInitialTaskId(taskId);
+    setSheetVisible(true);
   };
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending');
@@ -194,7 +151,7 @@ export default function MissionsScreen() {
           <Text style={styles.title}>Missions</Text>
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => { play('tap'); setShowCreateModal(true); }}
+            onPress={() => { openFocusSheet(25, null); }}
             activeOpacity={0.75}
           >
             <Text style={styles.addBtnText}>+ Task</Text>
@@ -245,7 +202,7 @@ export default function MissionsScreen() {
                   <View style={styles.taskActions}>
                     <TouchableOpacity
                       style={styles.myTaskStartBtn}
-                      onPress={() => openFocusModal(q.duration_min, null)}
+                      onPress={() => openFocusSheet(q.duration_min, null)}
                       activeOpacity={0.8}
                     >
                       <Text style={styles.myTaskStartText}>▶ Start</Text>
@@ -295,7 +252,7 @@ export default function MissionsScreen() {
                     <View style={styles.taskActions}>
                       <TouchableOpacity
                         style={styles.myTaskStartBtn}
-                        onPress={() => openFocusModal(task.duration_min, task.id)}
+                        onPress={() => openFocusSheet(task.duration_min, task.id)}
                         activeOpacity={0.8}
                       >
                         <Text style={styles.myTaskStartText}>▶ Start</Text>
@@ -317,108 +274,16 @@ export default function MissionsScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Focus Setup Modal (same flow as home) ── */}
-      <FocusSetupModal
-        visible={focusModalVisible}
-        onClose={() => setFocusModalVisible(false)}
+      {/* ── Focus Setup Sheet ── */}
+      <FocusSetupSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
         pets={modalPets}
         tasks={pendingTasks}
         initialPetId={activePet?.id ?? null}
-        initialDuration={focusInitialDuration}
-        initialTaskId={focusInitialTaskId}
+        initialDuration={sheetInitialDuration}
+        initialTaskId={sheetInitialTaskId}
       />
-
-      {/* ── Create Task Modal ── */}
-      <Modal
-        visible={showCreateModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => { setShowCreateModal(false); resetCreateModal(); }}
-      >
-        <KeyboardAvoidingView
-          style={styles.modalKav}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => { setShowCreateModal(false); resetCreateModal(); }}
-          />
-          <View style={styles.modalSheet}>
-            <FrostCard radius={28}>
-              <Text style={styles.modalTitle}>New Task</Text>
-
-              {/* Emoji picker */}
-              <Text style={styles.modalLabel}>PICK AN EMOJI</Text>
-              <View style={styles.emojiGrid}>
-                {EMOJI_OPTIONS.map((em) => (
-                  <TouchableOpacity
-                    key={em}
-                    style={[styles.emojiCell, newEmoji === em && styles.emojiCellActive]}
-                    onPress={() => { play('tap'); setNewEmoji(em); }}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={styles.emojiCellText}>{em}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Task name */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>TASK NAME</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newTitle}
-                onChangeText={setNewTitle}
-                placeholder="What do you want to focus on?"
-                placeholderTextColor={Colors.inkFaint}
-                returnKeyType="next"
-              />
-              <View style={styles.modalUnderline} />
-
-              {/* Memo */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>
-                MEMO <Text style={styles.optionalTag}>(optional)</Text>
-              </Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newMemo}
-                onChangeText={(t) => setNewMemo(t.slice(0, 60))}
-                placeholder="Short note…"
-                placeholderTextColor={Colors.inkFaint}
-                returnKeyType="done"
-                maxLength={60}
-              />
-              <View style={styles.modalUnderlineRow}>
-                <View style={[styles.modalUnderline, { flex: 1 }]} />
-                <Text style={styles.charCount}>{newMemo.length}/60</Text>
-              </View>
-
-              {/* Duration slider */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>FOCUS DURATION</Text>
-              <View style={{ marginTop: 12 }}>
-                <DurationSlider value={newDuration} onChange={setNewDuration} />
-              </View>
-
-              {/* Actions */}
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.modalCancelBtn}
-                  onPress={() => { play('tap'); setShowCreateModal(false); resetCreateModal(); }}
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalCreateBtn, (!newTitle.trim() || creating) && styles.disabled]}
-                  disabled={!newTitle.trim() || creating}
-                  onPress={() => { play('transition_up'); handleCreate(); }}
-                >
-                  <Text style={styles.modalCreateText}>{creating ? 'Creating…' : 'Create'}</Text>
-                </TouchableOpacity>
-              </View>
-            </FrostCard>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
@@ -472,42 +337,5 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // Create Task Modal
-  modalKav: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  modalSheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
-  modalTitle: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 22, fontWeight: '500', color: Colors.ink, marginBottom: 16,
-  },
-  modalLabel: {
-    fontSize: 11, fontWeight: '700', color: Colors.inkFaint,
-    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10,
-  },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  emojiCell: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(20,16,28,0.05)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'transparent',
-  },
-  emojiCellActive: { backgroundColor: 'rgba(242,206,220,0.45)', borderColor: PINK_TEXT },
-  emojiCellText: { fontSize: 22 },
-  modalInput: { fontSize: 17, fontWeight: '500', color: Colors.ink, paddingVertical: 6 },
-  modalUnderline: { height: 1.2, backgroundColor: 'rgba(20,16,28,0.15)', marginTop: 4 },
-  modalUnderlineRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  charCount: { fontSize: 10, color: Colors.inkFaint },
-  optionalTag: { fontSize: 10, fontWeight: '400', color: Colors.inkFaint, textTransform: 'none' },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  modalCancelBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 9999,
-    alignItems: 'center', backgroundColor: 'rgba(20,16,28,0.06)',
-  },
-  modalCancelText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
-  modalCreateBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 9999,
-    alignItems: 'center', backgroundColor: Colors.ink,
-  },
-  modalCreateText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   disabled: { opacity: 0.4 },
 });

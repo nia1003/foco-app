@@ -17,7 +17,7 @@ import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { FocusSetupModal } from '@/components/FocusSetupModal';
+import { FocusSetupSheet } from '@/components/FocusSetupSheet';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
@@ -199,8 +199,8 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Focus Setup Modal ────────────────────────────────────── */}
-      <FocusSetupModal
+      {/* ── Focus Setup Sheet ────────────────────────────────────── */}
+      <FocusSetupSheet
         visible={showModal}
         onClose={() => setShowModal(false)}
         pets={modalPets}

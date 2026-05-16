@@ -426,9 +426,13 @@ export default function StatsScreen() {
 
         {/* ── Focus type breakdown ────────────────────── */}
         <View style={styles.section}>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/disc-detail', params: { dominant } })}>
           <FrostCard radius={24} padded={false}>
             <View style={styles.breakdownCard}>
-              <Text style={styles.chartTitle}>Focus type breakdown</Text>
+              <View style={styles.chartTitleRow}>
+                <Text style={styles.chartTitle}>Focus type breakdown</Text>
+                <Text style={styles.chartTitleChevron}>›</Text>
+              </View>
 
               {/* Dominant type row */}
               <View style={styles.dominantRow}>
@@ -462,6 +466,7 @@ export default function StatsScreen() {
               </View>
             </View>
           </FrostCard>
+          </TouchableOpacity>
         </View>
 
         {/* ── Recent sessions ─────────────────────────── */}
@@ -566,7 +571,9 @@ const styles = StyleSheet.create({
 
   // Line chart card
   chartCard: { padding: 22, paddingTop: 26, overflow: 'visible' },
-  chartTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink, marginBottom: 18 },
+  chartTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink },
+  chartTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  chartTitleChevron: { fontSize: 20, color: Colors.inkFaint },
   selectedDetail: { marginTop: 10 },
   selectedDetailText: { fontSize: 12, color: Colors.inkSoft, textAlign: 'center' },
 
