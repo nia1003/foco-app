@@ -22,7 +22,7 @@ function getTintOverlay(tone: Tone, dark: boolean): string {
   const map: Record<Tone, string> = {
     clear: dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.38)',
     chrome: dark ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.60)',
-    pink: dark ? 'rgba(231,160,204,0.18)' : 'rgba(232,71,151,0.14)',
+    pink: dark ? 'rgba(242,206,220,0.22)' : 'rgba(242,206,220,0.32)',
     blue: dark ? 'rgba(148,194,218,0.18)' : 'rgba(32,63,154,0.10)',
     ink: 'rgba(20,16,28,0.72)',
   };

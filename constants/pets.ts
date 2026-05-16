@@ -44,7 +44,7 @@ export const PETS: Pet[] = [
     id: 'spike',
     name: 'Spike',
     trait: 'Bold & spiky',
-    accent: '#e84797',
+    accent: '#F2CEDC',
     image: require('../assets/pets/spike.png'),
   },
 ];

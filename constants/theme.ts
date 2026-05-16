@@ -6,7 +6,8 @@
 export const Colors = {
   // Brand palette
   beige: '#EFE8E0',
-  pinkHot: '#E84797',
+  pinkHot: '#F2CEDC',
+  pinkText: '#b5607a',
   pinkSoft: '#E7A0CC',
   blueDeep: '#203F9A',
   blueSoft: '#94C2DA',

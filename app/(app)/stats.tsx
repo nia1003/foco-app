@@ -21,7 +21,7 @@ const activePet = PETS[0];
 // DISC 顏色對照
 const DISC_COLOR: Record<string, string> = {
   conscientiousness: '#4A90E2',
-  dominance: Colors.pinkHot,
+  dominance: Colors.pinkText,
   steadiness: '#5BAD6F',
   influence: '#F5A623',
 };
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   },
   tooltipText: { fontSize: 10, color: '#fff', fontWeight: '600' },
   barBg: { width: '100%', height: 80, justifyContent: 'flex-end', borderRadius: 6, backgroundColor: 'rgba(20,16,28,0.06)' },
-  barFill: { width: '100%', borderRadius: 6, backgroundColor: 'rgba(232,71,151,0.35)' },
+  barFill: { width: '100%', borderRadius: 6, backgroundColor: 'rgba(242,206,220,0.60)' },
   barFillActive: { backgroundColor: Colors.pinkHot },
   barDay: { fontSize: 11, color: Colors.inkFaint, fontWeight: '500' },
   barDayActive: { color: Colors.ink, fontWeight: '700' },
@@ -324,9 +324,9 @@ const styles = StyleSheet.create({
   sessionInfo: { flex: 1 },
   sessionTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink, textTransform: 'capitalize' },
   sessionSub: { fontSize: 11, color: Colors.inkSoft, marginTop: 2 },
-  sessionBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9999, backgroundColor: 'rgba(232,71,151,0.12)' },
+  sessionBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9999, backgroundColor: 'rgba(242,206,220,0.50)' },
   sessionBadgeInactive: { backgroundColor: 'rgba(20,16,28,0.06)' },
-  sessionBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.pinkHot },
+  sessionBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.pinkText },
   sessionBadgeTextInactive: { color: Colors.inkFaint },
   insightCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, padding: 18 },
   insightPet: { width: 44, height: 44 },

@@ -190,11 +190,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   durationChipActive: {
-    backgroundColor: 'rgba(232,71,151,0.10)',
+    backgroundColor: 'rgba(242,206,220,0.40)',
     borderColor: Colors.pinkHot,
   },
   durationChipText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
-  durationChipTextActive: { color: Colors.pinkHot },
+  durationChipTextActive: { color: Colors.pinkText },
   startBtn: {
     paddingVertical: 14, borderRadius: 9999,
     backgroundColor: Colors.ink, alignItems: 'center',
@@ -205,5 +205,5 @@ const styles = StyleSheet.create({
   missionEmoji: { fontSize: 28 },
   missionTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
   missionSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 2 },
-  missionCta: { fontSize: 14, fontWeight: '600', color: Colors.pinkHot },
+  missionCta: { fontSize: 14, fontWeight: '600', color: Colors.pinkText },
 });

@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   xpItemLabel: { fontSize: 13, color: Colors.inkSoft },
   xpItemValue: { fontSize: 13, fontWeight: '600', color: Colors.ink },
-  negative: { color: Colors.pinkHot },
+  negative: { color: Colors.pinkText },
   actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   actionBtn: {
     flex: 1,

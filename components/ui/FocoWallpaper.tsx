@@ -79,7 +79,7 @@ export function FocoWallpaper({ dark = false }: FocoWallpaperProps) {
           cx={-20}
           cy={H + 30}
           r={180}
-          fill="rgba(232,71,151,0.38)"
+          fill="rgba(242,206,220,0.60)"
           filter="url(#f3)"
         />
 

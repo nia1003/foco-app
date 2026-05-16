@@ -110,8 +110,8 @@ export function TabBar({ dark = false }: TabBarProps) {
               ? pathname === '/home' || pathname.endsWith('/home')
               : pathname.includes(tab.id);
           const color = isActive ? fg : muted;
-          const activeBg = dark ? 'rgba(255,255,255,0.16)' : 'rgba(232,71,151,0.18)';
-          const activeBorder = dark ? 'rgba(255,255,255,0.18)' : 'rgba(232,71,151,0.28)';
+          const activeBg = dark ? 'rgba(255,255,255,0.16)' : 'rgba(242,206,220,0.55)';
+          const activeBorder = dark ? 'rgba(255,255,255,0.18)' : 'rgba(181,96,122,0.20)';
 
           return (
             <TouchableOpacity
