@@ -1,12 +1,14 @@
 /**
  * HomeScreen — daily dashboard hub
- * - 寵物排只提供點擊查看詳情，不影響 Focus 區
- * - FocusLauncher 是獨立 memo component，擁有自己的 selectedDuration state
- *   → 選時長不會觸發寵物列 re-render / 3D 動畫重置
+ * - Pet carousel: tap for detail view
+ * - START FOCUS button → bottom-sheet modal to pick pet / duration / mission
  */
-import React, { memo, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,9 +25,9 @@ import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { getPets } from '@/services/focoService';
-import { mockPets } from '@/data/mockData';
-import type { FocoPet } from '@/types';
+import { getPets, getTasks } from '@/services/focoService';
+import { mockPets, mockTasks } from '@/data/mockData';
+import type { FocoPet, Task } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PET_CARD_W = Math.round(SCREEN_W * 0.58);
@@ -33,6 +35,9 @@ const PET_CARD_W = Math.round(SCREEN_W * 0.58);
 const DURATION_OPTIONS = [15, 25, 50, 90];
 const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const PINK      = '#F2CEDC';
+const PINK_TEXT = '#b5607a';
 
 function mergeWithMock(real: FocoPet[]): FocoPet[] {
   return mockPets.map((mock) => {
@@ -43,87 +48,70 @@ function mergeWithMock(real: FocoPet[]): FocoPet[] {
   });
 }
 
-// ── Focus Launcher（獨立 memo — selectedDuration 改變時只有這裡 re-render）──
-const FocusLauncher = memo(function FocusLauncher() {
-  const router = useRouter();
-  const { play } = useSound();
-  const [selectedDuration, setSelectedDuration] = useState(25);
-
-  return (
-    <View style={styles.section}>
-      <FrostCard radius={28} padded={false}>
-        <View style={styles.focusCard}>
-          <Text style={styles.eyebrow}>START FOCUS</Text>
-          <Text style={styles.focusTitle}>How long?</Text>
-
-          <View style={styles.durationRow}>
-            {DURATION_OPTIONS.map((min) => (
-              <TouchableOpacity
-                key={min}
-                style={[
-                  styles.durationChip,
-                  selectedDuration === min && styles.durationChipActive,
-                ]}
-                onPress={() => {
-                  play('tap');
-                  setSelectedDuration(min);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.durationChipText,
-                    selectedDuration === min && styles.durationChipTextActive,
-                  ]}
-                >
-                  {min}m
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <TouchableOpacity
-            style={styles.startBtn}
-            onPress={() => {
-              play('transition_up');
-              router.push({
-                pathname: '/(app)/focus',
-                params: { durationMin: String(selectedDuration) },
-              });
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.startBtnText}>START FOCUS →</Text>
-          </TouchableOpacity>
-        </View>
-      </FrostCard>
-    </View>
-  );
-});
-
-// ── Main Screen ──────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
   const { userId, userName, userEmail } = useAuthStore();
-  const { pets, setPets, restoreActivePet } = usePetStore();
+  const { pets, activePet, setPets, setActivePet, restoreActivePet } = usePetStore();
+  const { play } = useSound();
 
   const displayPets: FocoPet[] = pets.length > 0 ? mergeWithMock(pets) : mockPets;
+
+  // ── Focus setup modal state ──────────────────────────────────────
+  const [showModal, setShowModal]           = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState(25);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [modalPetId, setModalPetId]         = useState<string | null>(null);
+  const [modalTasks, setModalTasks]         = useState<Task[]>([]);
 
   useEffect(() => {
     if (!userId) return;
     getPets(userId)
-      .then((fetched) => {
-        setPets(fetched);
-        restoreActivePet();
-      })
+      .then((fetched) => { setPets(fetched); restoreActivePet(); })
       .catch(() => setPets(mockPets));
   }, [userId]);
+
+  // Open modal: set defaults, lazily fetch tasks
+  const openModal = async () => {
+    const defaultPet = activePet?.id ?? pets[0]?.id ?? null;
+    setModalPetId(defaultPet);
+    setSelectedTaskId(null);
+    setShowModal(true);
+
+    if (userId && modalTasks.length === 0) {
+      try {
+        const res = await getTasks(userId);
+        setModalTasks(res.tasks.filter((t: Task) => t.status === 'pending'));
+      } catch {
+        setModalTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
+      }
+    } else if (!userId && modalTasks.length === 0) {
+      setModalTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
+    }
+  };
+
+  const handleStartFocus = async () => {
+    if (modalPetId && modalPetId !== activePet?.id) {
+      await setActivePet(modalPetId);
+    }
+    setShowModal(false);
+    play('transition_up');
+    router.push({
+      pathname: '/(app)/focus',
+      params: {
+        durationMin: String(selectedDuration),
+        ...(selectedTaskId ? { taskId: selectedTaskId } : {}),
+      },
+    });
+  };
 
   const now = new Date();
   const dateStr   = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
   const hour      = now.getHours();
   const timeGreet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'there';
+
+  // Pets available in modal (real pets only; fall back to first mock if none)
+  const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
 
   return (
     <View style={styles.root}>
@@ -141,7 +129,7 @@ export default function HomeScreen() {
           <Text style={styles.greet}>{timeGreet},{'\n'}{displayName}.</Text>
         </View>
 
-        {/* ── Pet Selector（只看，不選）──────────────── */}
+        {/* ── Pet Carousel (view only) ─────────────── */}
         <View style={styles.selectorSection}>
           <View style={styles.selectorHeader}>
             <Text style={styles.selectorEyebrow}>今天的夥伴</Text>
@@ -172,33 +160,18 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={p.id}
                   style={[styles.petCard, { width: PET_CARD_W }]}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(app)/pet-info',
-                      params: { petId: def.id },
-                    })
-                  }
+                  onPress={() => router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } })}
                   activeOpacity={0.88}
                 >
                   <View style={styles.petPreview}>
                     <PetRenderer pet={def} size={150} interactive={false} />
                   </View>
-
                   <Text style={styles.petCardName}>{def.name}</Text>
                   <View style={[styles.levelPill, { backgroundColor: def.accent + '22' }]}>
                     <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
                   </View>
-
                   <View style={styles.xpBarBg}>
-                    <View
-                      style={[
-                        styles.xpBarFill,
-                        {
-                          width: `${Math.min(xpPct * 100, 100)}%` as any,
-                          backgroundColor: def.accent,
-                        },
-                      ]}
-                    />
+                    <View style={[styles.xpBarFill, { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent }]} />
                   </View>
                   <Text style={styles.xpText}>{p.xp} / {p.xp_next_level} XP</Text>
                 </TouchableOpacity>
@@ -209,9 +182,112 @@ export default function HomeScreen() {
           <Text style={styles.selectorHint}>點擊查看詳情</Text>
         </View>
 
-        {/* ── Focus Launcher（memo，狀態獨立）──────────── */}
-        <FocusLauncher />
+        {/* ── START FOCUS button ───────────────────── */}
+        <View style={styles.section}>
+          <FrostCard radius={28} padded={false}>
+            <TouchableOpacity
+              style={styles.startFocusBtn}
+              onPress={() => { play('tap'); openModal(); }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.startFocusEyebrow}>準備好了嗎？</Text>
+              <Text style={styles.startFocusLabel}>START FOCUS →</Text>
+            </TouchableOpacity>
+          </FrostCard>
+        </View>
       </ScrollView>
+
+      {/* ── Focus Setup Modal ────────────────────────────────────── */}
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalKav}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowModal(false)} />
+
+          <View style={styles.modalSheet}>
+            <FrostCard radius={28}>
+              <Text style={styles.modalTitle}>Start a Focus Session</Text>
+
+              {/* ── Pet ── */}
+              <Text style={styles.modalLabel}>COMPANION</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.petChipRow}>
+                {modalPets.map((p) => {
+                  const def = PETS.find((d) => d.id === p.name.toLowerCase()) ?? PETS[0];
+                  const active = modalPetId === p.id;
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[styles.petChip, active && { borderColor: def.accent, backgroundColor: def.accent + '18' }]}
+                      onPress={() => { play('tap'); setModalPetId(p.id); }}
+                      activeOpacity={0.8}
+                    >
+                      <PetRenderer pet={def} size={52} interactive={false} />
+                      <Text style={[styles.petChipName, active && { color: def.accent, fontWeight: '700' }]}>
+                        {def.name}
+                      </Text>
+                      {active && <View style={[styles.petChipDot, { backgroundColor: def.accent }]} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* ── Duration ── */}
+              <Text style={[styles.modalLabel, { marginTop: 20 }]}>DURATION</Text>
+              <View style={styles.durationRow}>
+                {DURATION_OPTIONS.map((min) => (
+                  <TouchableOpacity
+                    key={min}
+                    style={[styles.durationChip, selectedDuration === min && styles.durationChipActive]}
+                    onPress={() => { play('tap'); setSelectedDuration(min); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.durationChipText, selectedDuration === min && styles.durationChipTextActive]}>
+                      {min}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* ── Mission ── */}
+              <Text style={[styles.modalLabel, { marginTop: 20 }]}>
+                MISSION <Text style={styles.optionalTag}>(optional)</Text>
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskChipRow}>
+                {/* "No mission" chip */}
+                <TouchableOpacity
+                  style={[styles.taskChip, !selectedTaskId && styles.taskChipActive]}
+                  onPress={() => { play('tap'); setSelectedTaskId(null); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.taskChipText, !selectedTaskId && styles.taskChipTextActive]}>No mission</Text>
+                </TouchableOpacity>
+
+                {modalTasks.map((t) => {
+                  const active = selectedTaskId === t.id;
+                  return (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={[styles.taskChip, active && styles.taskChipActive]}
+                      onPress={() => { play('tap'); setSelectedTaskId(t.id); }}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.taskChipText, active && styles.taskChipTextActive]} numberOfLines={1}>
+                        {t.emoji ? `${t.emoji} ` : ''}{t.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* ── Start button ── */}
+              <TouchableOpacity style={styles.modalStartBtn} onPress={handleStartFocus} activeOpacity={0.85}>
+                <Text style={styles.modalStartText}>START FOCUS →</Text>
+              </TouchableOpacity>
+            </FrostCard>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -225,127 +301,106 @@ const styles = StyleSheet.create({
   date: { fontSize: 13, color: Colors.inkSoft },
   greet: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 32,
-    fontWeight: '500',
-    color: Colors.ink,
-    marginTop: 4,
-    letterSpacing: -0.4,
-    lineHeight: 38,
+    fontSize: 32, fontWeight: '500',
+    color: Colors.ink, marginTop: 4,
+    letterSpacing: -0.4, lineHeight: 38,
   },
 
   selectorSection: { marginTop: 20 },
   selectorHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+    flexDirection: 'row', alignItems: 'baseline',
     justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    marginBottom: 12,
+    paddingHorizontal: 22, marginBottom: 12,
   },
   selectorEyebrow: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.inkFaint,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
+    fontSize: 11, fontWeight: '700',
+    color: Colors.inkFaint, letterSpacing: 1.4, textTransform: 'uppercase',
   },
-  selectorAll: { fontSize: 13, fontWeight: '600', color: Colors.pinkText },
+  selectorAll: { fontSize: 13, fontWeight: '600', color: PINK_TEXT },
   selectorHint: {
-    fontSize: 11,
-    color: Colors.inkFaint,
-    textAlign: 'center',
-    marginTop: 10,
-    letterSpacing: 0.3,
+    fontSize: 11, color: Colors.inkFaint,
+    textAlign: 'center', marginTop: 10, letterSpacing: 0.3,
   },
 
   petRow: { paddingHorizontal: 22, gap: 12 },
-
   petCard: {
-    borderRadius: 26,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 12,
-    alignItems: 'center',
-    overflow: 'visible',
+    borderRadius: 26, paddingHorizontal: 12,
+    paddingTop: 8, paddingBottom: 12,
+    alignItems: 'center', overflow: 'visible',
   },
-
-  petPreview: {
-    width: 150,
-    height: 150,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    marginTop: 4,
-  },
-
+  petPreview: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center', marginBottom: 6, marginTop: 4 },
   petCardName: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 17,
-    fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: -0.2,
-    marginBottom: 5,
+    fontSize: 17, fontWeight: '500',
+    color: Colors.ink, letterSpacing: -0.2, marginBottom: 5,
   },
-
-  levelPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 9999,
-    marginBottom: 10,
-  },
+  levelPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999, marginBottom: 10 },
   levelPillText: { fontSize: 10, fontWeight: '700' },
-
-  xpBarBg: {
-    width: '100%',
-    height: 4,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(20,16,28,0.08)',
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
+  xpBarBg: { width: '100%', height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)', overflow: 'hidden', marginBottom: 4 },
   xpBarFill: { height: 4, borderRadius: 9999 },
   xpText: { fontSize: 9, color: Colors.inkFaint, letterSpacing: 0.2 },
 
+  // ── START FOCUS card ──
   section: { marginTop: 14, paddingHorizontal: 18 },
+  startFocusBtn: { padding: 28, alignItems: 'center', gap: 6 },
+  startFocusEyebrow: { fontSize: 11, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6 },
+  startFocusLabel: { fontSize: 20, fontWeight: '700', color: Colors.ink, letterSpacing: 2 },
 
-  focusCard: { padding: 22 },
-  eyebrow: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.inkFaint,
-    letterSpacing: 1.6,
-  },
-  focusTitle: {
+  // ── Modal ──
+  modalKav: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  modalSheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
+  modalTitle: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 28,
-    fontWeight: '500',
-    color: Colors.ink,
-    marginTop: 6,
-    marginBottom: 16,
-    letterSpacing: -0.3,
+    fontSize: 22, fontWeight: '500',
+    color: Colors.ink, marginBottom: 20,
   },
+  modalLabel: {
+    fontSize: 11, fontWeight: '700',
+    color: Colors.inkFaint, letterSpacing: 1.2,
+    textTransform: 'uppercase', marginBottom: 10,
+  },
+  optionalTag: { fontSize: 10, fontWeight: '400', color: Colors.inkFaint, textTransform: 'none' },
 
-  durationRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  // Pet chips
+  petChipRow: { flexDirection: 'row', gap: 10, paddingBottom: 4 },
+  petChip: {
+    alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 20, borderWidth: 1.5, borderColor: 'transparent',
+    backgroundColor: 'rgba(20,16,28,0.04)', gap: 4, minWidth: 76, position: 'relative',
+  },
+  petChipName: { fontSize: 11, color: Colors.inkSoft, letterSpacing: 0.2 },
+  petChipDot: { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3 },
+
+  // Duration chips
+  durationRow: { flexDirection: 'row', gap: 8 },
   durationChip: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9999,
+    flex: 1, paddingVertical: 10, borderRadius: 9999,
     backgroundColor: 'rgba(20,16,28,0.06)',
-    borderWidth: 1,
-    borderColor: 'transparent',
-    alignItems: 'center',
+    borderWidth: 1, borderColor: 'transparent', alignItems: 'center',
   },
-  durationChipActive: {
-    backgroundColor: 'rgba(242,206,220,0.40)',
-    borderColor: Colors.pinkHot,
-  },
+  durationChipActive: { backgroundColor: 'rgba(242,206,220,0.40)', borderColor: PINK_TEXT },
   durationChipText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
-  durationChipTextActive: { color: Colors.pinkText },
+  durationChipTextActive: { color: PINK_TEXT },
 
-  startBtn: {
-    paddingVertical: 14,
+  // Task chips
+  taskChipRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
+  taskChip: {
+    paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 9999,
-    backgroundColor: Colors.ink,
-    alignItems: 'center',
+    backgroundColor: 'rgba(20,16,28,0.05)',
+    borderWidth: 1, borderColor: 'transparent',
   },
-  startBtnText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 2 },
+  taskChipActive: { backgroundColor: PINK, borderColor: PINK_TEXT },
+  taskChipText: { fontSize: 13, fontWeight: '500', color: Colors.inkSoft, maxWidth: 200 },
+  taskChipTextActive: { color: PINK_TEXT, fontWeight: '600' },
+
+  // Start button
+  modalStartBtn: {
+    marginTop: 24, paddingVertical: 16, borderRadius: 9999,
+    backgroundColor: Colors.ink, alignItems: 'center',
+    shadowColor: Colors.ink, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18, shadowRadius: 24, elevation: 6,
+  },
+  modalStartText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 2.5 },
 });
