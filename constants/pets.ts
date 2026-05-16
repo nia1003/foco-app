@@ -7,6 +7,7 @@ import type { ComponentType } from 'react';
 import { XingWangPet3D } from '@/components/pets/XingWangPet3D';
 import { LilyPet3D } from '@/components/pets/LilyPet3D';
 import { FluffPet3D } from '@/components/pets/FluffPet3D';
+import { StayPet3D } from '@/components/pets/StayPet3D';
 
 export interface Pet {
   id: string;
@@ -50,5 +51,13 @@ export const PETS: Pet[] = [
     accent: '#4ecdc4',
     image: require('../assets/pets/fluff.png'),
     CustomComponent: FluffPet3D,
+  },
+  {
+    id: 'stay',
+    name: 'Stay',
+    trait: 'Calm & starry',
+    accent: '#C4A8E8',
+    image: require('../assets/pets/fluff.png'),
+    CustomComponent: StayPet3D,
   },
 ];
