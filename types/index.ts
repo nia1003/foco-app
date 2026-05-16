@@ -185,6 +185,7 @@ export interface SessionResult {
   started_at?: string;         // ISO string — 用於時間段顯示
   ended_at?: string;           // ISO string — Edge Function 回傳
   events?: SessionEvent[];     // 個別事件 — 用於時間軸視覺化
+  old_xp?: number;             // 本次 session 前的 XP（用於進度條起始位置）
 }
 
 // 單次事件紀錄（在 useTimer 內部累積）

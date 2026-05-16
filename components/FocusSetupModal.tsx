@@ -68,11 +68,13 @@ export function FocusSetupModal({
     }
     onClose();
     play('transition_up');
+    const selectedTask = tasks.find((t) => t.id === selectedTaskId);
     router.push({
       pathname: '/(app)/focus',
       params: {
         durationMin: String(selectedDuration),
         ...(selectedTaskId ? { taskId: selectedTaskId } : {}),
+        ...(selectedTask?.title ? { taskTitle: selectedTask.title } : {}),
       },
     });
   };

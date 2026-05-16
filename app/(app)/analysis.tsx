@@ -307,8 +307,6 @@ export default function AnalysisScreen() {
               <StatCell label="時長" value={formatDuration(duration)} accent={cfg.accent} />
               <View style={[styles.statDivider, { backgroundColor: cfg.accentLight }]} />
               <StatCell label="暫停" value={`${pauses} 次`} accent={cfg.accent} />
-              <View style={[styles.statDivider, { backgroundColor: cfg.accentLight }]} />
-              <StatCell label="獲得 XP" value={`+${xpGained}`} accent={cfg.accent} />
             </View>
 
             {/* 描述文字 */}

@@ -1,6 +1,6 @@
 /**
- * RewardScreen — Session 結束後的 XP 獎勵頁面
- * 顯示：+XP 動畫、XP bar、升級動畫 → 查看報告 or 回首頁
+ * RewardScreen — Session 結束後的寵物進度頁面
+ * 顯示：寵物等級進度條從舊值→新值的動畫、升級提示 → 查看報告 or 回首頁
  */
 import React, { useEffect, useRef } from 'react';
 import {
@@ -25,38 +25,33 @@ export default function RewardScreen() {
   const { applySessionResult } = usePetStore();
   const { play } = useSound();
 
-  // ── 動畫 refs ────────────────────────────────
-  const xpScaleAnim = useRef(new Animated.Value(0)).current;
-  const xpBarAnim = useRef(new Animated.Value(0)).current;
-  const levelUpAnim = useRef(new Animated.Value(0)).current;
-  const cardFadeAnim = useRef(new Animated.Value(0)).current;
-
-  const xpFraction = result.xp_next_level
+  const oldXpFraction = result.xp_next_level
+    ? (result.old_xp ?? 0) / result.xp_next_level
+    : 0;
+  const newXpFraction = result.xp_next_level
     ? result.new_xp / result.xp_next_level
     : 0;
 
+  // ── 動畫 refs ────────────────────────────────
+  const xpBarAnim = useRef(new Animated.Value(oldXpFraction)).current;
+  const levelUpAnim = useRef(new Animated.Value(0)).current;
+  const cardFadeAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    // 1. 更新 pet store（傳入 petId 讓 store 更新正確的寵物）
+    // 1. 更新 pet store
     if (result.pet_id && result.new_xp !== undefined) {
       applySessionResult(result.pet_id, result.new_xp, result.new_level, result.xp_next_level);
     }
 
     // 2. 進場動畫序列
     Animated.sequence([
-      // Card fade in
       Animated.timing(cardFadeAnim, {
         toValue: 1, duration: 300, useNativeDriver: true,
       }),
-      // +XP 數字彈出
-      Animated.spring(xpScaleAnim, {
-        toValue: 1, tension: 60, friction: 6, useNativeDriver: true,
-      }),
-      // XP bar 填充
       Animated.timing(xpBarAnim, {
-        toValue: xpFraction, duration: 800, useNativeDriver: false,
+        toValue: newXpFraction, duration: 900, useNativeDriver: false,
       }),
     ]).start(() => {
-      // 升級動畫（如果有升級）
       if (result.level_up) {
         Animated.spring(levelUpAnim, {
           toValue: 1, tension: 50, friction: 5, useNativeDriver: true,
@@ -75,34 +70,23 @@ export default function RewardScreen() {
       <AppBackground />
 
       <Animated.View style={[styles.content, { opacity: cardFadeAnim }]}>
-        {/* +XP 大字 */}
-        <Animated.Text
-          style={[
-            styles.xpBadge,
-            { transform: [{ scale: xpScaleAnim }] },
-          ]}
-        >
-          +{result.xp_gained ?? 0} XP
-        </Animated.Text>
-
         {/* 升級提示 */}
         {result.level_up && (
           <Animated.View
             style={[styles.levelUpBadge, { opacity: levelUpAnim, transform: [{ scale: levelUpAnim }] }]}
           >
-            <Text style={styles.levelUpText}>🎉 Level Up! Lv.{result.new_level}</Text>
+            <Text style={styles.levelUpText}>🎉 Level Up!</Text>
           </Animated.View>
         )}
 
-        {/* XP 進度卡 */}
+        {/* 寵物進度卡 */}
         <FrostCard radius={24}>
-          <Text style={styles.progressLabel}>
-            XP {result.new_xp} / {result.xp_next_level}
-          </Text>
+          <View style={styles.levelRow}>
+            <Text style={styles.levelLabel}>Lv.{result.new_level}</Text>
+          </View>
           <View style={styles.xpBarBg}>
             <Animated.View style={[styles.xpBarFill, { width: xpBarWidth }]} />
           </View>
-          <Text style={styles.levelText}>Lv.{result.new_level}</Text>
         </FrostCard>
 
         {/* 按鈕 */}
@@ -140,13 +124,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 20,
   },
-  xpBadge: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 64,
-    fontWeight: '500',
-    color: Colors.pinkText,
-    letterSpacing: -1,
-  },
   levelUpBadge: {
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -160,11 +137,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.pinkText,
   },
-  progressLabel: {
+  levelRow: {
+    marginBottom: 10,
+  },
+  levelLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: Colors.inkSoft,
-    marginBottom: 10,
   },
   xpBarBg: {
     height: 8,
@@ -176,13 +155,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 9999,
     backgroundColor: Colors.pinkHot,
-  },
-  levelText: {
-    fontSize: 12,
-    color: Colors.inkFaint,
-    marginTop: 8,
-    textAlign: 'right',
-    letterSpacing: 0.5,
   },
   actions: { width: '100%', gap: 10, marginTop: 8 },
   primaryBtn: {
