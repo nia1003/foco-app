@@ -28,8 +28,8 @@ import { mockPets } from '@/data/mockData';
 const { height: SCREEN_H } = Dimensions.get('window');
 
 // Sheet geometry
-const PEEK_H   = 148;              // visible when collapsed (handle + name + level)
-const SHEET_H  = SCREEN_H * 0.70; // height when fully expanded
+const PEEK_H   = 200;              // visible when collapsed: handle + name + level + XP bar top edge
+const SHEET_H  = SCREEN_H * 0.72; // height when fully expanded
 const MAX_DRAG = SHEET_H - PEEK_H; // translateY range
 
 // Level metadata
@@ -49,7 +49,16 @@ export default function PetInfoScreen() {
 
   // When the store is empty (backend not yet loaded), fall back to mockPets as the search pool
   const searchPool = pets.length > 0 ? pets : mockPets;
-  // Find the specific pet by Supabase UUID or lowercase name (e.g. 'xingwang', 'lily')
+
+  // petDef (visual definition): petId param is the PETS constant id ('xingwang'/'lily')
+  // — use it directly first, so collection→pet-info always shows the right 3D model + name
+  const petDef =
+    (petId ? PETS.find((p) => p.id === petId) : null) ??
+    PETS.find((p) => p.id === (activePet?.name ?? '').toLowerCase()) ??
+    PETS.find((p) => p.id === 'xingwang') ??
+    PETS[0];
+
+  // FocoPet (XP / level data): find by UUID or by name matching the petDef
   const pet =
     (petId ? searchPool.find((p) => p.id === petId || p.name.toLowerCase() === petId) : null) ??
     activePet ??
@@ -58,11 +67,6 @@ export default function PetInfoScreen() {
   const level = Math.min(Math.max(pet.level, 1), 5) as 1 | 2 | 3 | 4 | 5;
   const info = LEVEL_INFO[level];
   const xpProgress = pet.xp_next_level > 0 ? pet.xp / pet.xp_next_level : 1;
-
-  const petDef =
-    PETS.find((p) => p.id === pet.name.toLowerCase()) ??
-    PETS.find((p) => p.id === 'xingwang') ??
-    PETS[0];
 
   // ── Bottom sheet animation ───────────────────
   const sheetY = useRef(new Animated.Value(MAX_DRAG)).current;
@@ -133,7 +137,7 @@ export default function PetInfoScreen() {
 
         {/* Always-visible: name + level */}
         <View style={styles.peekSection}>
-          <Text style={styles.petName}>{pet.name}</Text>
+          <Text style={styles.petName}>{petDef.name}</Text>
           <View style={styles.levelBadge}>
             <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
           </View>

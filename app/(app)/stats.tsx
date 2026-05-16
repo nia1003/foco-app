@@ -4,19 +4,19 @@
  * 資料來源：focoService.getSessions()，後端未好時 fallback mockSessions
  */
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
+import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
+import { usePetStore } from '@/stores/petStore';
 import { getSessions } from '@/services/focoService';
 import { mockSessions } from '@/data/mockData';
 import type { SessionRecord } from '@/types';
-
-const activePet = PETS[0];
 
 // DISC 顏色對照
 const DISC_COLOR: Record<string, string> = {
@@ -92,6 +92,10 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export default function StatsScreen() {
   const router = useRouter();
   const { userId } = useAuthStore();
+  const { activePet } = usePetStore();
+  const activePetDef =
+    (activePet ? PETS.find((p) => p.id === activePet.name.toLowerCase()) : null) ??
+    PETS[0];
 
   const [sessions, setSessions] = useState<SessionRecord[]>(mockSessions.sessions);
   const [summary, setSummary] = useState(mockSessions.summary);
@@ -265,7 +269,7 @@ export default function StatsScreen() {
         <View style={styles.section}>
           <FrostCard radius={24} padded={false}>
             <View style={styles.insightCard}>
-              <Image source={activePet.image} style={styles.insightPet} resizeMode="contain" />
+              <PetRenderer pet={activePetDef} size={60} interactive={false} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.insightTitle}>Your pet says</Text>
                 <Text style={styles.insightText}>
@@ -329,7 +333,7 @@ const styles = StyleSheet.create({
   sessionBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.pinkText },
   sessionBadgeTextInactive: { color: Colors.inkFaint },
   insightCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, padding: 18 },
-  insightPet: { width: 44, height: 44 },
+  insightPet: { width: 60, height: 60 },
   insightTitle: { fontSize: 13, fontWeight: '700', color: Colors.ink, marginBottom: 4 },
   insightText: { fontSize: 13, color: Colors.inkSoft, lineHeight: 18 },
 });
