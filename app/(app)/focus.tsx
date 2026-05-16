@@ -7,7 +7,6 @@
  */
 import React, { useEffect, useRef } from 'react';
 import {
-  Alert,
   Animated,
   Modal,
   StyleSheet,
@@ -35,7 +34,7 @@ export default function FocusScreen() {
     taskId?: string;
   }>();
   const { userId } = useAuthStore();
-  const { activePet: storePet, pets, setActivePet } = usePetStore();
+  const { activePet: storePet } = usePetStore();
   const durationSeconds = Number(durationMin) * 60;
 
   // Resolve active pet definition (for 3D render)
@@ -47,7 +46,9 @@ export default function FocusScreen() {
 
   const { play, playToggle } = useSound();
   const [showQuitModal, setShowQuitModal] = React.useState(false);
-  const [submitting, setSubmitting] = React.useState(false);
+
+  // Use a ref so handleEnd always reads the latest value and stale closures can't freeze the screen
+  const submittingRef = useRef(false);
 
   const floatAnim  = useRef(new Animated.Value(0)).current;
   const scaleAnim  = useRef(new Animated.Value(1)).current;
@@ -86,8 +87,8 @@ export default function FocusScreen() {
 
   // ── Session complete ──────────────────────────
   const handleEnd = async (earlyStop: boolean) => {
-    if (submitting) return;
-    setSubmitting(true);
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     const snap = getSnapshot();
     const now = Date.now();
@@ -130,6 +131,9 @@ export default function FocusScreen() {
         pathname: '/(app)/reward',
         params: { result: JSON.stringify({ ...mockSessionResult, ...localStats }) },
       });
+    } finally {
+      // Reset so the user can retry if navigation somehow fails
+      submittingRef.current = false;
     }
   };
 
@@ -138,43 +142,13 @@ export default function FocusScreen() {
       <AppBackground />
 
       <View style={styles.content}>
-        {/* Header */}
+        {/* Header — title only */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7}>
-            <Text style={styles.headerBtnText}>+ Task</Text>
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Flow State · {durationMin}m</Text>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={() => { play('tap'); setShowQuitModal(true); }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.headerBtnText}>✕</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Pet + timer */}
         <View style={styles.petArea}>
-          {/* Compact pet switcher — only shown when user has > 1 pet */}
-          {pets.length > 1 && (
-            <View style={styles.petSwitcherRow}>
-              {pets.map((p) => {
-                const def = PETS.find((d) => d.id === p.name.toLowerCase()) ?? PETS[0];
-                const isActive = p.id === storePet?.id;
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={[styles.petSwitchChip, isActive && { borderColor: def.accent, borderWidth: 2 }]}
-                    onPress={() => { play('tap'); setActivePet(p.id); }}
-                    activeOpacity={0.75}
-                  >
-                    <PetRenderer pet={def} size={44} interactive={false} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
           {/* Floating pet */}
           <Animated.View
             style={{
@@ -194,18 +168,9 @@ export default function FocusScreen() {
               {paused ? 'PAUSED' : 'FLOW STATE'}
             </Text>
           </View>
-
-          {/* Exit pill */}
-          <TouchableOpacity
-            style={styles.exitPill}
-            onPress={() => { play('tap'); setShowQuitModal(true); }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.exitText}>Exit flowstate</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Controls */}
+        {/* Controls: Quit | Pause/Resume | Done */}
         <View style={styles.controls}>
           <TouchableOpacity
             style={styles.controlBtn}
@@ -218,7 +183,10 @@ export default function FocusScreen() {
 
           <TouchableOpacity
             style={[styles.mainBtn, paused && styles.mainBtnPaused]}
-            onPress={() => { playToggle(!paused); paused ? resume() : pause(); }}
+            onPress={() => {
+              playToggle(paused); // paused→resume: toggle_on; running→pause: toggle_off
+              paused ? resume() : pause();
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.mainBtnText}>{paused ? '▶ Resume' : '⏸ Pause'}</Text>
@@ -274,22 +242,11 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingBottom: 90 },
 
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 22,
     paddingTop: 60,
     paddingBottom: 10,
   },
-  headerBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(20,16,28,0.08)',
-  },
-  headerBtnText: { fontSize: 14, color: Colors.inkSoft },
   headerTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
 
   // Pet area
@@ -298,25 +255,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 20,
-  },
-
-  // Pet switcher (compact row, only shows when >1 pet)
-  petSwitcherRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  petSwitchChip: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.60)',
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   // Timer below pet
@@ -335,16 +273,6 @@ const styles = StyleSheet.create({
     color: Colors.inkFaint,
     letterSpacing: 2.5,
   },
-
-  exitPill: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(20,16,28,0.08)',
-  },
-  exitText: { fontSize: 13, color: Colors.inkSoft, letterSpacing: 0.3 },
 
   // Controls
   controls: {

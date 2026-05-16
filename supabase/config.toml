@@ -41,6 +41,7 @@ enable_anonymous_sign_ins = false
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+otp_length = 6
 
 [functions.session-complete]
 verify_jwt = true
