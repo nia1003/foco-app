@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
@@ -43,6 +44,7 @@ const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }>
 export default function PetInfoScreen() {
   const router = useRouter();
   const { pet: storePet } = usePetStore();
+  const insets = useSafeAreaInsets();
   const pet = storePet ?? mockPet;
 
   const level = Math.min(Math.max(pet.level, 1), 5) as 1 | 2 | 3 | 4 | 5;
@@ -96,8 +98,8 @@ export default function PetInfoScreen() {
         <FocoBar back />
       </View>
 
-      {/* Full-screen pet (behind sheet) */}
-      <View style={styles.petBg} pointerEvents="none">
+      {/* Full-screen pet — no pointerEvents block so WebView can receive touch for 3D spin */}
+      <View style={[styles.petBg, { top: 56 + insets.top }]}>
         <View style={{ transform: [{ scale: info.scale }] }}>
           <PetRenderer pet={petDef} size={240} />
         </View>
@@ -211,10 +213,10 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
 
-  // Pet fills upper area
+  // Pet fills upper area (top is set dynamically via inline style)
   petBg: {
     position: 'absolute',
-    top: 56,
+    top: 56,   // overridden inline with 56 + insets.top
     left: 0,
     right: 0,
     bottom: PEEK_H,
