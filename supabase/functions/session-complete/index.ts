@@ -30,14 +30,22 @@ function calcQualityScore(params: {
     return Math.round(ratio * 40)
   }
 
+  // 完成度 (0–70)
   const completionRatio = plannedDuration > 0
     ? Math.min(actualDuration / plannedDuration, 1.0)
     : 1.0
   let score = Math.round(completionRatio * 70)
 
+  // 完成獎勵 (+15)
   if (completed) score += 15
+
+  // 暫停扣分：每次 -5，最多扣 20
   score -= Math.min(pauseCount * 5, 20)
+
+  // 切出 App 扣分：每次 -8，最多扣 25
   score -= Math.min(leftAppCount * 8, 25)
+
+  // 長時間切出扣分（超過 2 分鐘算嚴重分心）
   if (leftAppTotalSec > 120) score -= 10
 
   return Math.max(0, Math.min(100, score))
@@ -77,6 +85,7 @@ function calcXP(params: {
 
   if (earlyStop) return base
 
+  // quality=100 → 1.5x, quality=50 → 1.0x, quality=0 → 0.5x
   const multiplier = 0.50 + (qualityScore / 100)
   return Math.max(Math.round(base * multiplier), 1)
 }
@@ -120,6 +129,7 @@ serve(async (req) => {
     } = body
 
     const ended_at = new Date().toISOString()
+
 
     if (!user_id || !pet_id || actual_duration == null || planned_duration == null) {
       return new Response(
@@ -212,7 +222,7 @@ serve(async (req) => {
       ? LEVEL_THRESHOLDS[newLevel]
       : LEVEL_THRESHOLDS[4]
 
-    // ── 7. 回傳 ──────────────────────────────────────────────
+    // ── 7. 回傳（含 quality_score 供前端顯示）────────────────
     return new Response(
       JSON.stringify({
         session_id:    session.id,
