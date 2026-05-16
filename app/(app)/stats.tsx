@@ -28,6 +28,7 @@ import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { getSessions } from '@/services/focoService';
 import { mockSessions } from '@/data/mockData';
+import { useSound } from '@/components/SoundProvider';
 import type { SessionRecord } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -320,6 +321,7 @@ function RadarChart({ data }: { data: Record<string, number> }) {
 export default function StatsScreen() {
   const router = useRouter();
   const { userId } = useAuthStore();
+  const { play } = useSound();
 
   const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -426,7 +428,7 @@ export default function StatsScreen() {
 
         {/* ── Focus type breakdown ────────────────────── */}
         <View style={styles.section}>
-          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push({ pathname: '/(app)/disc-detail', params: { dominant } })}>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => { play('tap'); router.push({ pathname: '/(app)/disc-detail', params: { dominant } }); }}>
           <FrostCard radius={24} padded={false}>
             <View style={styles.breakdownCard}>
               <View style={styles.chartTitleRow}>
@@ -489,7 +491,8 @@ export default function StatsScreen() {
                     <TouchableOpacity
                       key={s.id}
                       style={styles.sessionRow}
-                      onPress={() =>
+                      onPress={() => {
+                        play('tap');
                         router.push({
                           pathname: '/(app)/analysis',
                           params: {
@@ -503,8 +506,8 @@ export default function StatsScreen() {
                               task_title: taskName,
                             }),
                           },
-                        })
-                      }
+                        });
+                      }}
                       activeOpacity={0.7}
                     >
                       <View style={styles.sessionDot} />

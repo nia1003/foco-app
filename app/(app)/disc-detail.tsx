@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { Colors } from '@/constants/theme';
+import { useSound } from '@/components/SoundProvider';
 
 // ── DISC data ────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ const DISC_TYPES: DiscType[] = [
 export default function DiscDetailScreen() {
   const router = useRouter();
   const { dominant } = useLocalSearchParams<{ dominant?: string }>();
+  const { play } = useSound();
 
   return (
     <View style={styles.root}>
@@ -95,7 +97,7 @@ export default function DiscDetailScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => { play('tap'); router.back(); }} activeOpacity={0.7}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Focus Styles</Text>
