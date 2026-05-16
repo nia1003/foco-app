@@ -104,7 +104,7 @@ export function FocusSetupModal({
                     key={p.id}
                     style={[
                       styles.petChip,
-                      active && { borderColor: def.accent, backgroundColor: def.accent + '18' },
+                      active && { borderColor: def.accent, backgroundColor: 'rgba(255,255,255,0.80)' },
                     ]}
                     onPress={() => { play('tap'); setSelectedPetId(p.id); }}
                     activeOpacity={0.8}

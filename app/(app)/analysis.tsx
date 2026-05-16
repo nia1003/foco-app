@@ -178,10 +178,10 @@ function StatRow({ icon, label, value }: { icon: string; label: string; value: s
 
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 60 },
-  captureArea: { backgroundColor: Colors.softBg, paddingBottom: 4 },
+  captureArea: { backgroundColor: '#f6f4f4', paddingBottom: 4 },
   title: {
     fontFamily: 'Fraunces_500Medium',
     fontSize: 36,

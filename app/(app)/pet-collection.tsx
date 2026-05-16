@@ -107,7 +107,7 @@ export default function PetCollectionScreen() {
 const CELL_GAP = 12;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 80 },
 

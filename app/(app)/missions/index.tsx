@@ -424,7 +424,7 @@ export default function MissionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.beige },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 120 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },

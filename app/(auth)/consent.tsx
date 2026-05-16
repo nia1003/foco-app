@@ -62,7 +62,7 @@ export default function ConsentScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
   cardWrap: { marginTop: 28 },
   heading: { fontFamily: 'Fraunces_500Medium', fontSize: 26, fontWeight: '500', color: Colors.ink, letterSpacing: -0.3 },

@@ -89,7 +89,7 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   content: { flex: 1, paddingHorizontal: 22, paddingTop: 54, paddingBottom: 30 },
   hero: { alignItems: 'center', marginTop: 16 },
   wordmark: {

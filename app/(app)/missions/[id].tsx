@@ -86,7 +86,7 @@ export default function MissionScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.beige },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 60 },
   header: { marginTop: 16, paddingHorizontal: 4 },

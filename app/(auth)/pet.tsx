@@ -29,7 +29,7 @@ export default function CompanionScreen() {
 
         {/* Large preview of selected pet */}
         <View style={styles.heroWrap}>
-          <View style={[styles.heroBg, { backgroundColor: selectedPet.accent + '30' }]}>
+          <View style={styles.heroBg}>
             <Image
               source={selectedPet.image}
               style={styles.heroImage}
@@ -93,13 +93,14 @@ export default function CompanionScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
   heroWrap: { alignItems: 'center', marginTop: 12, marginBottom: 20 },
   heroBg: {
     width: 200, height: 200, borderRadius: 100,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 14,
+    backgroundColor: 'rgba(255,255,255,0.55)',
   },
   heroImage: { width: 170, height: 170 },
   heroName: {

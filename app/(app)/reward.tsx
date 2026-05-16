@@ -132,7 +132,7 @@ export default function RewardScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   content: {
     flex: 1,
     alignItems: 'center',

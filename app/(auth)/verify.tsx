@@ -122,7 +122,7 @@ export default function VerifyScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
   cardWrap: { marginTop: 8 },
   iconWrap: { alignItems: 'center', marginBottom: 16 },

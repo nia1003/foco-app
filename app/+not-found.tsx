@@ -20,7 +20,7 @@ export default function NotFound() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.beige },
+  safe: { flex: 1, backgroundColor: '#f6f4f4' },
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg, gap: Spacing.md },
   title: { fontSize: FontSize.xxl, fontWeight: '700' as const, color: Colors.ink },
   sub: { fontSize: FontSize.md, color: Colors.inkSoft },

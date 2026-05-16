@@ -215,7 +215,7 @@ export default function PetInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
 
   // FocoBar floats above
   barWrap: {
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SHEET_H,
-    backgroundColor: Colors.softBg,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     shadowColor: '#14101c',

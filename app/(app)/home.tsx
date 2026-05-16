@@ -138,7 +138,7 @@ export default function HomeScreen() {
                     <PetRenderer pet={def} size={150} interactive={false} />
                   </View>
                   <Text style={styles.petCardName}>{def.name}</Text>
-                  <View style={[styles.levelPill, { backgroundColor: def.accent + '22' }]}>
+                  <View style={styles.levelPill}>
                     <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
                   </View>
                   <View style={styles.xpBarBg}>
@@ -181,7 +181,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.softBg },
+  root: { flex: 1, backgroundColor: '#f6f4f4' },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 120 },
 
@@ -215,6 +215,8 @@ const styles = StyleSheet.create({
     borderRadius: 26, paddingHorizontal: 12,
     paddingTop: 8, paddingBottom: 12,
     alignItems: 'center', overflow: 'visible',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)',
   },
   petPreview: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center', marginBottom: 6, marginTop: 4 },
   petCardName: {
@@ -222,7 +224,7 @@ const styles = StyleSheet.create({
     fontSize: 17, fontWeight: '500',
     color: Colors.ink, letterSpacing: -0.2, marginBottom: 5,
   },
-  levelPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999, marginBottom: 10 },
+  levelPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999, marginBottom: 10, backgroundColor: 'rgba(20,16,28,0.06)' },
   levelPillText: { fontSize: 10, fontWeight: '700' },
   xpBarBg: { width: '100%', height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)', overflow: 'hidden', marginBottom: 4 },
   xpBarFill: { height: 4, borderRadius: 9999 },
