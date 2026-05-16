@@ -31,6 +31,30 @@ export const authService = {
     return data;
   },
 
+  /**
+   * 發送 OTP 驗證碼到 email（新用戶註冊用）
+   */
+  sendOtp: async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
+    if (error) throw error;
+  },
+
+  /**
+   * 驗證 OTP 碼
+   */
+  verifyOtp: async (email: string, token: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+    if (error) throw error;
+    return data;
+  },
+
   /** 登出 */
   logout: async () => {
     const { error } = await supabase.auth.signOut();

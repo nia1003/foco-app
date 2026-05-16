@@ -1,40 +1,37 @@
 /**
- * DoneScreen — Onboarding complete celebration.
- * iOS 26: SoftWallpaper, pet emoji, sparkles, pink halo, CTA.
+ * DoneScreen — Onboarding complete.
  */
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
+import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
-import { PETS } from '@/constants/pets';
 
 export default function DoneScreen() {
   const router = useRouter();
-  const { petId } = useLocalSearchParams<{ petId?: string }>();
-  const activePet = PETS.find((p) => p.id === petId) ?? PETS[0];
 
   return (
     <View style={styles.root}>
       <AppBackground />
+      <FocoBar back />
+
       <View style={styles.content}>
-        {/* Pet + halo */}
+        {/* Halo + sparkle */}
         <View style={styles.heroWrap}>
           <View style={styles.halo} />
-          <View style={[styles.petCircle, { backgroundColor: activePet.accent + '28' }]}>
-            <Image source={activePet.image} style={styles.petImg} resizeMode="contain" />
-          </View>
+          <Text style={styles.heroEmoji}>✦</Text>
           <View style={styles.sparkles}>
-            <Text style={[styles.sparkle, { top: -10, left: 20, fontSize: 14 }]}>✦</Text>
-            <Text style={[styles.sparkle, { top: 10, right: 20, fontSize: 10 }]}>✦</Text>
-            <Text style={[styles.sparkle, { bottom: 0, left: 40, fontSize: 18 }]}>✦</Text>
+            <Text style={[styles.sparkle, { top: -10, left: 10, fontSize: 14 }]}>✦</Text>
+            <Text style={[styles.sparkle, { top: 10, right: 10, fontSize: 10 }]}>✦</Text>
+            <Text style={[styles.sparkle, { bottom: 0, left: 30, fontSize: 18 }]}>✦</Text>
           </View>
         </View>
 
         <Text style={styles.heading}>You're all set!</Text>
         <Text style={styles.sub}>
-          {activePet.name} is ready to focus with you.{'\n'}Let's get started.
+          Your account is ready.{'\n'}Time to start focusing.
         </Text>
 
         <View style={styles.cardWrap}>
@@ -47,7 +44,7 @@ export default function DoneScreen() {
               <View style={styles.statDivider} />
               <View style={styles.stat}>
                 <Text style={styles.statNum}>Lv.1</Text>
-                <Text style={styles.statLabel}>{activePet.name}</Text>
+                <Text style={styles.statLabel}>Pet</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.stat}>
@@ -73,25 +70,30 @@ export default function DoneScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.softBg },
   content: {
-    flex: 1, paddingHorizontal: 22, paddingTop: 80,
+    flex: 1, paddingHorizontal: 22, paddingTop: 40,
     alignItems: 'center',
   },
-  heroWrap: { width: 120, height: 120, position: 'relative', alignItems: 'center', justifyContent: 'center', marginBottom: 32 },
+  heroWrap: {
+    width: 120, height: 120,
+    position: 'relative', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 28,
+  },
   halo: {
     position: 'absolute', width: 120, height: 120, borderRadius: 60,
     backgroundColor: Colors.pinkHot, opacity: 0.15,
   },
-  petCircle: {
-    width: 90, height: 90, borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.8)',
-  },
-  petImg: { width: 64, height: 64 },
+  heroEmoji: { fontSize: 40, color: Colors.pinkHot },
   sparkles: { position: 'absolute', width: '100%', height: '100%' },
   sparkle: { position: 'absolute', color: Colors.pinkHot },
-  heading: { fontFamily: 'Fraunces_600SemiBold', fontSize: 32, fontWeight: '600', color: Colors.ink, letterSpacing: -0.5, textAlign: 'center' },
-  sub: { fontSize: 15, color: Colors.inkSoft, marginTop: 10, textAlign: 'center', lineHeight: 22 },
+  heading: {
+    fontFamily: 'Fraunces_600SemiBold',
+    fontSize: 32, fontWeight: '600', color: Colors.ink,
+    letterSpacing: -0.5, textAlign: 'center',
+  },
+  sub: {
+    fontSize: 15, color: Colors.inkSoft, marginTop: 10,
+    textAlign: 'center', lineHeight: 22,
+  },
   cardWrap: { width: '100%', marginTop: 32 },
   statRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   stat: { alignItems: 'center', flex: 1 },

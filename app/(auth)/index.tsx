@@ -1,24 +1,18 @@
 /**
- * WelcomeScreen — iOS 26 Liquid Glass design.
- * SoftWallpaper (cream/pink/lavender) background with FrostCard sign-in panel.
+ * WelcomeScreen — Choose Sign In or Create Account
  */
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { Colors } from '@/constants/theme';
 
-function SignInButton({ children }: { children: React.ReactNode }) {
-  return (
-    <TouchableOpacity activeOpacity={0.75} style={styles.signInBtn}>
-      {children}
-    </TouchableOpacity>
-  );
-}
-
 export default function WelcomeScreen() {
   const router = useRouter();
+
+  const comingSoon = (provider: string) =>
+    Alert.alert('即將推出', `${provider} 登入功能即將上線。`);
 
   return (
     <View style={styles.root}>
@@ -31,39 +25,59 @@ export default function WelcomeScreen() {
           <Text style={styles.tagline}>Focus together, grow together</Text>
         </View>
 
-        {/* Welcome card */}
+        {/* Auth card */}
         <View style={styles.cardWrap}>
           <FrostCard radius={32}>
-            <Text style={styles.cardTitle}>Welcome back</Text>
-            <Text style={styles.cardSub}>Ready to focus?</Text>
+            <Text style={styles.cardTitle}>Get started</Text>
+            <Text style={styles.cardSub}>Sign in or create a new account.</Text>
 
-            {/* Sign-in buttons */}
-            <View style={styles.signInRow}>
-              <SignInButton>
-                <Text style={styles.signinIcon}>🍎</Text>
-              </SignInButton>
-              <SignInButton>
-                <Text style={[styles.signinIcon, { color: '#4285F4', fontWeight: '700' }]}>G</Text>
-              </SignInButton>
-              <SignInButton>
-                <Text style={styles.signinIcon}>✉️</Text>
-              </SignInButton>
+            {/* Social buttons */}
+            <View style={styles.socialRow}>
+              <TouchableOpacity
+                style={styles.socialBtn}
+                onPress={() => comingSoon('Apple')}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.socialIcon}>🍎</Text>
+                <Text style={styles.socialLabel}>Apple</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.socialBtn}
+                onPress={() => comingSoon('Google')}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.socialIcon, { color: '#4285F4', fontWeight: '700' }]}>G</Text>
+                <Text style={styles.socialLabel}>Google</Text>
+              </TouchableOpacity>
             </View>
 
-            <Text style={styles.tos}>
-              By continuing you agree to our{' '}
-              <Text style={{ color: Colors.inkSoft, textDecorationLine: 'underline' }}>Terms of Service</Text>.
-            </Text>
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Email Sign In */}
+            <TouchableOpacity
+              style={styles.emailBtn}
+              onPress={() => router.push('/(auth)/login')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.emailBtnText}>SIGN IN WITH EMAIL</Text>
+            </TouchableOpacity>
+
+            {/* Create Account */}
+            <TouchableOpacity
+              style={styles.createBtn}
+              onPress={() => router.push('/(auth)/signup')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.createBtnText}>CREATE ACCOUNT</Text>
+            </TouchableOpacity>
           </FrostCard>
         </View>
-
-        <TouchableOpacity
-          onPress={() => router.push('/(auth)/signup')}
-          style={styles.footerBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.footerText}>New here? Get started →</Text>
-        </TouchableOpacity>
       </View>
 
       <Text style={styles.version}>v 1.0  ·  est. 2026</Text>
@@ -72,98 +86,48 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.softBg,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 22,
-    paddingTop: 54,
-    paddingBottom: 30,
-  },
-  hero: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
+  root: { flex: 1, backgroundColor: Colors.softBg },
+  content: { flex: 1, paddingHorizontal: 22, paddingTop: 54, paddingBottom: 30 },
+  hero: { alignItems: 'center', marginTop: 16 },
   wordmark: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 38,
-    fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: 14,
-    paddingLeft: 14,
+    fontSize: 38, fontWeight: '500', color: Colors.ink,
+    letterSpacing: 14, paddingLeft: 14,
   },
-  tagline: {
-    fontSize: 14,
-    color: Colors.inkSoft,
-    marginTop: 8,
-    letterSpacing: 0.2,
-  },
-  cardWrap: {
-    marginTop: 56,
-  },
+  tagline: { fontSize: 14, color: Colors.inkSoft, marginTop: 8, letterSpacing: 0.2 },
+  cardWrap: { marginTop: 48 },
   cardTitle: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 30,
-    fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: -0.4,
-    lineHeight: 32,
+    fontSize: 28, fontWeight: '500', color: Colors.ink, letterSpacing: -0.4,
   },
-  cardSub: {
-    fontSize: 15,
-    color: Colors.inkSoft,
-    marginTop: 6,
+  cardSub: { fontSize: 14, color: Colors.inkSoft, marginTop: 6 },
+  socialRow: { flexDirection: 'row', gap: 12, marginTop: 28 },
+  socialBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 13, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderWidth: 0.5, borderColor: 'rgba(20,16,28,0.1)',
   },
-  signInRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 18,
-    marginTop: 36,
+  socialIcon: { fontSize: 18, color: Colors.ink },
+  socialLabel: { fontSize: 14, fontWeight: '600', color: Colors.ink },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
+  dividerLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(20,16,28,0.15)' },
+  dividerText: { fontSize: 12, color: Colors.inkFaint, letterSpacing: 0.5 },
+  emailBtn: {
+    paddingVertical: 15, borderRadius: 9999,
+    backgroundColor: Colors.ink, alignItems: 'center',
+    shadowColor: Colors.ink, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18, shadowRadius: 24, elevation: 6,
   },
-  signInBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.signInBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0.5,
-    borderColor: 'rgba(20,16,28,0.06)',
-    shadowColor: '#3c2850',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+  emailBtnText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 2.5 },
+  createBtn: {
+    marginTop: 10, paddingVertical: 15, borderRadius: 9999,
+    backgroundColor: 'transparent', alignItems: 'center',
+    borderWidth: 1.5, borderColor: Colors.ink,
   },
-  signinIcon: {
-    fontSize: 20,
-    color: Colors.ink,
-  },
-  tos: {
-    fontSize: 12,
-    color: Colors.inkFaint,
-    textAlign: 'center',
-    marginTop: 32,
-    lineHeight: 18,
-  },
-  footerBtn: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: Colors.inkSoft,
-  },
+  createBtnText: { fontSize: 13, fontWeight: '700', color: Colors.ink, letterSpacing: 2.5 },
   version: {
-    position: 'absolute',
-    bottom: 30,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    fontSize: 11,
-    color: Colors.inkFaint,
-    letterSpacing: 1.4,
+    position: 'absolute', bottom: 30, left: 0, right: 0,
+    textAlign: 'center', fontSize: 11, color: Colors.inkFaint, letterSpacing: 1.4,
   },
 });

@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -19,6 +20,7 @@ import { Colors } from '@/constants/theme';
 import { authService } from '@/services/authService';
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -97,6 +99,17 @@ export default function LoginScreen() {
                   {loading ? 'Signing in…' : 'SIGN IN →'}
                 </Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.switchBtn}
+                onPress={() => router.replace('/(auth)/signup')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.switchText}>
+                  Don't have an account?{' '}
+                  <Text style={styles.switchLink}>Create one</Text>
+                </Text>
+              </TouchableOpacity>
             </FrostCard>
           </View>
         </View>
@@ -145,4 +158,7 @@ const styles = StyleSheet.create({
   },
   continueBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 3 },
   disabled: { opacity: 0.4 },
+  switchBtn: { marginTop: 20, alignItems: 'center' },
+  switchText: { fontSize: 13, color: Colors.inkFaint },
+  switchLink: { color: Colors.ink, fontWeight: '600' },
 });
