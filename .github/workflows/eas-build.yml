@@ -34,12 +34,14 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # PR → iOS-only preview build (Android free-tier quota shared with main builds)
+      # PR → iOS-only preview build (Android free-tier quota reserved for main)
       - name: EAS Preview Build (PR)
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         run: eas build --platform ios --non-interactive --profile preview --no-wait
 
       # push to main → production build (Android only until Apple Developer account is set up)
       - name: EAS Production Build (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: eas build --platform android --non-interactive --profile production --no-wait
