@@ -195,12 +195,41 @@ export default function HomeScreen() {
               <Text style={styles.eyebrow}>START FOCUS</Text>
               <Text style={styles.focusTitle}>How long?</Text>
 
-              {/* Active companion indicator */}
-              <View style={[styles.companionRow, { borderColor: activeDef.accent + '55' }]}>
-                <View style={[styles.companionDot, { backgroundColor: activeDef.accent }]} />
-                <Text style={styles.companionLabel}>今日夥伴</Text>
-                <Text style={[styles.companionName, { color: activeDef.accent }]}>{activeDef.name}</Text>
-              </View>
+              {/* Pet picker inside START FOCUS */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.focusPetRow}
+              >
+                {displayPets.map((p) => {
+                  const def =
+                    PETS.find((d) => d.id === p.name.toLowerCase()) ??
+                    PETS.find((d) => d.id === 'xingwang') ??
+                    PETS[0];
+                  const isActive =
+                    activePet?.id === p.id ||
+                    (!activePet && p.id === displayPets[0].id);
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[
+                        styles.focusPetChip,
+                        isActive && { borderColor: def.accent, backgroundColor: def.accent + '18' },
+                      ]}
+                      onPress={() => handleSelectPet(p, def.name)}
+                      activeOpacity={0.8}
+                    >
+                      <PetRenderer pet={def} size={52} interactive={false} />
+                      <Text style={[styles.focusPetName, isActive && { color: def.accent, fontWeight: '700' }]}>
+                        {def.name}
+                      </Text>
+                      {isActive && (
+                        <View style={[styles.focusPetActiveDot, { backgroundColor: def.accent }]} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
               <View style={styles.durationRow}>
                 {DURATION_OPTIONS.map((min) => (
@@ -373,6 +402,38 @@ const styles = StyleSheet.create({
   companionDot: { width: 7, height: 7, borderRadius: 999 },
   companionLabel: { fontSize: 12, color: Colors.inkSoft, flex: 1 },
   companionName: { fontSize: 13, fontWeight: '700' },
+
+  focusPetRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 4,
+    marginBottom: 16,
+  },
+  focusPetChip: {
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(20,16,28,0.04)',
+    gap: 4,
+    minWidth: 72,
+    position: 'relative',
+  },
+  focusPetName: {
+    fontSize: 11,
+    color: Colors.inkSoft,
+    letterSpacing: 0.2,
+  },
+  focusPetActiveDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
 
   durationRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
   durationChip: {
