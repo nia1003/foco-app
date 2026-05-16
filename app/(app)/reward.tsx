@@ -1,6 +1,6 @@
 /**
- * RewardScreen — Session 結束後的寵物進度頁面
- * 顯示：寵物等級進度條從舊值→新值的動畫、升級提示 → 查看報告 or 回首頁
+ * RewardScreen — 專注結束後的寵物進度頁
+ * 顯示：寵物本體（無框）+ 等級進度條從舊值→新值的動畫 + 升級特效
  */
 import React, { useEffect, useRef } from 'react';
 import {
@@ -13,8 +13,9 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
-import { FrostCard } from '@/components/ui/FrostCard';
+import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
+import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
 import type { SessionResult } from '@/types';
 
@@ -22,39 +23,57 @@ export default function RewardScreen() {
   const router = useRouter();
   const { result: resultStr } = useLocalSearchParams<{ result: string }>();
   const result: SessionResult = resultStr ? JSON.parse(resultStr) : {};
-  const { applySessionResult } = usePetStore();
+  const { applySessionResult, pets: allPets } = usePetStore();
   const { play } = useSound();
 
+  // ── Resolve pet visual ────────────────────────
+  const petRecord = allPets.find((p) => p.id === result.pet_id) ?? allPets[0];
+  const petDef =
+    (petRecord
+      ? PETS.find((p) => p.id === petRecord.name.toLowerCase()) ?? PETS[0]
+      : PETS[0]) ?? PETS[0];
+  const accent = petDef.accent ?? Colors.pinkText;
+
+  // ── XP fractions ─────────────────────────────
   const oldXpFraction = result.xp_next_level
     ? (result.old_xp ?? 0) / result.xp_next_level
     : 0;
   const newXpFraction = result.xp_next_level
-    ? result.new_xp / result.xp_next_level
+    ? Math.min(result.new_xp / result.xp_next_level, 1)
     : 0;
 
-  // ── 動畫 refs ────────────────────────────────
-  const xpBarAnim = useRef(new Animated.Value(oldXpFraction)).current;
-  const levelUpAnim = useRef(new Animated.Value(0)).current;
-  const cardFadeAnim = useRef(new Animated.Value(0)).current;
+  // ── Animation refs ────────────────────────────
+  const xpBarAnim    = useRef(new Animated.Value(oldXpFraction)).current;
+  const levelUpAnim  = useRef(new Animated.Value(0)).current;
+  const contentAnim  = useRef(new Animated.Value(0)).current;
+  const petScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const floatAnim    = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // 1. 更新 pet store
     if (result.pet_id && result.new_xp !== undefined) {
       applySessionResult(result.pet_id, result.new_xp, result.new_level, result.xp_next_level);
     }
 
-    // 2. 進場動畫序列
+    // Pet floats continuously
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, { toValue: -12, duration: 2000, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0,   duration: 2000, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Entrance: fade in + pet pops in → bar fills
     Animated.sequence([
-      Animated.timing(cardFadeAnim, {
-        toValue: 1, duration: 300, useNativeDriver: true,
-      }),
-      Animated.timing(xpBarAnim, {
-        toValue: newXpFraction, duration: 900, useNativeDriver: false,
-      }),
+      Animated.parallel([
+        Animated.timing(contentAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(petScaleAnim, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }),
+      ]),
+      Animated.timing(xpBarAnim, { toValue: newXpFraction, duration: 1000, useNativeDriver: false }),
     ]).start(() => {
       if (result.level_up) {
+        play('transition_up');
         Animated.spring(levelUpAnim, {
-          toValue: 1, tension: 50, friction: 5, useNativeDriver: true,
+          toValue: 1, tension: 40, friction: 5, useNativeDriver: true,
         }).start();
       }
     });
@@ -69,27 +88,54 @@ export default function RewardScreen() {
     <View style={styles.root}>
       <AppBackground />
 
-      <Animated.View style={[styles.content, { opacity: cardFadeAnim }]}>
-        {/* 升級提示 */}
-        {result.level_up && (
-          <Animated.View
-            style={[styles.levelUpBadge, { opacity: levelUpAnim, transform: [{ scale: levelUpAnim }] }]}
-          >
-            <Text style={styles.levelUpText}>🎉 Level Up!</Text>
-          </Animated.View>
-        )}
+      <Animated.View style={[styles.content, { opacity: contentAnim }]}>
 
-        {/* 寵物進度卡 */}
-        <FrostCard radius={24}>
+        {/* ── Pet (no card) ──────────────────────── */}
+        <Animated.View
+          style={{
+            transform: [
+              { translateY: floatAnim },
+              { scale: petScaleAnim },
+            ],
+          }}
+        >
+          <PetRenderer pet={petDef} size={240} interactive={false} />
+        </Animated.View>
+
+        {/* ── Level + progress bar ───────────────── */}
+        <View style={styles.progressSection}>
           <View style={styles.levelRow}>
-            <Text style={styles.levelLabel}>Lv.{result.new_level}</Text>
+            <Text style={[styles.levelLabel, { color: accent }]}>Lv.{result.new_level}</Text>
+            {result.level_up && (
+              <Animated.View
+                style={[
+                  styles.levelUpBadge,
+                  {
+                    opacity: levelUpAnim,
+                    transform: [
+                      { scale: levelUpAnim },
+                      {
+                        translateY: levelUpAnim.interpolate({
+                          inputRange: [0, 1], outputRange: [10, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <Text style={styles.levelUpText}>🎉 Level Up!</Text>
+              </Animated.View>
+            )}
           </View>
-          <View style={styles.xpBarBg}>
-            <Animated.View style={[styles.xpBarFill, { width: xpBarWidth }]} />
-          </View>
-        </FrostCard>
 
-        {/* 按鈕 */}
+          <View style={styles.xpBarBg}>
+            <Animated.View
+              style={[styles.xpBarFill, { width: xpBarWidth, backgroundColor: accent }]}
+            />
+          </View>
+        </View>
+
+        {/* ── Buttons ────────────────────────────── */}
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.primaryBtn}
@@ -116,47 +162,62 @@ export default function RewardScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
+  root: { flex: 1 },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 20,
+    paddingHorizontal: 32,
+    gap: 0,
   },
+
+  // Progress
+  progressSection: {
+    width: '100%',
+    marginTop: 24,
+    gap: 10,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  levelLabel: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+
   levelUpBadge: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 9999,
-    backgroundColor: 'rgba(242,206,220,0.40)',
+    backgroundColor: 'rgba(242,206,220,0.50)',
     borderWidth: 1,
-    borderColor: 'rgba(181,96,122,0.25)',
+    borderColor: 'rgba(181,96,122,0.30)',
   },
   levelUpText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.pinkText,
   },
-  levelRow: {
-    marginBottom: 10,
-  },
-  levelLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.inkSoft,
-  },
+
   xpBarBg: {
-    height: 8,
+    height: 10,
     borderRadius: 9999,
     backgroundColor: 'rgba(20,16,28,0.08)',
     overflow: 'hidden',
+    width: '100%',
   },
   xpBarFill: {
     height: '100%',
     borderRadius: 9999,
-    backgroundColor: Colors.pinkHot,
   },
-  actions: { width: '100%', gap: 10, marginTop: 8 },
+
+  // Buttons
+  actions: { width: '100%', gap: 10, marginTop: 36 },
   primaryBtn: {
     paddingVertical: 16,
     borderRadius: 9999,
