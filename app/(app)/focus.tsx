@@ -138,7 +138,8 @@ export default function FocusScreen() {
         pathname: '/(app)/reward',
         params: { result: JSON.stringify({ ...result, ...localStats }) },
       });
-    } catch {
+    } catch (err) {
+      console.error('[FOCO] session-complete failed:', err);
       router.replace({
         pathname: '/(app)/reward',
         params: { result: JSON.stringify({ ...mockSessionResult, ...localStats }) },

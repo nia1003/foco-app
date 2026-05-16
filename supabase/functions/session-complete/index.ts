@@ -188,26 +188,28 @@ serve(async (req) => {
 
     if (sessionError) throw sessionError
 
-    // ── 3. 讀取目前 pet XP ───────────────────────────────────
-    const { data: pet, error: petError } = await supabase
+    // ── 3. 讀取目前 pet XP（找不到就跳過，不中斷 session 儲存）──
+    const { data: pet } = await supabase
       .from('pets')
       .select('xp, level')
       .eq('id', pet_id)
-      .single()
+      .maybeSingle()
 
-    if (petError) throw petError
+    let newXP    = xpGained
+    let newLevel = 1
+    let levelUp  = false
 
-    const newXP    = pet.xp + xpGained
-    const newLevel = Math.min(calcLevel(newXP), 5)
-    const levelUp  = newLevel > pet.level
+    if (pet) {
+      newXP    = pet.xp + xpGained
+      newLevel = Math.min(calcLevel(newXP), 5)
+      levelUp  = newLevel > pet.level
 
-    // ── 4. 更新 pet ──────────────────────────────────────────
-    const { error: updateError } = await supabase
-      .from('pets')
-      .update({ xp: newXP, level: newLevel })
-      .eq('id', pet_id)
-
-    if (updateError) throw updateError
+      // ── 4. 更新 pet ────────────────────────────────────────
+      await supabase
+        .from('pets')
+        .update({ xp: newXP, level: newLevel })
+        .eq('id', pet_id)
+    }
 
     // ── 5. 完成任務標記 done ─────────────────────────────────
     if (task_id && completed) {
