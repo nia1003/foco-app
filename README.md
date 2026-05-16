@@ -1,237 +1,256 @@
-# FOCO — System Design (Final)
-> No food system. XP goes directly to the pet from focus sessions.
+# FOCO — 專案完整文件
 
 ---
 
-## Core Mechanic (One Sentence)
+## 一、我們在做什麼
 
-> You focus → your pet gains XP → your pet levels up.
+**FOCO 是一個專注 App。**
 
-That's it. No food, no backpack, no feeding step.
+> 你專注 → 你的寵物獲得 XP → 寵物升級
+
+就像養電子寵物，但動力來自於你真的去做事。
 
 ---
 
-## 一、XP System
-
-### XP Source: Focus Session Only
+## 二、用戶會經歷什麼
 
 ```
-Base XP (by actual focus duration):
-  < 15 min    → +5 XP
-  15–30 min   → +15 XP
-  30–60 min   → +30 XP
-  ≥ 60 min    → +50 XP
-
-Bonus XP:
-  completed == true        → +10 XP
-  left_app_count == 0      → +5 XP
-  pause_count == 0         → +5 XP
-
-Penalty:
-  early_stop == true       → base XP only, no bonus
+1. 打開 App，看到自己的寵物在主頁
+2. 選要專注幾分鐘（15 / 25 / 50 / 90 分鐘）
+3. 開始計時，App 在背景記錄你的狀態
+4. 結束後看到這次的分析報告
+   → 你的專注類型（DISC）
+   → 這次獲得多少 XP
+   → 寵物升級了嗎？
+5. 可以把報告截圖分享出去
+6. 回到主頁，看到寵物又長大了一點
 ```
 
-### Level Thresholds (Lv.1–5)
+---
+
+## 三、頁面清單與跳轉邏輯
+
+```
+[Splash]
+  ├─ 已登入 ──────────────────→ [Home]
+  └─ 未登入
+       ├─→ [Login] ──────────→ [Home]
+       └─→ [Signup]
+             [輸入名字]
+               → [輸入 Email / 密碼]
+                 → [選擇目標]
+                   → [Home]
+
+[Home]
+  → 選時長 chip（15 / 25 / 50 / 90 min）
+  → 點「Start Focus」→ [Timer]
+  → 點寵物 → [Pet Info]
+  → Nav: Missions / Stats
+
+[Timer]
+  ├─ 暫停 ⇄ 繼續
+  ├─ 提前結束 → 確認 modal → [Reward]
+  └─ 時間到 ────────────────→ [Reward]
+                                   ↓
+                             [Analysis]
+                                   ↓
+                               [Home]
+
+[Missions]
+  → 新增任務（輸入名稱 + 時長）
+  → 點任務 → [Mission Detail]
+               → 開始專注 → [Timer]
+
+[Stats]
+  → 顯示歷史紀錄、總時數、連續天數
+  → 點某次紀錄 → 查看分析報告
+
+[Pet Info]
+  → 顯示等級、XP 進度條、外觀
+```
+
+---
+
+## 四、DISC 專注類型分析
+
+每次計時結束，根據行為數據判斷這次的專注風格。
+
+### 記錄哪些數據
+
+| 欄位 | 說明 |
+|------|------|
+| `planned_duration` | 用戶選擇的時長（秒） |
+| `actual_duration` | 實際專注時長 = 總秒數 − 暫停秒數 − 切出秒數 |
+| `pause_count` | 暫停次數 |
+| `pause_total_sec` | 總暫停時間（秒） |
+| `left_app_count` | 切出 App 次數 |
+| `left_app_total_sec` | 切出 App 總時間（秒） |
+| `completed` | actual_duration ≥ planned × 0.9 |
+| `early_stop` | 用戶主動結束 AND !completed |
+
+### DISC 判斷公式
+
+```
+focus_score =
+  completed == true        → +2 分
+  pause_count == 0         → +1 分
+  left_app_count == 0      → +1 分
+
+score = 4  → 🔵 Conscientiousness 謹慎型（最專注、最精準）
+score = 3  → 🔴 Dominance 主導型（目標導向、高完成率）
+score = 2  → 🟢 Steadiness 穩健型（節奏穩定、偶爾暫停）
+score ≤ 1  → 🟡 Influence 影響型（彈性大、容易分心）
+```
+
+DISC 結果只顯示給用戶看，**不影響 XP 計算**。
+
+---
+
+## 五、寵物系統：XP 與升級
+
+### XP 來源：只有專注完成
+
+**基礎 XP（依實際專注時長）**
+
+| 實際時長 | 基礎 XP |
+|---------|--------|
+| 15 分鐘以下 | +5 XP |
+| 15–30 分鐘 | +15 XP |
+| 30–60 分鐘 | +30 XP |
+| 60 分鐘以上 | +50 XP |
+
+**加分**
+```
+有完成目標時長          → +10 XP
+計時期間沒有切出 App    → +5 XP
+計時期間沒有暫停        → +5 XP
+```
+
+**扣分**
+```
+提前放棄（early_stop）   → 只拿基礎 XP，加分全部取消
+暫停超過 3 次            → −5 XP
+切出 App 超過 2 次       → −5 XP
+切出 App 總時間 > 5 分鐘 → −5 XP
+```
+
+### 等級門檻
 
 ```
 Lv.1  →    0 XP
 Lv.2  →  100 XP
 Lv.3  →  250 XP
 Lv.4  →  500 XP
-Lv.5  →  900 XP  (max)
-```
-
-### Visual Changes Per Level
-
-```
-Lv.1  scale 100%   no decoration
-Lv.2  scale 115%   head accessory unlocked
-Lv.3  scale 130%   body pattern unlocked
-Lv.4  scale 145%   tail / wings unlocked
-Lv.5  scale 160%   full look + special idle animation
-
-Implementation: one base pet model, decorations conditionally rendered on top.
-Assets needed: base × 1, head accessory × 1, body pattern × 1, tail × 1 → 4 assets total
+Lv.5  →  900 XP（上限）
 ```
 
 ---
 
-## 二、Focus Tracking
-
-### What Gets Recorded During a Session
-
-| Field | Description |
-|-------|-------------|
-| `planned_duration` | Duration the user selected (seconds) |
-| `actual_duration` | Real focus time (minus pauses and app-away time) |
-| `pause_count` | How many times paused |
-| `pause_total_sec` | Total time spent paused |
-| `left_app_count` | How many times app went to background |
-| `left_app_total_sec` | Total time app was in background |
-| `completed` | actual ≥ planned × 0.9 |
-| `early_stop` | User manually ended AND !completed |
-
-### Focus Type Classification
+## 六、分析報告
 
 ```
-focus_score = completed(+2) + pause_count==0(+1) + left_app_count==0(+1)
-
-score ≥ 3  → Focus type  🔥  ("Goal-driven, locked in")
-score ≤ 2  → Flow type   🌿  ("Steady pace, flexible")
-
-→ Stored in sessions.focus_type_result
-→ Shown in Analysis Report as user's session personality
-→ No gameplay effect in MVP. Just informational.
+┌──────────────────────────────┐
+│  這次專注報告                 │
+│                               │
+│  ⏱  實際專注   47 分 23 秒   │
+│  ⏸  暫停次數   0 次          │
+│  📱  切出 App   0 次          │
+│                               │
+│  🔵 Conscientiousness 謹慎型  │
+│  「精準、有條理，完美執行！」   │
+│                               │
+│  獲得 XP：+50 XP              │
+│  （基礎 +30、完成 +10、       │
+│   不暫停 +5、不切出 +5）      │
+│                               │
+│  [分享]  [儲存圖片]           │
+└──────────────────────────────┘
 ```
 
 ---
 
-## 三、User Flow
+## 七、System Flow（資料流動邏輯）
+
+### Auth 判斷
 
 ```
-━━━━━━━━━━━━━━━━━━
-ONBOARDING
-━━━━━━━━━━━━━━━━━━
-
-[Splash]
-  ├─ logged in  ──────────────→ [Home]
-  └─ not logged in
-       ├─→ [Login]  ──────────→ [Home]
-       └─→ [Signup]
-             [Name] → [Email / Password] → [Goal Selection] → [Home]
-
-━━━━━━━━━━━━━━━━━━
-Main Flow A: Quick Start
-━━━━━━━━━━━━━━━━━━
-
-[Home]
-  → pick duration chip (15 / 25 / 50 / 90 min)
-  → tap "Start Focus"
-  → [Timer]
-       ├─ pause ⇄ resume
-       ├─ early stop → confirm modal → [Reward]
-       └─ time up ──────────────────→ [Reward]
-                                          ↓
-                                   [Analysis Report]
-                                          ↓
-                                       [Home]
-
-━━━━━━━━━━━━━━━━━━
-Main Flow B: Start From a Task
-━━━━━━━━━━━━━━━━━━
-
-[Home] → Nav → [Missions]
-  → [+ Add Task]
-       enter title + duration → save → back to [Missions]
-  → tap task → [Mission Detail]
-       → "Start Focus" → [Timer] (same as Flow A)
-
-━━━━━━━━━━━━━━━━━━
-Pet Interaction
-━━━━━━━━━━━━━━━━━━
-
-[Home] → tap pet → [Pet Info]
-  shows: level, XP bar, current look, total focus time
-
-━━━━━━━━━━━━━━━━━━
-Stats
-━━━━━━━━━━━━━━━━━━
-
-[Home] → Nav → [Stats]
-  shows: weekly focus hours, streak, session history
-  → tap session → view analysis report
-  → share / save image
+App 開啟
+  → 讀 AsyncStorage token
+       有 → Supabase 驗證
+                有效 → Home
+                失效 → 清除 → Login
+       沒有 → Splash → Login / Signup
 ```
 
----
-
-## 四、System Flow
+### Timer 追蹤（前端 local state）
 
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-App Launch → Auth Check
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-App opens
-  → read AsyncStorage token
-       exists → Supabase verify
-                  valid   → Home
-                  invalid → clear token → Login
-       missing → Splash → Login / Signup
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Timer — Frontend Local State
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Start
-  → init local state:
+開始計時
+  → 初始化 local state：
        { planned_duration, started_at,
          pause_count: 0, pause_total_sec: 0,
          left_app_count: 0, left_app_total_sec: 0 }
-  → begin setInterval countdown
 
-While running:
+計時中：
   AppState → 'background'
     left_app_count += 1
     leave_time = Date.now()
   AppState → 'active'
     left_app_total_sec += Date.now() - leave_time
 
-Pause:
+暫停：
   pause_count += 1
   pause_start = Date.now()
-Resume:
+繼續：
   pause_total_sec += Date.now() - pause_start
 
-Session ends (time up or early stop):
+結束（時間到 or 提前放棄）：
   actual_duration = elapsed - pause_total_sec - left_app_total_sec
   completed = actual_duration >= planned_duration × 0.9
-  early_stop = user tapped end AND !completed
-  → POST to backend
+  early_stop = 用戶主動按結束 AND !completed
+  → POST session 給後端
+```
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Backend: Session End Processing
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### 後端：Session 結束處理
 
-Receive POST session data
-  → INSERT into sessions table
-  → calculate focus_score → focus_type_result
-  → calculate XP (base + bonus)
-  → UPDATE pets SET xp = xp + xp_gained
-  → check level up:
-       new xp >= next level threshold?
-         YES → UPDATE pets SET level = level + 1
-               set level_up = true
-  → return to frontend:
+```
+收到 POST
+  → INSERT sessions
+  → 計算 focus_score → DISC 類型
+  → 計算 XP（基礎 + 加分 - 扣分）
+  → UPDATE pets.xp += xp_gained
+  → 檢查升級：新 xp >= 下一級門檻？
+       YES → UPDATE pets.level += 1，level_up = true
+  → 回傳：
        { xp_gained, new_xp, new_level, level_up, focus_type }
+```
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Frontend: Reward Screen
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### 前端：Reward 頁
 
-Receive backend response
-  → show XP gained animation (+xx XP)
-  → animate XP bar to new value
-  → if level_up == true → play level up animation
-  → show "View Report" button → Analysis
+```
+收到回傳
+  → 顯示 XP 動畫（+xx XP）
+  → XP bar animate 到新數值
+  → level_up == true → 升級動畫
+  → 「查看報告」→ Analysis
+```
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Frontend: Analysis Report Screen
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### 前端：Analysis 頁
 
-Data comes from the session POST response (no extra GET needed)
-  → show: actual_duration, pause_count, left_app_count
-  → show: focus_type label + description
-  → show: XP earned this session
+```
+資料直接來自 POST 回傳（不需要額外 GET）
+  → 顯示：actual_duration、pause_count、left_app_count
+  → 顯示：DISC 類型 + 說明文字
+  → 顯示：本次獲得 XP 明細
 
-"Share"  → react-native-view-shot screenshot → expo-sharing
-"Save"   → expo-media-library → camera roll
-"Home"   → navigate to Home
+「分享」→ react-native-view-shot → expo-sharing
+「儲存」→ expo-media-library
+「回首頁」→ Home
 ```
 
 ---
 
-## 五、DB Schema
+## 八、DB Schema
 
 ```sql
 users (
@@ -256,40 +275,35 @@ tasks (
   user_id      uuid REFERENCES users(id) ON DELETE CASCADE,
   title        text NOT NULL,
   duration_min int  NOT NULL,
-  status       text DEFAULT 'pending',   -- 'pending' | 'done'
+  status       text DEFAULT 'pending',
   created_at   timestamp DEFAULT now()
 )
 
 sessions (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            uuid REFERENCES users(id) ON DELETE CASCADE,
-  task_id            uuid REFERENCES tasks(id),   -- nullable (quick start)
-  planned_duration   int  NOT NULL,               -- seconds
-  actual_duration    int  NOT NULL,               -- seconds
+  task_id            uuid REFERENCES tasks(id),
+  planned_duration   int  NOT NULL,
+  actual_duration    int  NOT NULL,
   pause_count        int  DEFAULT 0,
   pause_total_sec    int  DEFAULT 0,
   left_app_count     int  DEFAULT 0,
   left_app_total_sec int  DEFAULT 0,
   completed          boolean DEFAULT false,
   early_stop         boolean DEFAULT false,
-  focus_type_result  text,                        -- 'focus' | 'flow'
+  focus_type_result  text,
   xp_earned          int  DEFAULT 0,
   started_at         timestamp,
   ended_at           timestamp DEFAULT now()
 )
-
--- food_items table: REMOVED
--- feeding_log table: REMOVED
 ```
 
 ---
 
-## 六、API Contract
+## 九、API Contract
 
----
-
-### POST `/sessions/complete`
-Called by: frontend (禹丞) when Timer ends
+### POST `/sessions/complete`（最核心）
+Timer 結束時由禹丞呼叫
 
 **Request:**
 ```json
@@ -316,16 +330,15 @@ Called by: frontend (禹丞) when Timer ends
   "new_xp": 180,
   "new_level": 2,
   "level_up": true,
-  "focus_type": "focus"
+  "focus_type": "conscientiousness"
 }
 ```
 
 ---
 
 ### GET `/pets?user_id=xxx`
-Called by: Home screen, Pet Info screen on load
+Home、Pet Info 頁載入時呼叫
 
-**Response:**
 ```json
 {
   "id": "uuid",
@@ -339,9 +352,8 @@ Called by: Home screen, Pet Info screen on load
 ---
 
 ### GET `/sessions?user_id=xxx`
-Called by: Stats screen on load
+Stats 頁載入時呼叫
 
-**Response:**
 ```json
 {
   "sessions": [
@@ -349,7 +361,7 @@ Called by: Stats screen on load
       "id": "uuid",
       "actual_duration": 1423,
       "completed": true,
-      "focus_type_result": "focus",
+      "focus_type_result": "dominance",
       "xp_earned": 30,
       "ended_at": "2025-05-15T10:30:00Z"
     }
@@ -365,11 +377,12 @@ Called by: Stats screen on load
 ---
 
 ### POST `/tasks`
+
 **Request:**
 ```json
 {
   "user_id": "uuid",
-  "title": "Read 30 pages",
+  "title": "讀書30頁",
   "duration_min": 25
 }
 ```
@@ -378,7 +391,7 @@ Called by: Stats screen on load
 ```json
 {
   "id": "uuid",
-  "title": "Read 30 pages",
+  "title": "讀書30頁",
   "duration_min": 25,
   "status": "pending"
 }
@@ -387,30 +400,30 @@ Called by: Stats screen on load
 ---
 
 ### GET `/tasks?user_id=xxx`
-**Response:**
+
 ```json
 {
   "tasks": [
-    { "id": "uuid", "title": "Read 30 pages", "duration_min": 25, "status": "pending" },
-    { "id": "uuid", "title": "Homework",       "duration_min": 50, "status": "done" }
+    { "id": "uuid", "title": "讀書30頁", "duration_min": 25, "status": "pending" },
+    { "id": "uuid", "title": "寫作業",   "duration_min": 50, "status": "done" }
   ]
 }
 ```
 
 ---
 
-## 七、Mock Data (frontend use before backend is ready)
+## 十、Mock Data（後端未完成時前端使用）
 
 ```javascript
-// mockData.js
+// mockData.js — 曉蓮、靖雯、禹丞直接 import
 
 export const mockSessionResult = {
-  session_id: 'mock-session-001',
+  session_id: 'mock-001',
   xp_gained: 30,
   new_xp: 180,
   new_level: 2,
   level_up: true,
-  focus_type: 'focus',
+  focus_type: 'conscientiousness',
 };
 
 export const mockPet = {
@@ -424,9 +437,11 @@ export const mockPet = {
 export const mockSessions = {
   sessions: [
     { id: 's001', actual_duration: 1423, completed: true,
-      focus_type_result: 'focus', xp_earned: 30, ended_at: '2025-05-15T10:30:00Z' },
+      focus_type_result: 'dominance', xp_earned: 30,
+      ended_at: '2025-05-15T10:30:00Z' },
     { id: 's002', actual_duration: 890, completed: false,
-      focus_type_result: 'flow', xp_earned: 5, ended_at: '2025-05-14T09:00:00Z' },
+      focus_type_result: 'influence', xp_earned: 5,
+      ended_at: '2025-05-14T09:00:00Z' },
   ],
   summary: {
     total_focus_sec: 12400,
@@ -437,53 +452,131 @@ export const mockSessions = {
 
 export const mockTasks = {
   tasks: [
-    { id: 't001', title: 'Read 30 pages', duration_min: 25, status: 'pending' },
-    { id: 't002', title: 'Homework',      duration_min: 50, status: 'done' },
+    { id: 't001', title: '讀書30頁', duration_min: 25, status: 'pending' },
+    { id: 't002', title: '寫作業',   duration_min: 50, status: 'done' },
   ],
 };
 ```
 
 ---
 
-## 八、Pages Removed From Scope
+## 十一、技術選擇
 
-The following pages are **no longer needed** since the food system is removed:
-
-| Removed Page | Reason |
-|-------------|--------|
-| Backpack | No food items to display |
-| Farm | No plants / harvesting mechanic |
-
-**Remaining pages:**
-Splash → Login → Signup (×3) → Home → Timer → Reward → Analysis → Pet Info → Missions → Mission Detail → Stats
-
----
-
-## 九、Team Assignment
-
-| Person | Role | Owns |
-|--------|------|------|
-| 曉蓮 | Frontend + Design | Home, Pet Info, design system |
-| 靖雯 | Frontend + Design | Onboarding, Analysis, Login, Stats |
-| 禹丞 | Frontend | Navigation setup, Timer logic, Reward screen |
-| 亮節 | Backend | Supabase setup, Auth, DB schema |
-| 子寰 | Backend | Session end Edge Function (core XP logic) |
-| 艾蓁 | Backend | Tasks/Sessions CRUD APIs, API doc maintenance |
+| 項目 | 選用 |
+|------|------|
+| App 框架 | React Native + Expo |
+| 資料庫 | Supabase |
+| 導航 | expo-router |
+| 本地儲存 | AsyncStorage |
+| 偵測切出 App | React Native AppState（內建，不需另裝） |
+| 截圖分享 | react-native-view-shot + expo-sharing |
+| 儲存相簿 | expo-media-library |
 
 ---
 
-## 十、Pipeline Validation Checklist (End of Week 2)
+## 十二、分工
 
-亮節 + 禹丞 verify together:
+| 人 | 負責 |
+|----|------|
+| 曉蓮 | UI 設計 + Home、Pet Info 頁面 |
+| 靖雯 | UI 設計 + Login、Signup、Analysis、Stats 頁面 |
+| 禹丞 | Navigation 架構 + Timer 邏輯 + Reward 頁 |
+| 亮節 | Supabase 設定 + Auth + DB Schema |
+| 子寰 | Session Edge Function（XP 計算 + DISC 分類） |
+| 艾蓁 | Tasks / Sessions / pets CRUD API + API 文件維護 |
+
+---
+
+## 十三、三週時程
+
+### Week 13 — 地基（Days 1–5）
+
+| 誰 | 做什麼 | 產出 |
+|----|--------|------|
+| 禹丞 | 建 Expo 專案、expo-router、所有空白 Screen | 頁面跳轉跑通 |
+| 亮節 | 建 Supabase、所有 table、Auth、測試資料 | DB 可以連 |
+| 子寰 | 讀懂 XP + DISC 邏輯，規劃 Edge Function 結構 | 設計文件 |
+| 曉蓮 | 確認設計系統（色票、字型）、Home + Timer wireframe | Wireframe |
+| 靖雯 | Login / Signup / Analysis wireframe | Wireframe |
+| 艾蓁 | 整理 API Contract，確認格式給前端 | API 文件 |
+
+**Week 13 目標：** 空白頁面可以跳轉 ＋ Supabase 可以連
+
+---
+
+### Week 14 — 核心功能（Days 6–12）
+
+| 誰 | 做什麼 |
+|----|--------|
+| 禹丞 | Timer 完整邏輯（計時、暫停、AppState、POST session） |
+| 亮節 + 禹丞 | Pipeline 驗證（見下方 Checklist） |
+| 子寰 | Session Edge Function 實作完成 |
+| 曉蓮 | 切 Home UI（Mock data）、切 Pet Info UI |
+| 靖雯 | 切 Login / Signup UI、切 Analysis UI |
+| 艾蓁 | GET pets、GET sessions、POST tasks API |
+
+**Week 14 目標：Timer → Supabase → 前端收到 XP 回傳 → Reward 頁顯示**
+
+---
+
+### Week 15 — 補齊收尾（Days 13–21）
+
+| 誰 | 做什麼 |
+|----|--------|
+| 禹丞 | Reward 頁完整版、升級動畫、測試 |
+| 曉蓮 | 寵物等級外觀（scale + 裝飾渲染）、主頁完整版、測試 |
+| 靖雯 | Stats 頁、截圖分享功能、測試 |
+| 亮節 | Auth 完整流程、修 bug、協助前端接 API、測試 |
+| 子寰 | 修 Edge Function bug、驗算 XP 準確性、測試 |
+| 艾蓁 | Missions 資料接入、Stats 聚合查詢、測試 |
+
+**Week 15 目標：** 完整走一遍用戶流程，沒有中斷
+
+---
+
+### 三週內不做（砍掉）
+
+| 砍掉的功能 | 理由 |
+|-----------|------|
+| 3D 寵物動畫 | 用靜態圖片 + scale 代替，省時間 |
+| 頁面轉場動畫 | 不影響功能 |
+| Missions（如果來不及） | 直接從 Home 選時長也是完整流程 |
+
+---
+
+## 十四、Pipeline 驗證 Checklist（Week 14 末）
+
+亮節 + 禹丞一起跑，全部 ✅ 才算通：
 
 ```
-□ App connects to Supabase without error
-□ Login with test account succeeds
-□ Token saved to AsyncStorage
-□ Reopen app → auto-navigates to Home (no re-login)
-□ Timer completes → POST session succeeds
-□ New session record visible in Supabase DB
-□ Backend response matches API Contract format
-□ Reward screen shows correct xp_gained and focus_type
-□ level_up: true triggers level up animation
+□ App 連上 Supabase 不報錯
+□ 測試帳號登入成功
+□ Token 存進 AsyncStorage
+□ 重開 App → 自動進 Home（不用重新登入）
+□ Timer 跑完 → POST session 成功
+□ Supabase DB 看得到新的 session 紀錄
+□ 後端回傳格式與 API Contract 一致
+□ Reward 頁顯示正確的 xp_gained 和 focus_type
+□ level_up: true 觸發升級動畫
 ```
+
+---
+
+## 十五、最重要的原則
+
+> **前端不等後端。**
+> 後端沒好之前，用 mockData.js 先把 UI 做完。
+> 後端好了，換一行 import 就接上去。
+
+---
+
+## 十六、有問題找誰
+
+| 問題 | 找誰 |
+|------|------|
+| 頁面跳轉 / 架構 | 禹丞 |
+| 設計規格 | 曉蓮 |
+| Supabase / 連線 | 亮節 |
+| XP 計算 / DISC 邏輯 | 子寰 |
+| API 格式 | 艾蓁 |
+| 不知道找誰 | 先問亮節 |
