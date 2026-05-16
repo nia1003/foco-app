@@ -204,7 +204,7 @@ export default function MissionsScreen() {
     }
   };
 
-  // My Tasks delete
+  // My Tasks delete（樂觀刪除 + 失敗還原）
   const handleDeleteTask = (taskId: string, taskTitle: string) => {
     Alert.alert(
       '刪除任務',
@@ -215,8 +215,18 @@ export default function MissionsScreen() {
           text: '刪除',
           style: 'destructive',
           onPress: () => {
+            // 先從 UI 移除（樂觀更新）
             setTasks((prev) => prev.filter((t) => t.id !== taskId));
-            deleteTask(taskId).catch(() => {});
+            // DB 操作失敗 → 還原任務，並提示使用者
+            deleteTask(taskId).catch(() => {
+              setTasks((prev) => {
+                // 如果已還原過就不重複加
+                if (prev.find((t) => t.id === taskId)) return prev;
+                const restored = tasks.find((t) => t.id === taskId);
+                return restored ? [restored, ...prev] : prev;
+              });
+              Alert.alert('刪除失敗', '網路異常，任務已還原，請稍後再試。');
+            });
           },
         },
       ],

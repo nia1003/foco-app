@@ -69,7 +69,7 @@ export async function getSessions(userId: string): Promise<{
 }> {
   const { data, error } = await supabase
     .from('sessions')
-    .select('id, actual_duration, completed, focus_type_result, xp_earned, ended_at')
+    .select('id, actual_duration, completed, focus_type_result, xp_earned, ended_at, pause_count, left_app_count')
     .eq('user_id', userId)
     .order('ended_at', { ascending: false });
 
@@ -108,7 +108,7 @@ export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
     .from('tasks')
     .select('id, user_id, title, duration_min, status, created_at')
     .eq('user_id', userId)
-    .neq('status', 'deleted')
+    .eq('deleted', false)            // ← 用 deleted 欄位過濾（比 status 更明確）
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -123,7 +123,7 @@ export async function createTask(
 ): Promise<Task> {
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ user_id: userId, title, duration_min: durationMin })
+    .insert({ user_id: userId, title, duration_min: durationMin, deleted: false })
     .select()
     .single();
 
@@ -131,11 +131,11 @@ export async function createTask(
   return data as Task;
 }
 
-// ── deleteTask（軟刪除）────────────────────────
+// ── deleteTask（軟刪除 — 標記 deleted=true）────
 export async function deleteTask(taskId: string): Promise<void> {
   const { error } = await supabase
     .from('tasks')
-    .update({ status: 'deleted' })
+    .update({ deleted: true })
     .eq('id', taskId);
-  if (error) throw error;
+  if (error) throw error;   // 讓呼叫端自己決定如何處理錯誤
 }

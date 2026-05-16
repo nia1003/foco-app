@@ -97,8 +97,8 @@ export default function StatsScreen() {
     (activePet ? PETS.find((p) => p.id === activePet.name.toLowerCase()) : null) ??
     PETS[0];
 
-  // 初始為空值，避免 mock → 真實資料的「閃爍」
-  // 後端成功：填入真實資料；失敗：fallback 到 mock
+  // loading=true 直到資料到位（避免空值→真實資料的「閃爍」）
+  const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [summary, setSummary] = useState({ total_focus_sec: 0, streak_days: 0, total_sessions: 0 });
   const [selectedDay, setSelectedDay] = useState(6); // 預設今天（最後一天）
@@ -108,6 +108,7 @@ export default function StatsScreen() {
       // 未登入：直接顯示 mock
       setSessions(mockSessions.sessions);
       setSummary(mockSessions.summary);
+      setLoading(false);
       return;
     }
     getSessions(userId)
@@ -116,10 +117,11 @@ export default function StatsScreen() {
         setSummary(res.summary);
       })
       .catch(() => {
-        // 後端失敗：fallback mock（只在這裡設定，避免初始閃爍）
+        // 後端失敗：fallback mock
         setSessions(mockSessions.sessions);
         setSummary(mockSessions.summary);
-      });
+      })
+      .finally(() => setLoading(false));
   }, [userId]);
 
   const weekStats = buildWeekStats(sessions);
@@ -136,6 +138,16 @@ export default function StatsScreen() {
   const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
 
   const selected = weekStats[selectedDay];
+
+  // 資料尚未到位：只顯示背景 + bar，不渲染任何數字（避免閃爍）
+  if (loading) {
+    return (
+      <View style={styles.root}>
+        <AppBackground />
+        <FocoBar />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -252,6 +264,9 @@ export default function StatsScreen() {
                             result: JSON.stringify({
                               xp_gained: s.xp_earned,
                               focus_type: s.focus_type_result,
+                              actual_duration: s.actual_duration,
+                              pause_count: s.pause_count ?? 0,
+                              left_app_count: s.left_app_count ?? 0,
                             }),
                           },
                         })

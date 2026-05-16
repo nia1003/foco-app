@@ -145,6 +145,9 @@ export interface SessionRecord {
   focus_type_result: FocusType;
   xp_earned: number;
   ended_at: string;
+  // 追蹤欄位（sessions table 儲存，歷史報告頁會用到）
+  pause_count?: number;
+  left_app_count?: number;
 }
 
 // POST /functions/v1/session-complete 的 request body
