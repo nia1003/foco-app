@@ -1,9 +1,12 @@
 /**
- * PetCollectionScreen — 寵物一覽
- * 2×2 grid：目前有 Xingwang + Penguin，另外兩格 Coming Soon
+ * PetCollectionScreen — 左右滑動切換寵物頁面
+ * 每隻寵物全螢幕展示：大 3D 模型 + 底部資訊卡
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,187 +14,229 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
+import { usePetStore } from '@/stores/petStore';
+import { mockPets } from '@/data/mockData';
 
-// Collect the 4 slots: real pets first, then coming-soon
+const { width: W, height: H } = Dimensions.get('window');
 const UNLOCKED = PETS.filter((p) => !p.locked);
-const LOCKED   = PETS.filter((p) =>  p.locked);
+const CARD_H = Math.round(H * 0.36);
 
-// Always show exactly 4 slots
-const COMING_SOON = [
-  { id: 'cs1', name: '???', trait: 'Coming soon…', accent: '#ccc' },
-  { id: 'cs2', name: '???', trait: 'Coming soon…', accent: '#ccc' },
-];
-const LOCKED_SLOTS = [...LOCKED, ...COMING_SOON].slice(0, Math.max(0, 4 - UNLOCKED.length));
+const LEVEL_LABELS: Record<number, string> = {
+  1: '新生', 2: '成長中', 3: '茁壯', 4: '強壯', 5: '傳說',
+};
 
 export default function PetCollectionScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { pets } = usePetStore();
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const slots: Array<
-    | { kind: 'pet'; data: (typeof PETS)[0] }
-    | { kind: 'locked'; data: { id: string; name: string; trait: string; accent: string } }
-  > = [
-    ...UNLOCKED.map((p) => ({ kind: 'pet' as const, data: p })),
-    ...LOCKED_SLOTS.map((p) => ({ kind: 'locked' as const, data: p })),
-  ];
+  const searchPool = pets.length > 0 ? pets : mockPets;
+
+  const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const page = Math.round(e.nativeEvent.contentOffset.x / W);
+    setCurrentIndex(page);
+  };
 
   return (
     <View style={styles.root}>
       <AppBackground />
-      <FocoBar back />
 
+      {/* FocoBar */}
+      <View style={[styles.barWrap, { paddingTop: insets.top }]}>
+        <FocoBar back />
+      </View>
+
+      {/* Dot indicators */}
+      <View style={[styles.dotsWrap, { top: 50 + insets.top }]}>
+        {UNLOCKED.map((_, i) => (
+          <View key={i} style={[styles.dot, i === currentIndex && styles.dotActive]} />
+        ))}
+      </View>
+
+      {/* Horizontal pager */}
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={handleMomentumEnd}
+        style={styles.pager}
       >
-        <Text style={styles.title}>Pets</Text>
-        <Text style={styles.subtitle}>
-          {UNLOCKED.length} / 4 collected
-        </Text>
+        {UNLOCKED.map((petDef, idx) => {
+          const storePet =
+            searchPool.find((p) => p.name.toLowerCase() === petDef.id) ??
+            searchPool[idx] ??
+            mockPets[0];
+          const level = Math.min(Math.max(storePet.level, 1), 5) as 1 | 2 | 3 | 4 | 5;
+          const xpPct = storePet.xp_next_level > 0 ? storePet.xp / storePet.xp_next_level : 0;
 
-        <View style={styles.grid}>
-          {slots.map((slot) => {
-            if (slot.kind === 'pet') {
-              const pet = slot.data;
-              return (
-                <TouchableOpacity
-                  key={pet.id}
-                  style={styles.cellWrap}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(app)/pet-info',
-                      params: { petId: pet.id },
-                    })
-                  }
-                >
-                  <FrostCard radius={24} padded={false}>
-                    <View style={styles.cell}>
-                      <View style={styles.petPreview}>
-                        <PetRenderer pet={pet} size={110} />
-                      </View>
-                      <Text style={styles.cellName}>{pet.name}</Text>
-                      <Text style={styles.cellTrait}>{pet.trait}</Text>
-                      <View style={[styles.accentDot, { backgroundColor: pet.accent }]} />
-                    </View>
-                  </FrostCard>
-                </TouchableOpacity>
-              );
-            }
-
-            // Locked / coming soon
-            return (
-              <View key={slot.data.id} style={styles.cellWrap}>
-                <View style={[styles.cellLocked]}>
-                  <Text style={styles.lockIcon}>🔒</Text>
-                  <Text style={styles.cellName} numberOfLines={1}>{slot.data.name}</Text>
-                  <Text style={styles.cellTrait}>{slot.data.trait}</Text>
-                </View>
+          return (
+            <View key={petDef.id} style={styles.page}>
+              {/* 3D pet */}
+              <View
+                style={[
+                  styles.petArea,
+                  { top: 80 + insets.top, bottom: CARD_H + 12 },
+                ]}
+              >
+                <PetRenderer pet={petDef} size={300} interactive />
               </View>
-            );
-          })}
-        </View>
 
-        <Text style={styles.footer}>More pets coming in future updates!</Text>
+              {/* Bottom info card */}
+              <View
+                style={[
+                  styles.cardWrap,
+                  { height: CARD_H, paddingBottom: Math.max(insets.bottom, 16) },
+                ]}
+              >
+                <FrostCard radius={32} padded={false}>
+                  <View style={styles.cardContent}>
+                    <Text style={styles.petName}>{petDef.name}</Text>
+                    <Text style={styles.petTrait}>{petDef.trait}</Text>
+
+                    <View style={styles.levelRow}>
+                      <View style={styles.levelBadge}>
+                        <Text style={[styles.levelBadgeText, { color: petDef.accent }]}>
+                          Lv.{level} · {LEVEL_LABELS[level]}
+                        </Text>
+                      </View>
+                      <Text style={styles.xpNums}>{storePet.xp} / {storePet.xp_next_level} XP</Text>
+                    </View>
+
+                    <View style={styles.xpBarBg}>
+                      <View
+                        style={[
+                          styles.xpBarFill,
+                          {
+                            width: `${Math.min(xpPct * 100, 100)}%` as any,
+                            backgroundColor: petDef.accent,
+                          },
+                        ]}
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.detailBtn}
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(app)/pet-info',
+                          params: { petId: petDef.id },
+                        })
+                      }
+                    >
+                      <Text style={styles.detailBtnText}>查看詳情 →</Text>
+                    </TouchableOpacity>
+                  </View>
+                </FrostCard>
+              </View>
+            </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
 }
 
-const CELL_GAP = 12;
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f6f4f4' },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 18, paddingBottom: 80 },
 
-  title: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 42,
-    fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: -0.5,
-    marginTop: 8,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: Colors.inkSoft,
-    marginTop: 2,
-    marginBottom: 20,
+  barWrap: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
   },
 
-  // 2×2 grid
-  grid: {
+  dotsWrap: {
+    position: 'absolute',
+    left: 0, right: 0,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: CELL_GAP,
+    justifyContent: 'center',
+    gap: 7,
+    zIndex: 10,
   },
-  cellWrap: {
-    width: `${(100 - CELL_GAP / 2) / 2}%` as any,
+  dot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: 'rgba(20,16,28,0.18)',
+  },
+  dotActive: {
+    width: 20, borderRadius: 3,
+    backgroundColor: Colors.ink,
   },
 
-  // Unlocked cell
-  cell: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 18,
-    paddingHorizontal: 10,
-    borderRadius: 24,
-    overflow: 'hidden',
+  pager: { flex: 1 },
+
+  page: {
+    width: W,
+    height: H,
   },
-  petPreview: {
-    width: 110,
-    height: 110,
+
+  petArea: {
+    position: 'absolute',
+    left: 0, right: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cellName: {
+
+  cardWrap: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 16,
+    justifyContent: 'flex-end',
+  },
+
+  cardContent: { padding: 22, paddingBottom: 18 },
+
+  petName: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 18,
-    fontWeight: '500',
-    color: Colors.ink,
-    marginTop: 10,
-    letterSpacing: -0.2,
+    fontSize: 30, fontWeight: '500',
+    color: Colors.ink, letterSpacing: -0.4,
+    marginBottom: 2,
   },
-  cellTrait: {
-    fontSize: 11,
-    color: Colors.inkSoft,
-    marginTop: 3,
-    textAlign: 'center',
-  },
-  accentDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 10,
+  petTrait: {
+    fontSize: 14, color: Colors.inkSoft,
+    marginBottom: 14,
   },
 
-  // Locked cell
-  cellLocked: {
+  levelRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 18,
-    paddingHorizontal: 10,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(20,16,28,0.12)',
-    backgroundColor: 'rgba(20,16,28,0.03)',
-    minHeight: 200,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  lockIcon: { fontSize: 28, marginBottom: 10, opacity: 0.35 },
+  levelBadge: {
+    paddingHorizontal: 12, paddingVertical: 4,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(20,16,28,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,16,28,0.10)',
+  },
+  levelBadgeText: { fontSize: 12, fontWeight: '700' },
+  xpNums: { fontSize: 12, color: Colors.inkSoft, fontWeight: '500' },
 
-  footer: {
-    fontSize: 12,
-    color: Colors.inkFaint,
-    textAlign: 'center',
-    marginTop: 28,
+  xpBarBg: {
+    height: 6, borderRadius: 9999,
+    backgroundColor: 'rgba(20,16,28,0.08)',
+    overflow: 'hidden',
+    marginBottom: 18,
+  },
+  xpBarFill: { height: '100%', borderRadius: 9999 },
+
+  detailBtn: {
+    alignSelf: 'center',
+    paddingHorizontal: 28, paddingVertical: 12,
+    borderRadius: 9999,
+    backgroundColor: Colors.ink,
+  },
+  detailBtnText: {
+    fontSize: 13, fontWeight: '700',
+    color: '#fff', letterSpacing: 1.2,
   },
 });

@@ -11,10 +11,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { AppBackground } from '@/components/ui/AppBackground';
@@ -42,7 +41,6 @@ const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }>
 };
 
 export default function PetInfoScreen() {
-  const router = useRouter();
   const { petId } = useLocalSearchParams<{ petId?: string }>();
   const { pets, activePet } = usePetStore();
   const insets = useSafeAreaInsets();
@@ -113,17 +111,6 @@ export default function PetInfoScreen() {
       {/* Full-screen pet — no pointerEvents block so WebView can receive touch for 3D spin */}
       <View style={[styles.petBg, { top: 56 + insets.top }]}>
         <PetRenderer pet={petDef} size={380} />
-      </View>
-
-      {/* Collection shortcut */}
-      <View style={styles.collectionBtn} pointerEvents="box-none">
-        <TouchableOpacity
-          onPress={() => router.push('/(app)/pet-collection' as any)}
-          style={styles.collectionPill}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.collectionPillText}>見全部寵物 →</Text>
-        </TouchableOpacity>
       </View>
 
       {/* ── Bottom Sheet ───────────────────────── */}
@@ -232,27 +219,6 @@ const styles = StyleSheet.create({
     bottom: PEEK_H,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  // Collection shortcut pill
-  collectionBtn: {
-    position: 'absolute',
-    bottom: PEEK_H + 16,
-    right: 20,
-    zIndex: 10,
-  },
-  collectionPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(255,255,255,0.72)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(20,16,28,0.08)',
-  },
-  collectionPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.inkSoft,
   },
 
   // ── Sheet ───────────────────────────────────
