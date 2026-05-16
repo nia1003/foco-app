@@ -40,7 +40,7 @@ export default function MissionScreen() {
               </View>
               <View style={styles.sessionDots}>
                 {[1, 1, 0].map((d, i) => (
-                  <View key={i} style={[styles.sessionDot, { backgroundColor: d ? Colors.pinkHot : 'rgba(20,16,28,0.10)' }]} />
+                  <View key={i} style={[styles.sessionDot, { backgroundColor: d ? '#b5607a' : 'rgba(20,16,28,0.10)' }]} />
                 ))}
               </View>
             </View>
@@ -55,10 +55,9 @@ export default function MissionScreen() {
               <View style={styles.rewardsList}>
                 {[
                   { emoji: '⭐', label: '+30 XP', sub: 'Experience points' },
-                  { emoji: '🥕', label: '×2 Carrots', sub: 'Pet food' },
                   { emoji: '🎖️', label: 'Focus Badge', sub: 'Rare collectible' },
                 ].map((r, i) => (
-                  <View key={i} style={[styles.rewardItem, i < 2 && styles.rewardDivider]}>
+                  <View key={i} style={[styles.rewardItem, i < 1 && styles.rewardDivider]}>
                     <Text style={styles.rewardEmoji}>{r.emoji}</Text>
                     <View>
                       <Text style={styles.rewardLabel}>{r.label}</Text>
@@ -98,7 +97,7 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 10, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6 },
   progressPct: { fontSize: 16, fontWeight: '700', color: Colors.ink },
   progressBg: { height: 8, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
-  progressFill: { height: 8, borderRadius: 9999, backgroundColor: Colors.pinkHot },
+  progressFill: { height: 8, borderRadius: 9999, backgroundColor: '#F2CEDC' },
   sessionDots: { flexDirection: 'row', gap: 10, marginTop: 14 },
   sessionDot: { width: 18, height: 18, borderRadius: 9 },
   rewardsCard: { padding: 22 },
