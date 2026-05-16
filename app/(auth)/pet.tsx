@@ -10,9 +10,11 @@ import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
+import { usePetStore } from '@/stores/petStore';
 
 export default function CompanionScreen() {
   const router = useRouter();
+  const { saveOnboardingPetName } = usePetStore();
   const [selected, setSelected] = useState(PETS[0].id);
   const selectedPet = PETS.find((p) => p.id === selected)!;
 
@@ -70,7 +72,10 @@ export default function CompanionScreen() {
             <View style={styles.btnWrap}>
               <TouchableOpacity
                 style={styles.continueBtn}
-                onPress={() => router.push({ pathname: '/(auth)/consent', params: { petId: selected } })}
+                onPress={async () => {
+                await saveOnboardingPetName(selectedPet.name);
+                router.push({ pathname: '/(auth)/consent', params: { petId: selected } });
+              }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.continueBtnText}>CONTINUE →</Text>

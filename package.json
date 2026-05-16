@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
     "tokens:build": "node tokens/build-tokens.mjs",
     "tokens:sync": "node tokens/build-tokens.mjs && cp tokens/build/theme.generated.ts constants/theme.ts",
     "figma:connect": "figma connect publish"
