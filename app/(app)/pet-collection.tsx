@@ -18,7 +18,7 @@ import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
-import { mockPet } from '@/data/mockData';
+import { mockPets } from '@/data/mockData';
 
 // Collect the 4 slots: real pets first, then coming-soon
 const UNLOCKED = PETS.filter((p) => !p.locked);
@@ -33,8 +33,8 @@ const LOCKED_SLOTS = [...LOCKED, ...COMING_SOON].slice(0, Math.max(0, 4 - UNLOCK
 
 export default function PetCollectionScreen() {
   const router = useRouter();
-  const { pet: storePet } = usePetStore();
-  const userPetName = (storePet ?? mockPet).name.toLowerCase();
+  const { activePet } = usePetStore();
+  const userPetName = (activePet ?? mockPets[0]).name.toLowerCase();
 
   // Interleave unlocked + locked to fill 4 slots
   const slots: Array<
@@ -70,7 +70,12 @@ export default function PetCollectionScreen() {
                   key={pet.id}
                   style={styles.cellWrap}
                   activeOpacity={0.85}
-                  onPress={() => router.push('/(app)/pet-info')}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/pet-info',
+                      params: { petId: pet.id }, // pet.id = 'xingwang' | 'lily' (matched by name in pet-info)
+                    })
+                  }
                 >
                   <FrostCard radius={24} padded={false}>
                     <View style={[styles.cell, isActive && { borderColor: pet.accent, borderWidth: 2 }]}>

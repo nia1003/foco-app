@@ -26,7 +26,7 @@ function buildHTML(color: string, interactive: boolean): string {
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{width:100%;height:100%;overflow:hidden;background:transparent}
-  canvas{display:block;width:100%!important;height:100%!important}
+  canvas{display:block;width:100%!important;height:100%!important;filter:saturate(1.6) contrast(1.05)}
 </style>
 </head>
 <body>

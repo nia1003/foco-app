@@ -34,9 +34,9 @@ export default function RewardScreen() {
     : 0;
 
   useEffect(() => {
-    // 1. 更新 pet store
-    if (result.new_xp !== undefined) {
-      applySessionResult(result.new_xp, result.new_level, result.xp_next_level);
+    // 1. 更新 pet store（傳入 petId 讓 store 更新正確的寵物）
+    if (result.pet_id && result.new_xp !== undefined) {
+      applySessionResult(result.pet_id, result.new_xp, result.new_level, result.xp_next_level);
     }
 
     // 2. 進場動畫序列

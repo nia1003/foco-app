@@ -11,6 +11,7 @@ import type {
 
 export const mockSessionResult: SessionResult = {
   session_id: 'mock-001',
+  pet_id: 'mock-pet-001',
   xp_gained: 50,
   new_xp: 180,
   new_level: 2,
@@ -19,6 +20,7 @@ export const mockSessionResult: SessionResult = {
   xp_next_level: 250,
 };
 
+// Single-pet alias for components that still use mockPet directly
 export const mockPet: FocoPet = {
   id: 'mock-pet-001',
   owner_id: 'mock-user-001',
@@ -27,6 +29,26 @@ export const mockPet: FocoPet = {
   xp: 180,
   xp_next_level: 250,
 };
+
+// Multi-pet mock — used after petStore refactor
+export const mockPets: FocoPet[] = [
+  {
+    id: 'mock-pet-001',
+    owner_id: 'mock-user-001',
+    name: 'Xingwang',
+    level: 2,
+    xp: 180,
+    xp_next_level: 250,
+  },
+  {
+    id: 'mock-pet-002',
+    owner_id: 'mock-user-001',
+    name: 'Lily',
+    level: 1,
+    xp: 40,
+    xp_next_level: 100,
+  },
+];
 
 export const mockSessions: {
   sessions: SessionRecord[];

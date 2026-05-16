@@ -15,8 +15,8 @@ import { PetRenderer } from '@/components/pets/PetRenderer';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { getPet } from '@/services/focoService';
-import { mockPet } from '@/data/mockData';
+import { getPets } from '@/services/focoService';
+import { mockPets } from '@/data/mockData';
 
 const DURATION_OPTIONS = [15, 25, 50, 90];
 
@@ -26,13 +26,13 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export default function HomeScreen() {
   const router = useRouter();
   const { userId, userName, userEmail } = useAuthStore();
-  const { pet: storePet, setPet } = usePetStore();
+  const { activePet: storePet, setPets, restoreActivePet } = usePetStore();
 
   const [selectedDuration, setSelectedDuration] = useState(25);
 
-  const pet = storePet ?? mockPet;
+  const pet = storePet ?? mockPets[0];
   const xpProgress = pet.xp_next_level > 0 ? pet.xp / pet.xp_next_level : 1;
-  const activePet =
+  const petDef =
     PETS.find((p) => p.id === pet.name.toLowerCase()) ??
     PETS.find((p) => p.id === 'xingwang') ??
     PETS[0];
@@ -40,8 +40,11 @@ export default function HomeScreen() {
   // Fetch real pet data
   useEffect(() => {
     if (!userId) return;
-    getPet(userId)
-      .then((p) => setPet(p))
+    getPets(userId)
+      .then((pets) => {
+        setPets(pets);
+        restoreActivePet();
+      })
       .catch(() => {}); // 後端未好時保持 mock
   }, [userId]);
 
@@ -75,11 +78,16 @@ export default function HomeScreen() {
           <FrostCard radius={28} padded={false}>
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => router.push('/(app)/pet-info')}
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/pet-info',
+                  params: { petId: pet.id },
+                })
+              }
             >
               <View style={styles.petCard}>
                 <View style={styles.petAvatar}>
-                  <PetRenderer pet={activePet} size={120} />
+                  <PetRenderer pet={petDef} size={120} />
                 </View>
                 <View style={styles.petInfo}>
                   <Text style={styles.petName}>{pet.name} · Lv.{pet.level}</Text>

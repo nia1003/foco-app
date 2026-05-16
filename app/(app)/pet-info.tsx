@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { AppBackground } from '@/components/ui/AppBackground';
@@ -23,7 +23,7 @@ import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
-import { mockPet } from '@/data/mockData';
+import { mockPets } from '@/data/mockData';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -43,9 +43,15 @@ const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }>
 
 export default function PetInfoScreen() {
   const router = useRouter();
-  const { pet: storePet } = usePetStore();
+  const { petId } = useLocalSearchParams<{ petId?: string }>();
+  const { pets, activePet } = usePetStore();
   const insets = useSafeAreaInsets();
-  const pet = storePet ?? mockPet;
+
+  // Find the specific pet by Supabase UUID or lowercase name; fall back to activePet, then first mock
+  const pet =
+    (petId ? pets.find((p) => p.id === petId || p.name.toLowerCase() === petId) : null) ??
+    activePet ??
+    mockPets[0];
 
   const level = Math.min(Math.max(pet.level, 1), 5) as 1 | 2 | 3 | 4 | 5;
   const info = LEVEL_INFO[level];
@@ -100,9 +106,7 @@ export default function PetInfoScreen() {
 
       {/* Full-screen pet — no pointerEvents block so WebView can receive touch for 3D spin */}
       <View style={[styles.petBg, { top: 56 + insets.top }]}>
-        <View style={{ transform: [{ scale: info.scale }] }}>
-          <PetRenderer pet={petDef} size={240} />
-        </View>
+        <PetRenderer pet={petDef} size={380} />
       </View>
 
       {/* Collection shortcut */}

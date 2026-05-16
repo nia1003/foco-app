@@ -150,6 +150,7 @@ export interface SessionRecord {
 // POST /functions/v1/session-complete 的 request body
 export interface SessionPayload {
   user_id: string;
+  pet_id: string;              // 本次陪伴的寵物 ID
   task_id: string | null;
   planned_duration: number;    // 秒
   actual_duration: number;     // 秒
@@ -165,6 +166,7 @@ export interface SessionPayload {
 // Edge Function 回傳（+ focus.tsx 補充的本地計時統計）
 export interface SessionResult {
   session_id: string;
+  pet_id: string;              // 哪隻寵物獲得 XP
   xp_gained: number;
   new_xp: number;
   new_level: number;

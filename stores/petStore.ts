@@ -1,28 +1,88 @@
 // ─────────────────────────────────────────────
-// Pet Store — 寵物狀態（FOCO 版）
+// Pet Store — 多寵物版本
+//
+// ● pets[]         所有屬於這個 user 的寵物
+// ● activePetId    目前選中（陪伴專注）的寵物 ID
+// ● activePet      computed: pets.find(id) ?? pets[0] ?? null
+//
+// activePetId 會寫入 AsyncStorage，重啟 App 後保留選擇
 // ─────────────────────────────────────────────
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FocoPet } from '@/types';
 
+const ACTIVE_PET_KEY = '@foco/activePetId';
+
 interface PetStore {
-  pet: FocoPet | null;
-  setPet: (pet: FocoPet) => void;
-  /** Session 結束後，直接套用後端回傳的新 XP / Level */
-  applySessionResult: (newXP: number, newLevel: number, xpNextLevel: number) => void;
+  pets: FocoPet[];
+  activePetId: string | null;
+
+  // ── computed (derived, not stored) ───────────
+  activePet: FocoPet | null;
+
+  // ── actions ──────────────────────────────────
+  /** 取代整個 pets 陣列（首次載入或刷新時使用） */
+  setPets: (pets: FocoPet[]) => void;
+  /** 選擇陪伴的寵物，並寫入 AsyncStorage */
+  setActivePet: (petId: string) => Promise<void>;
+  /** Session 結束後更新特定寵物的 XP / Level */
+  applySessionResult: (
+    petId: string,
+    newXP: number,
+    newLevel: number,
+    xpNextLevel: number,
+  ) => void;
+  /** 從 AsyncStorage 恢復 activePetId */
+  restoreActivePet: () => Promise<void>;
   reset: () => void;
 }
 
-export const usePetStore = create<PetStore>((set) => ({
-  pet: null,
+function deriveActivePet(pets: FocoPet[], activePetId: string | null): FocoPet | null {
+  if (!pets.length) return null;
+  return pets.find((p) => p.id === activePetId) ?? pets[0];
+}
 
-  setPet: (pet) => set({ pet }),
+export const usePetStore = create<PetStore>((set, get) => ({
+  pets: [],
+  activePetId: null,
+  activePet: null,
 
-  applySessionResult: (newXP, newLevel, xpNextLevel) =>
+  setPets: (pets) => {
+    const activePetId = get().activePetId;
+    set({ pets, activePet: deriveActivePet(pets, activePetId) });
+  },
+
+  setActivePet: async (petId) => {
     set((state) => ({
-      pet: state.pet
-        ? { ...state.pet, xp: newXP, level: newLevel, xp_next_level: xpNextLevel }
-        : null,
-    })),
+      activePetId: petId,
+      activePet: deriveActivePet(state.pets, petId),
+    }));
+    try {
+      await AsyncStorage.setItem(ACTIVE_PET_KEY, petId);
+    } catch {}
+  },
 
-  reset: () => set({ pet: null }),
+  applySessionResult: (petId, newXP, newLevel, xpNextLevel) =>
+    set((state) => {
+      const pets = state.pets.map((p) =>
+        p.id === petId
+          ? { ...p, xp: newXP, level: newLevel, xp_next_level: xpNextLevel }
+          : p,
+      );
+      return { pets, activePet: deriveActivePet(pets, state.activePetId) };
+    }),
+
+  restoreActivePet: async () => {
+    try {
+      const stored = await AsyncStorage.getItem(ACTIVE_PET_KEY);
+      if (stored) {
+        set((state) => ({
+          activePetId: stored,
+          activePet: deriveActivePet(state.pets, stored),
+        }));
+      }
+    } catch {}
+  },
+
+  reset: () => set({ pets: [], activePetId: null, activePet: null }),
 }));

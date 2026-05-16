@@ -39,17 +39,27 @@ export async function completeSession(payload: SessionPayload): Promise<SessionR
   return res.json() as Promise<SessionResult>;
 }
 
-// ── getPet ────────────────────────────────────
-export async function getPet(userId: string): Promise<FocoPet> {
+// ── getPets — 取得 user 所有寵物（多寵物支援）──────
+export async function getPets(userId: string): Promise<FocoPet[]> {
   const { data, error } = await supabase
     .from('pets')
     .select('id, owner_id, name, level, xp')
     .eq('owner_id', userId)
-    .single();
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
 
-  return { ...data, xp_next_level: xpNextLevel(data.level) };
+  return (data as any[]).map((row) => ({
+    ...row,
+    xp_next_level: xpNextLevel(row.level),
+  }));
+}
+
+// ── getPet — 向下相容 wrapper（取第一隻）───────────
+export async function getPet(userId: string): Promise<FocoPet> {
+  const pets = await getPets(userId);
+  if (!pets.length) throw new Error('No pet found');
+  return pets[0];
 }
 
 // ── getSessions ───────────────────────────────
@@ -98,7 +108,7 @@ export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
     .from('tasks')
     .select('id, user_id, title, duration_min, status, created_at')
     .eq('user_id', userId)
-    .neq('status', 'deleted')          // 過濾軟刪除
+    .neq('status', 'deleted')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -121,8 +131,7 @@ export async function createTask(
   return data as Task;
 }
 
-// ── deleteTask ────────────────────────────────
-// 軟刪除：status → 'deleted'，不影響已關聯的 sessions 紀錄
+// ── deleteTask（軟刪除）────────────────────────
 export async function deleteTask(taskId: string): Promise<void> {
   const { error } = await supabase
     .from('tasks')

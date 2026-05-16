@@ -10,12 +10,13 @@ import type { Pet } from '@/constants/pets';
 interface PetRendererProps {
   pet: Pet;
   size: number;
+  interactive?: boolean;
 }
 
-export function PetRenderer({ pet, size }: PetRendererProps) {
+export function PetRenderer({ pet, size, interactive = true }: PetRendererProps) {
   if (pet.CustomComponent) {
     const PetComponent = pet.CustomComponent;
-    return <PetComponent size={size} color={pet.accent} />;
+    return <PetComponent size={size} color={pet.accent} interactive={interactive} />;
   }
   return (
     <Image

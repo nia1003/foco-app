@@ -34,11 +34,11 @@ export default function FocusScreen() {
     taskId?: string;
   }>();
   const { userId } = useAuthStore();
-  const { pet: storePet } = usePetStore();
+  const { activePet: storePet, pets, setActivePet } = usePetStore();
   const durationSeconds = Number(durationMin) * 60;
 
-  // Resolve active pet (use user's pet → xingwang fallback → PETS[0])
-  const activePet =
+  // Resolve active pet definition (for 3D render)
+  const activePetDef =
     (storePet
       ? PETS.find((p) => p.id === storePet.name.toLowerCase()) ??
         PETS.find((p) => p.id === 'xingwang')
@@ -98,6 +98,7 @@ export default function FocusScreen() {
 
     const payload: SessionPayload = {
       user_id: userId ?? 'unknown',
+      pet_id: storePet?.id ?? 'unknown',
       task_id: snap.taskId,
       planned_duration: snap.plannedDuration,
       actual_duration: actualDuration,
@@ -152,6 +153,26 @@ export default function FocusScreen() {
 
         {/* Pet + timer */}
         <View style={styles.petArea}>
+          {/* Compact pet switcher — only shown when user has > 1 pet */}
+          {pets.length > 1 && (
+            <View style={styles.petSwitcherRow}>
+              {pets.map((p) => {
+                const def = PETS.find((d) => d.id === p.name.toLowerCase()) ?? PETS[0];
+                const isActive = p.id === storePet?.id;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[styles.petSwitchChip, isActive && { borderColor: def.accent, borderWidth: 2 }]}
+                    onPress={() => setActivePet(p.id)}
+                    activeOpacity={0.75}
+                  >
+                    <PetRenderer pet={def} size={44} interactive={false} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
           {/* Floating pet */}
           <Animated.View
             style={{
@@ -161,7 +182,7 @@ export default function FocusScreen() {
               ],
             }}
           >
-            <PetRenderer pet={activePet} size={220} />
+            <PetRenderer pet={activePetDef} size={220} />
           </Animated.View>
 
           {/* Timer display */}
@@ -274,6 +295,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 20,
+  },
+
+  // Pet switcher (compact row, only shows when >1 pet)
+  petSwitcherRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  petSwitchChip: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.60)',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Timer below pet
