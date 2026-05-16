@@ -17,8 +17,9 @@ export default function CompanionScreen() {
   const router = useRouter();
   const { play } = useSound();
   const { saveOnboardingPetName } = usePetStore();
-  const [selected, setSelected] = useState(PETS[0].id);
-  const selectedPet = PETS.find((p) => p.id === selected)!;
+  const AVAILABLE_PETS = PETS.filter((p) => !p.locked);
+  const [selected, setSelected] = useState(AVAILABLE_PETS[0].id);
+  const selectedPet = AVAILABLE_PETS.find((p) => p.id === selected)!;
 
   return (
     <View style={styles.root}>
@@ -45,7 +46,7 @@ export default function CompanionScreen() {
             <View style={styles.selectorInner}>
               <Text style={styles.selectorLabel}>Choose your companion</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.petRow}>
-                {PETS.map((pet) => {
+                {AVAILABLE_PETS.map((pet) => {
                   const active = selected === pet.id;
                   return (
                     <TouchableOpacity
