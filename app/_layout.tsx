@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/fraunces';
 import { useAuthStore } from '@/stores/authStore';
 import { audioService } from '@/services/audioService';
+import { SoundProvider } from '@/components/SoundProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -49,9 +50,9 @@ export default function RootLayout() {
   }, [isAuthenticated, isLoading, segments, router]);
 
   return (
-    <>
+    <SoundProvider>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }} />
-    </>
+    </SoundProvider>
   );
 }

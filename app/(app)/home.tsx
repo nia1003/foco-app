@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -48,6 +49,7 @@ export default function HomeScreen() {
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet, setPets, setActivePet, restoreActivePet } = usePetStore();
 
+  const { play } = useSound();
   const [selectedDuration, setSelectedDuration] = useState(25);
   const [selectFeedback, setSelectFeedback] = useState<string | null>(null);
 
@@ -68,7 +70,8 @@ export default function HomeScreen() {
   const isMockPet = (p: FocoPet) => p.id.startsWith('mock-');
 
   const handleSelectPet = async (p: FocoPet, defName: string) => {
-    if (isMockPet(p)) return; // mock pets aren't in the DB, can't actually select
+    if (isMockPet(p)) return;
+    play('tap');
     await setActivePet(p.id);
     setSelectFeedback(defName);
     setTimeout(() => setSelectFeedback(null), 1800);
@@ -243,7 +246,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={min}
                     style={[styles.durationChip, selectedDuration === min && styles.durationChipActive]}
-                    onPress={() => setSelectedDuration(min)}
+                    onPress={() => { play('tap'); setSelectedDuration(min); }}
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.durationChipText, selectedDuration === min && styles.durationChipTextActive]}>
@@ -255,12 +258,13 @@ export default function HomeScreen() {
 
               <TouchableOpacity
                 style={styles.startBtn}
-                onPress={() =>
+                onPress={() => {
+                  play('transition_up');
                   router.push({
                     pathname: '/(app)/focus',
                     params: { durationMin: String(selectedDuration) },
-                  })
-                }
+                  });
+                }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.startBtnText}>START FOCUS →</Text>
