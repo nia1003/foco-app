@@ -22,7 +22,7 @@ export const mockSessionResult: SessionResult = {
 export const mockPet: FocoPet = {
   id: 'mock-pet-001',
   owner_id: 'mock-user-001',
-  name: 'Bean',
+  name: 'Xingwang',
   level: 2,
   xp: 180,
   xp_next_level: 250,

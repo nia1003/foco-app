@@ -2,13 +2,20 @@
  * Pet character definitions.
  * Images go in: assets/pets/
  * Filenames match the id below.
+ *
+ * CustomComponent: optional React component for vector/3D pets.
+ * When set, PetRenderer uses this instead of the image prop.
  */
+import type { ComponentType } from 'react';
+import { XingWangPet } from '@/components/pets/XingWangPet';
+
 export interface Pet {
   id: string;
   name: string;
   trait: string;
   accent: string;       // theme color for selection highlight
   image: any;           // require('../assets/pets/xxx.png')
+  CustomComponent?: ComponentType<{ size: number; color?: string }>;
 }
 
 export const PETS: Pet[] = [
@@ -46,5 +53,13 @@ export const PETS: Pet[] = [
     trait: 'Bold & spiky',
     accent: '#F2CEDC',
     image: require('../assets/pets/spike.png'),
+  },
+  {
+    id: 'xingwang',
+    name: 'Xingwang',
+    trait: 'Round & cheerful',
+    accent: '#FABD03',
+    image: require('../assets/pets/bean.png'), // fallback if CustomComponent unavailable
+    CustomComponent: XingWangPet,
   },
 ];

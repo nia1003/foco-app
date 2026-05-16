@@ -5,12 +5,13 @@
  * - 導向 Timer 時帶入 durationMin 參數
  */
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
+import { PetRenderer } from '@/components/pets/PetRenderer';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
@@ -75,7 +76,7 @@ export default function HomeScreen() {
             >
               <View style={styles.petCard}>
                 <View style={[styles.petAvatar, { backgroundColor: activePet.accent + '30' }]}>
-                  <Image source={activePet.image} style={styles.petImage} resizeMode="contain" />
+                  <PetRenderer pet={activePet} size={80} />
                 </View>
                 <View style={styles.petInfo}>
                   <Text style={styles.petName}>{pet.name} · Lv.{pet.level}</Text>
