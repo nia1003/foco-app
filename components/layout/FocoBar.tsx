@@ -55,6 +55,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 18,
     position: 'relative',
+    zIndex: 10,
   },
   wordmark: {
     fontFamily: 'Fraunces_500Medium',
