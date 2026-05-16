@@ -51,8 +51,8 @@ function buildHTML(color: string, interactive: boolean): string {
 
   var scene=new THREE.Scene();
   var camera=new THREE.PerspectiveCamera(40,W/H,0.1,100);
-  camera.position.set(0,0.3,8);
-  camera.lookAt(0,0,0);
+  camera.position.set(0,0.5,6.5);
+  camera.lookAt(0,0.2,0);
 
   // ── Lighting ────────────────────────────────────
   scene.add(new THREE.AmbientLight(0xffffff,0.9));
@@ -118,8 +118,8 @@ function buildHTML(color: string, interactive: boolean): string {
   // ── Base dome ─────────────────────────────────────
   add(new THREE.SphereGeometry(0.80,26,26), greenMat, 0,-2.02,0, 1.28,0.36,1.0);
 
-  ch.scale.setScalar(0.62);
-  ch.position.y=0.10;
+  ch.scale.setScalar(0.82);
+  ch.position.y=0.20;
 
   // ── Drag-to-rotate (same logic as XingWang) ──────
   var rotY=0,rotX=0.05,tY=0,tX=0.05,dragging=false,lx=0,ly=0;

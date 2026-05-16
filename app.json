@@ -30,7 +30,9 @@
       "package": "com.yourcompany.focoapp",
       "permissions": [
         "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED"
+        "RECEIVE_BOOT_COMPLETED",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -54,6 +56,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dac8347f-4086-4d35-af5e-09e30b8cfb5e"
+      }
     }
   }
 }

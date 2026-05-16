@@ -8,8 +8,12 @@ on:
 
 jobs:
   build:
-    name: EAS Preview Build
+    name: EAS Build
     runs-on: ubuntu-latest
+
+    # 掛在 job 層級，所有 step 都能讀到
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -24,18 +28,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup EAS
+      - name: Setup EAS CLI
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # PR → preview build（internal distribution，QR 碼給組員掃）
+      # PR → preview build，加 --no-wait 讓 CI 馬上回傳（不等 build 跑完）
       - name: EAS Preview Build (PR)
         if: github.event_name == 'pull_request'
-        run: eas build --platform all --non-interactive --profile preview
+        run: eas build --platform all --non-interactive --profile preview --no-wait
 
       # push to main → production build
       - name: EAS Production Build (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: eas build --platform all --non-interactive --profile production
+        run: eas build --platform all --non-interactive --profile production --no-wait

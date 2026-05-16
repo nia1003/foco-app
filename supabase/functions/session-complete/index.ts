@@ -59,16 +59,13 @@ function calcXP(params: {
   let xp = base
 
   // 加分
-  if (completed)          xp += 10   // 完成目標時長
-  if (leftAppCount === 0) xp += 5    // 未切出 App
-  if (pauseCount === 0)   xp += 5    // 未暫停
+  if (completed) xp += 10   // 完成目標時長
 
-  // 扣分
-  if (pauseCount > 3)              xp -= 5  // 暫停超過 3 次
-  if (leftAppCount > 2)            xp -= 5  // 切出超過 2 次
-  if (leftAppTotalSec > 5 * 60)   xp -= 5  // 切出總時間 > 5 分鐘
+  // 折扣（有暫停 -5%、有切出 App -10%，可同時疊加）
+  if (pauseCount > 0)   xp = xp * 0.95
+  if (leftAppCount > 0) xp = xp * 0.90
 
-  return Math.max(xp, 0)  // 不能為負
+  return Math.max(Math.round(xp), 0)  // 四捨五入，不能為負
 }
 
 // ── 升級門檻（index = level - 1）────────────────────────────

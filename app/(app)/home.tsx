@@ -129,8 +129,7 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={p.id}
                   style={[styles.petCard, { width: PET_CARD_W }]}
-                  onPress={() => setActivePet(p.id)}
-                  onLongPress={() =>
+                  onPress={() =>
                     router.push({
                       pathname: '/(app)/pet-info',
                       params: { petId: def.id },
@@ -171,7 +170,7 @@ export default function HomeScreen() {
             })}
           </ScrollView>
 
-          <Text style={styles.selectorHint}>點擊選擇 · 長按查看詳情</Text>
+          <Text style={styles.selectorHint}>點擊查看詳情</Text>
         </View>
 
         {/* ── Focus Launcher ─────────────────────── */}

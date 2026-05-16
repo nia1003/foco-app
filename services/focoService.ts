@@ -108,7 +108,7 @@ export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
     .from('tasks')
     .select('id, user_id, title, duration_min, status, created_at')
     .eq('user_id', userId)
-    .eq('deleted', false)            // ← 用 deleted 欄位過濾（比 status 更明確）
+    .neq('status', 'deleted')        // 軟刪除：status='deleted' 的不顯示
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -123,7 +123,7 @@ export async function createTask(
 ): Promise<Task> {
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ user_id: userId, title, duration_min: durationMin, deleted: false })
+    .insert({ user_id: userId, title, duration_min: durationMin })
     .select()
     .single();
 
@@ -131,11 +131,13 @@ export async function createTask(
   return data as Task;
 }
 
-// ── deleteTask（軟刪除 — 標記 deleted=true）────
+// ── deleteTask（軟刪除 — status='deleted'）───────
+// 注意：等亮節執行 supabase/migrations/add_deleted_to_tasks.sql 之後
+// 可改成 update({ deleted: true }) + getTasks 改 .eq('deleted', false)
 export async function deleteTask(taskId: string): Promise<void> {
   const { error } = await supabase
     .from('tasks')
-    .update({ deleted: true })
+    .update({ status: 'deleted' })
     .eq('id', taskId);
-  if (error) throw error;   // 讓呼叫端自己決定如何處理錯誤
+  if (error) throw error;
 }

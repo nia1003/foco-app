@@ -61,9 +61,6 @@ export default function AnalysisScreen() {
   const discKey = result.focus_type ?? 'steadiness';
   const disc = DISC_INFO[discKey as keyof typeof DISC_INFO] ?? DISC_INFO.steadiness;
 
-  // XP 明細說明
-  const xpDetails = buildXPDetails(result);
-
   // ── 截圖並分享
   const handleShare = async () => {
     try {
@@ -133,19 +130,11 @@ export default function AnalysisScreen() {
             </FrostCard>
           </View>
 
-          {/* XP 明細卡 */}
+          {/* XP 卡 */}
           <View style={styles.section}>
             <FrostCard radius={24} padded={false}>
               <View style={styles.xpCard}>
                 <Text style={styles.xpTotal}>獲得 XP：+{result.xp_gained ?? 0} XP</Text>
-                {xpDetails.map((d, i) => (
-                  <View key={i} style={styles.xpRow}>
-                    <Text style={styles.xpItemLabel}>{d.label}</Text>
-                    <Text style={[styles.xpItemValue, d.value < 0 && styles.negative]}>
-                      {d.value > 0 ? `+${d.value}` : d.value} XP
-                    </Text>
-                  </View>
-                ))}
               </View>
             </FrostCard>
           </View>
@@ -185,30 +174,6 @@ function StatRow({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-// XP 明細（根據 result 與本地統計推算；真實明細應由後端回傳）
-function buildXPDetails(result: SessionResult) {
-  const details: { label: string; value: number }[] = [];
-  if (!result.xp_gained) return details;
-
-  const actualMin = Math.floor((result.actual_duration ?? 0) / 60);
-  let base = 5;
-  if (actualMin >= 60) base = 50;
-  else if (actualMin >= 30) base = 30;
-  else if (actualMin >= 15) base = 15;
-
-  details.push({ label: '基礎 XP', value: base });
-
-  const discKey = result.focus_type ?? '';
-  // 加分項推算
-  if (result.pause_count === 0) details.push({ label: '不暫停獎勵', value: 5 });
-  if (result.left_app_count === 0) details.push({ label: '不切出獎勵', value: 5 });
-
-  // 是否完成（score >= 2 → 有 completed 加分）
-  const impliedCompleted = result.xp_gained >= base + 10;
-  if (impliedCompleted) details.push({ label: '完成目標', value: 10 });
-
-  return details;
-}
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.softBg },
@@ -246,13 +211,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '500',
     color: Colors.ink,
-    marginBottom: 14,
     letterSpacing: -0.3,
   },
-  xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  xpItemLabel: { fontSize: 13, color: Colors.inkSoft },
-  xpItemValue: { fontSize: 13, fontWeight: '600', color: Colors.ink },
-  negative: { color: Colors.pinkText },
   actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   actionBtn: {
     flex: 1,

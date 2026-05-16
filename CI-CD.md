@@ -12,7 +12,7 @@
 
 | Secret 名稱 | 在哪裡取得 |
 |---|---|
-| `EXPO_TOKEN` | [expo.dev](https://expo.dev) → Account → Access Tokens → Create |
+| `EXPO_TOKEN` | 本地執行 `eas token:create`，選 "All projects" scope，複製產生的 token（⚠️ 不是 expo.dev 網頁上的 Account Access Token，格式不同） |
 | `SUPABASE_ACCESS_TOKEN` | [supabase.com](https://supabase.com) → Account → Access Tokens → Generate new token |
 | `SUPABASE_PROJECT_ID` | Supabase Dashboard → Project Settings → General → Reference ID |
 
