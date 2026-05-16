@@ -369,6 +369,7 @@ export default function MissionsScreen() {
             </FrostCard>
           )}
 
+          <View style={styles.taskList}>
           {pendingTasks.map((task) => (
             <View key={task.id} style={styles.myTaskWrap}>
               <FrostCard radius={20} padded={false}>
@@ -415,6 +416,7 @@ export default function MissionsScreen() {
               </FrostCard>
             </View>
           ))}
+          </View>
         </View>
       </ScrollView>
 
@@ -526,6 +528,7 @@ const styles = StyleSheet.create({
 
   // Unified quest + task card styles
   list: { gap: 10, marginTop: 8 },
+  taskList: { gap: 10 },
   myTasksSection: { marginTop: 24 },
   myTasksLabel: { fontSize: 10, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6, marginBottom: 10 },
   emptyState: { padding: 20, alignItems: 'center' },
