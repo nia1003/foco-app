@@ -6,6 +6,7 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
+import { AppleIcon, GoogleIcon } from '@/components/ui/BrandIcons';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { Colors } from '@/constants/theme';
 
@@ -40,7 +41,7 @@ export default function WelcomeScreen() {
                 onPress={() => { play('tap'); comingSoon('Apple'); }}
                 activeOpacity={0.75}
               >
-                <Text style={styles.socialIcon}>🍎</Text>
+                <AppleIcon size={20} color="#000" />
                 <Text style={styles.socialLabel}>Apple</Text>
               </TouchableOpacity>
 
@@ -49,7 +50,7 @@ export default function WelcomeScreen() {
                 onPress={() => { play('tap'); comingSoon('Google'); }}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.socialIcon, { color: '#4285F4', fontWeight: '700' }]}>G</Text>
+                <GoogleIcon size={20} />
                 <Text style={styles.socialLabel}>Google</Text>
               </TouchableOpacity>
             </View>
