@@ -167,9 +167,8 @@ const styles = StyleSheet.create({
   // Pet card
   petCard: { flexDirection: 'row', alignItems: 'center', gap: 18, padding: 20 },
   petAvatar: {
-    width: 90, height: 90, borderRadius: 45,
+    width: 90, height: 90,
     alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
   },
   petImage: { width: 80, height: 80 },
   petInfo: { flex: 1 },

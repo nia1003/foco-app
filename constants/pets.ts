@@ -7,7 +7,7 @@
  * When set, PetRenderer uses this instead of the image prop.
  */
 import type { ComponentType } from 'react';
-import { XingWangPet } from '@/components/pets/XingWangPet';
+import { XingWangPet3D } from '@/components/pets/XingWangPet3D';
 
 export interface Pet {
   id: string;
@@ -60,6 +60,6 @@ export const PETS: Pet[] = [
     trait: 'Round & cheerful',
     accent: '#FABD03',
     image: require('../assets/pets/bean.png'), // fallback if CustomComponent unavailable
-    CustomComponent: XingWangPet,
+    CustomComponent: XingWangPet3D,
   },
 ];
