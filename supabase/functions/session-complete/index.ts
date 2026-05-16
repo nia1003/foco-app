@@ -93,6 +93,7 @@ serve(async (req) => {
     const body = await req.json()
     const {
       user_id,
+      pet_id,
       task_id          = null,
       planned_duration,
       actual_duration,
@@ -106,9 +107,9 @@ serve(async (req) => {
     } = body
 
     // 驗證必要欄位
-    if (!user_id || actual_duration == null || planned_duration == null) {
+    if (!user_id || !pet_id || actual_duration == null || planned_duration == null) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: user_id, actual_duration, planned_duration' }),
+        JSON.stringify({ error: 'Missing required fields: user_id, pet_id, actual_duration, planned_duration' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -153,11 +154,11 @@ serve(async (req) => {
 
     if (sessionError) throw sessionError
 
-    // ── 3. 讀取目前 pet XP ───────────────────────────────────
+    // ── 3. 讀取目前 pet XP（by pet UUID）────────────────────────
     const { data: pet, error: petError } = await supabase
       .from('pets')
       .select('xp, level')
-      .eq('owner_id', user_id)
+      .eq('id', pet_id)
       .single()
 
     if (petError) throw petError
@@ -166,11 +167,11 @@ serve(async (req) => {
     const newLevel = Math.min(calcLevel(newXP), 5)
     const levelUp  = newLevel > pet.level
 
-    // ── 4. 更新 pet XP & level ───────────────────────────────
+    // ── 4. 更新 pet XP & level（by pet UUID）─────────────────
     const { error: updateError } = await supabase
       .from('pets')
       .update({ xp: newXP, level: newLevel })
-      .eq('owner_id', user_id)
+      .eq('id', pet_id)
 
     if (updateError) throw updateError
 
@@ -192,6 +193,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         session_id:    session.id,
+        pet_id,
         xp_gained:     xpGained,
         new_xp:        newXP,
         new_level:     newLevel,

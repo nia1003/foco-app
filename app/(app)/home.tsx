@@ -1,14 +1,11 @@
 /**
  * HomeScreen — daily dashboard hub
  * - Pet carousel: tap for detail view
- * - START FOCUS button → bottom-sheet modal to pick pet / duration / mission
+ * - START FOCUS button → FocusSetupModal (pick pet / duration / mission)
  */
 import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +17,7 @@ import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
+import { FocusSetupModal } from '@/components/FocusSetupModal';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
@@ -32,11 +30,9 @@ import type { FocoPet, Task } from '@/types';
 const { width: SCREEN_W } = Dimensions.get('window');
 const PET_CARD_W = Math.round(SCREEN_W * 0.58);
 
-const DURATION_OPTIONS = [15, 25, 50, 90];
 const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const PINK      = '#F2CEDC';
 const PINK_TEXT = '#b5607a';
 
 function mergeWithMock(real: FocoPet[]): FocoPet[] {
@@ -56,12 +52,9 @@ export default function HomeScreen() {
 
   const displayPets: FocoPet[] = pets.length > 0 ? mergeWithMock(pets) : mockPets;
 
-  // ── Focus setup modal state ──────────────────────────────────────
-  const [showModal, setShowModal]           = useState(false);
-  const [selectedDuration, setSelectedDuration] = useState(25);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [modalPetId, setModalPetId]         = useState<string | null>(null);
-  const [modalTasks, setModalTasks]         = useState<Task[]>([]);
+  // ── Focus modal state ──────────────────────────────────────────
+  const [showModal, setShowModal] = useState(false);
+  const [modalTasks, setModalTasks] = useState<Task[]>([]);
 
   useEffect(() => {
     if (!userId) return;
@@ -70,38 +63,17 @@ export default function HomeScreen() {
       .catch(() => setPets(mockPets));
   }, [userId]);
 
-  // Open modal: set defaults, lazily fetch tasks
+  // Lazily fetch pending tasks the first time the modal opens
   const openModal = async () => {
-    const defaultPet = activePet?.id ?? pets[0]?.id ?? null;
-    setModalPetId(defaultPet);
-    setSelectedTaskId(null);
     setShowModal(true);
-
-    if (userId && modalTasks.length === 0) {
+    if (modalTasks.length === 0) {
       try {
-        const res = await getTasks(userId);
+        const res = await getTasks(userId ?? '');
         setModalTasks(res.tasks.filter((t: Task) => t.status === 'pending'));
       } catch {
         setModalTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
       }
-    } else if (!userId && modalTasks.length === 0) {
-      setModalTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
     }
-  };
-
-  const handleStartFocus = async () => {
-    if (modalPetId && modalPetId !== activePet?.id) {
-      await setActivePet(modalPetId);
-    }
-    setShowModal(false);
-    play('transition_up');
-    router.push({
-      pathname: '/(app)/focus',
-      params: {
-        durationMin: String(selectedDuration),
-        ...(selectedTaskId ? { taskId: selectedTaskId } : {}),
-      },
-    });
   };
 
   const now = new Date();
@@ -110,7 +82,6 @@ export default function HomeScreen() {
   const timeGreet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'there';
 
-  // Pets available in modal (real pets only; fall back to first mock if none)
   const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
 
   return (
@@ -198,96 +169,13 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* ── Focus Setup Modal ────────────────────────────────────── */}
-      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
-        <KeyboardAvoidingView
-          style={styles.modalKav}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowModal(false)} />
-
-          <View style={styles.modalSheet}>
-            <FrostCard radius={28}>
-              <Text style={styles.modalTitle}>Start a Focus Session</Text>
-
-              {/* ── Pet ── */}
-              <Text style={styles.modalLabel}>COMPANION</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.petChipRow}>
-                {modalPets.map((p) => {
-                  const def = PETS.find((d) => d.id === p.name.toLowerCase()) ?? PETS[0];
-                  const active = modalPetId === p.id;
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[styles.petChip, active && { borderColor: def.accent, backgroundColor: def.accent + '18' }]}
-                      onPress={() => { play('tap'); setModalPetId(p.id); }}
-                      activeOpacity={0.8}
-                    >
-                      <PetRenderer pet={def} size={52} interactive={false} />
-                      <Text style={[styles.petChipName, active && { color: def.accent, fontWeight: '700' }]}>
-                        {def.name}
-                      </Text>
-                      {active && <View style={[styles.petChipDot, { backgroundColor: def.accent }]} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-
-              {/* ── Duration ── */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>DURATION</Text>
-              <View style={styles.durationRow}>
-                {DURATION_OPTIONS.map((min) => (
-                  <TouchableOpacity
-                    key={min}
-                    style={[styles.durationChip, selectedDuration === min && styles.durationChipActive]}
-                    onPress={() => { play('tap'); setSelectedDuration(min); }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationChipText, selectedDuration === min && styles.durationChipTextActive]}>
-                      {min}m
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* ── Mission ── */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>
-                MISSION <Text style={styles.optionalTag}>(optional)</Text>
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskChipRow}>
-                {/* "No mission" chip */}
-                <TouchableOpacity
-                  style={[styles.taskChip, !selectedTaskId && styles.taskChipActive]}
-                  onPress={() => { play('tap'); setSelectedTaskId(null); }}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.taskChipText, !selectedTaskId && styles.taskChipTextActive]}>No mission</Text>
-                </TouchableOpacity>
-
-                {modalTasks.map((t) => {
-                  const active = selectedTaskId === t.id;
-                  return (
-                    <TouchableOpacity
-                      key={t.id}
-                      style={[styles.taskChip, active && styles.taskChipActive]}
-                      onPress={() => { play('tap'); setSelectedTaskId(t.id); }}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[styles.taskChipText, active && styles.taskChipTextActive]} numberOfLines={1}>
-                        {t.emoji ? `${t.emoji} ` : ''}{t.title}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-
-              {/* ── Start button ── */}
-              <TouchableOpacity style={styles.modalStartBtn} onPress={handleStartFocus} activeOpacity={0.85}>
-                <Text style={styles.modalStartText}>START FOCUS →</Text>
-              </TouchableOpacity>
-            </FrostCard>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <FocusSetupModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        pets={modalPets}
+        tasks={modalTasks}
+        initialPetId={activePet?.id ?? null}
+      />
     </View>
   );
 }
@@ -340,67 +228,9 @@ const styles = StyleSheet.create({
   xpBarFill: { height: 4, borderRadius: 9999 },
   xpText: { fontSize: 9, color: Colors.inkFaint, letterSpacing: 0.2 },
 
-  // ── START FOCUS card ──
+  // START FOCUS card
   section: { marginTop: 14, paddingHorizontal: 18 },
   startFocusBtn: { padding: 28, alignItems: 'center', gap: 6 },
   startFocusEyebrow: { fontSize: 11, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6 },
   startFocusLabel: { fontSize: 20, fontWeight: '700', color: Colors.ink, letterSpacing: 2 },
-
-  // ── Modal ──
-  modalKav: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  modalSheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
-  modalTitle: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 22, fontWeight: '500',
-    color: Colors.ink, marginBottom: 20,
-  },
-  modalLabel: {
-    fontSize: 11, fontWeight: '700',
-    color: Colors.inkFaint, letterSpacing: 1.2,
-    textTransform: 'uppercase', marginBottom: 10,
-  },
-  optionalTag: { fontSize: 10, fontWeight: '400', color: Colors.inkFaint, textTransform: 'none' },
-
-  // Pet chips
-  petChipRow: { flexDirection: 'row', gap: 10, paddingBottom: 4 },
-  petChip: {
-    alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: 20, borderWidth: 1.5, borderColor: 'transparent',
-    backgroundColor: 'rgba(20,16,28,0.04)', gap: 4, minWidth: 76, position: 'relative',
-  },
-  petChipName: { fontSize: 11, color: Colors.inkSoft, letterSpacing: 0.2 },
-  petChipDot: { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3 },
-
-  // Duration chips
-  durationRow: { flexDirection: 'row', gap: 8 },
-  durationChip: {
-    flex: 1, paddingVertical: 10, borderRadius: 9999,
-    backgroundColor: 'rgba(20,16,28,0.06)',
-    borderWidth: 1, borderColor: 'transparent', alignItems: 'center',
-  },
-  durationChipActive: { backgroundColor: 'rgba(242,206,220,0.40)', borderColor: PINK_TEXT },
-  durationChipText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
-  durationChipTextActive: { color: PINK_TEXT },
-
-  // Task chips
-  taskChipRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
-  taskChip: {
-    paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(20,16,28,0.05)',
-    borderWidth: 1, borderColor: 'transparent',
-  },
-  taskChipActive: { backgroundColor: PINK, borderColor: PINK_TEXT },
-  taskChipText: { fontSize: 13, fontWeight: '500', color: Colors.inkSoft, maxWidth: 200 },
-  taskChipTextActive: { color: PINK_TEXT, fontWeight: '600' },
-
-  // Start button
-  modalStartBtn: {
-    marginTop: 24, paddingVertical: 16, borderRadius: 9999,
-    backgroundColor: Colors.ink, alignItems: 'center',
-    shadowColor: Colors.ink, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18, shadowRadius: 24, elevation: 6,
-  },
-  modalStartText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 2.5 },
 });
