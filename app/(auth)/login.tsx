@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -21,6 +22,7 @@ import { authService } from '@/services/authService';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { play } = useSound();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -83,7 +85,7 @@ export default function LoginScreen() {
                   placeholderTextColor={Colors.inkFaint}
                   secureTextEntry={!showPw}
                 />
-                <TouchableOpacity onPress={() => setShowPw((v) => !v)} style={styles.eyeBtn}>
+                <TouchableOpacity onPress={() => { play('tap'); setShowPw((v) => !v); }} style={styles.eyeBtn}>
                   <Text style={styles.eyeIcon}>{showPw ? '🙈' : '👁️'}</Text>
                 </TouchableOpacity>
               </View>
@@ -92,7 +94,7 @@ export default function LoginScreen() {
               <TouchableOpacity
                 style={[styles.continueBtn, (!valid || loading) && styles.disabled]}
                 disabled={!valid || loading}
-                onPress={handleLogin}
+                onPress={() => { play('transition_up'); handleLogin(); }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.continueBtnText}>
@@ -102,7 +104,7 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 style={styles.switchBtn}
-                onPress={() => router.replace('/(auth)/signup')}
+                onPress={() => { play('tap'); router.replace('/(auth)/signup'); }}
                 activeOpacity={0.7}
               >
                 <Text style={styles.switchText}>

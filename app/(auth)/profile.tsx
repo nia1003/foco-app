@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -23,6 +24,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { play } = useSound();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -32,6 +34,7 @@ export default function ProfileScreen() {
 
   const handleContinue = async () => {
     if (!canSubmit) return;
+    play('transition_up');
     try {
       setLoading(true);
       // 更新密碼與名字到 Supabase auth user
@@ -89,7 +92,7 @@ export default function ProfileScreen() {
                   placeholderTextColor={Colors.inkFaint}
                   secureTextEntry={!showPw}
                 />
-                <TouchableOpacity onPress={() => setShowPw((v) => !v)} style={styles.eyeBtn}>
+                <TouchableOpacity onPress={() => { play('tap'); setShowPw((v) => !v); }} style={styles.eyeBtn}>
                   <Text style={styles.eyeIcon}>{showPw ? '🙈' : '👁️'}</Text>
                 </TouchableOpacity>
               </View>

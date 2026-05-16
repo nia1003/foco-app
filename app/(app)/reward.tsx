@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { Colors } from '@/constants/theme';
@@ -22,6 +23,7 @@ export default function RewardScreen() {
   const { result: resultStr } = useLocalSearchParams<{ result: string }>();
   const result: SessionResult = resultStr ? JSON.parse(resultStr) : {};
   const { applySessionResult } = usePetStore();
+  const { play } = useSound();
 
   // ── 動畫 refs ────────────────────────────────
   const xpScaleAnim = useRef(new Animated.Value(0)).current;
@@ -107,9 +109,10 @@ export default function RewardScreen() {
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.primaryBtn}
-            onPress={() =>
-              router.push({ pathname: '/(app)/analysis', params: { result: resultStr } })
-            }
+            onPress={() => {
+              play('transition_up');
+              router.push({ pathname: '/(app)/analysis', params: { result: resultStr } });
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.primaryBtnText}>查看報告 →</Text>
@@ -117,7 +120,7 @@ export default function RewardScreen() {
 
           <TouchableOpacity
             style={styles.ghostBtn}
-            onPress={() => router.replace('/(app)/home')}
+            onPress={() => { play('transition_down'); router.replace('/(app)/home'); }}
             activeOpacity={0.7}
           >
             <Text style={styles.ghostBtnText}>回首頁</Text>

@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -14,6 +15,7 @@ import { usePetStore } from '@/stores/petStore';
 
 export default function CompanionScreen() {
   const router = useRouter();
+  const { play } = useSound();
   const { saveOnboardingPetName } = usePetStore();
   const [selected, setSelected] = useState(PETS[0].id);
   const selectedPet = PETS.find((p) => p.id === selected)!;
@@ -52,7 +54,7 @@ export default function CompanionScreen() {
                         styles.petTile,
                         active && { borderColor: pet.accent, borderWidth: 2, backgroundColor: pet.accent + '20' },
                       ]}
-                      onPress={() => setSelected(pet.id)}
+                      onPress={() => { play('tap'); setSelected(pet.id); }}
                       activeOpacity={0.75}
                     >
                       <Image
@@ -73,6 +75,7 @@ export default function CompanionScreen() {
               <TouchableOpacity
                 style={styles.continueBtn}
                 onPress={async () => {
+                play('transition_up');
                 await saveOnboardingPetName(selectedPet.name);
                 router.push({ pathname: '/(auth)/consent', params: { petId: selected } });
               }}

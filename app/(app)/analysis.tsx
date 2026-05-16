@@ -16,6 +16,7 @@ import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -57,6 +58,7 @@ export default function AnalysisScreen() {
   const { result: resultStr } = useLocalSearchParams<{ result: string }>();
   const result: SessionResult = resultStr ? JSON.parse(resultStr) : {};
   const reportRef = useRef<View>(null);
+  const { play } = useSound();
 
   const discKey = result.focus_type ?? 'steadiness';
   const disc = DISC_INFO[discKey as keyof typeof DISC_INFO] ?? DISC_INFO.steadiness;
@@ -143,17 +145,17 @@ export default function AnalysisScreen() {
 
         {/* 操作按鈕 */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.75}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => { play('tap'); handleShare(); }} activeOpacity={0.75}>
             <Text style={styles.actionBtnText}>📤  分享</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleSave} activeOpacity={0.75}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => { play('tap'); handleSave(); }} activeOpacity={0.75}>
             <Text style={styles.actionBtnText}>💾  儲存圖片</Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity
           style={styles.homeBtn}
-          onPress={() => router.replace('/(app)/home')}
+          onPress={() => { play('transition_down'); router.replace('/(app)/home'); }}
           activeOpacity={0.85}
         >
           <Text style={styles.homeBtnText}>回首頁</Text>

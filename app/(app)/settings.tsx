@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -25,6 +26,7 @@ export default function SettingsScreen() {
   const { logout, userEmail, userName } = useAuthStore();
   const { reset: resetPets } = usePetStore();
 
+  const { playToggle } = useSound();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [notifEnabled, setNotifEnabled] = useState(true);
 
@@ -88,14 +90,14 @@ export default function SettingsScreen() {
               label="音效"
               sub="計時期間的提示音"
               value={soundEnabled}
-              onChange={setSoundEnabled}
+              onChange={(v) => { playToggle(v); setSoundEnabled(v); }}
             />
             <View style={styles.divider} />
             <ToggleRow
               label="通知"
               sub="專注結束時提醒"
               value={notifEnabled}
-              onChange={setNotifEnabled}
+              onChange={(v) => { playToggle(v); setNotifEnabled(v); }}
             />
           </FrostCard>
         </Section>

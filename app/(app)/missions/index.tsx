@@ -24,6 +24,7 @@ import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
+import { useSound } from '@/components/SoundProvider';
 import { getTasks, createTask, deleteTask } from '@/services/focoService';
 import { mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
@@ -159,6 +160,7 @@ export default function MissionsScreen() {
   const [tab, setTab] = useState<TabType>('active');
   const router = useRouter();
   const { userId } = useAuthStore();
+  const { play } = useSound();
 
   // My Tasks state
   const [tasks, setTasks] = useState<Task[]>(mockTasks.tasks);
@@ -272,7 +274,7 @@ export default function MissionsScreen() {
           <Text style={styles.title}>Missions</Text>
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => setShowModal(true)}
+            onPress={() => { play('tap'); setShowModal(true); }}
             activeOpacity={0.75}
           >
             <Text style={styles.addBtnText}>+ Task</Text>
@@ -285,7 +287,7 @@ export default function MissionsScreen() {
             <TouchableOpacity
               key={t}
               style={[styles.tabPill, tab === t && styles.tabPillActive]}
-              onPress={() => setTab(t)}
+              onPress={() => { play('tap'); setTab(t); }}
               activeOpacity={0.75}
             >
               <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>
@@ -329,19 +331,20 @@ export default function MissionsScreen() {
                   <View style={styles.taskActions}>
                     <TouchableOpacity
                       style={styles.myTaskStartBtn}
-                      onPress={() =>
+                      onPress={() => {
+                        play('transition_up');
                         router.push({
                           pathname: '/(app)/focus',
                           params: { durationMin: String(q.duration_min) },
-                        })
-                      }
+                        });
+                      }}
                       activeOpacity={0.8}
                     >
                       <Text style={styles.myTaskStartText}>▶ Start</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteBtn}
-                      onPress={() => handleDeleteQuest(q.id, q.title)}
+                      onPress={() => { play('tap'); handleDeleteQuest(q.id, q.title); }}
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -388,19 +391,20 @@ export default function MissionsScreen() {
                   <View style={styles.taskActions}>
                     <TouchableOpacity
                       style={styles.myTaskStartBtn}
-                      onPress={() =>
+                      onPress={() => {
+                        play('transition_up');
                         router.push({
                           pathname: '/(app)/focus',
                           params: { durationMin: String(task.duration_min), taskId: task.id },
-                        })
-                      }
+                        });
+                      }}
                       activeOpacity={0.8}
                     >
                       <Text style={styles.myTaskStartText}>▶ Start</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteBtn}
-                      onPress={() => handleDeleteTask(task.id, task.title)}
+                      onPress={() => { play('tap'); handleDeleteTask(task.id, task.title); }}
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -436,7 +440,7 @@ export default function MissionsScreen() {
                   <TouchableOpacity
                     key={em}
                     style={[styles.emojiCell, newEmoji === em && styles.emojiCellActive]}
-                    onPress={() => setNewEmoji(em)}
+                    onPress={() => { play('tap'); setNewEmoji(em); }}
                     activeOpacity={0.75}
                   >
                     <Text style={styles.emojiCellText}>{em}</Text>
@@ -482,14 +486,14 @@ export default function MissionsScreen() {
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.modalCancelBtn}
-                  onPress={() => { setShowModal(false); resetModal(); }}
+                  onPress={() => { play('tap'); setShowModal(false); resetModal(); }}
                 >
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalCreateBtn, (!newTitle.trim() || creating) && styles.disabled]}
                   disabled={!newTitle.trim() || creating}
-                  onPress={handleCreate}
+                  onPress={() => { play('transition_up'); handleCreate(); }}
                 >
                   <Text style={styles.modalCreateText}>{creating ? 'Creating…' : 'Create'}</Text>
                 </TouchableOpacity>

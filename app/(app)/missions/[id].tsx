@@ -5,6 +5,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { Glass } from '@/components/ui/Glass';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -13,6 +14,7 @@ import { Colors } from '@/constants/theme';
 export default function MissionScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { play } = useSound();
 
   return (
     <View style={styles.root}>
@@ -73,7 +75,7 @@ export default function MissionScreen() {
         {/* Start CTA */}
         <TouchableOpacity
           style={styles.startBtn}
-          onPress={() => router.push('/(app)/focus')}
+          onPress={() => { play('transition_up'); router.push('/(app)/focus'); }}
           activeOpacity={0.85}
         >
           <Text style={styles.startBtnText}>START SESSION →</Text>

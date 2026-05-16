@@ -7,6 +7,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
+import { useSound } from '@/components/SoundProvider';
 
 interface FocoBarProps {
   back?: boolean;
@@ -17,6 +18,7 @@ interface FocoBarProps {
 export function FocoBar({ back = false, avatar = null, dark = false }: FocoBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { play } = useSound();
 
   const fg         = dark ? '#fff' : Colors.ink;
   const mutedColor = dark ? 'rgba(255,255,255,0.6)' : Colors.inkSoft;
@@ -36,7 +38,7 @@ export function FocoBar({ back = false, avatar = null, dark = false }: FocoBarPr
             styles.iconBtn,
             { backgroundColor: btnBg, borderColor: btnBorder, top: btnTop },
           ]}
-          onPress={() => router.back()}
+          onPress={() => { play('transition_down'); router.back(); }}
           activeOpacity={0.7}
         >
           {/* Chevron left */}
@@ -52,7 +54,7 @@ export function FocoBar({ back = false, avatar = null, dark = false }: FocoBarPr
       {avatar && (
         <TouchableOpacity
           style={[styles.avatarBadge, { top: btnTop }]}
-          onPress={() => router.push('/(app)/settings')}
+          onPress={() => { play('tap'); router.push('/(app)/settings'); }}
           activeOpacity={0.75}
         >
           <Text style={styles.avatarText}>{avatar}</Text>

@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -21,6 +22,7 @@ import { authService } from '@/services/authService';
 
 export default function VerifyScreen() {
   const router = useRouter();
+  const { play } = useSound();
   const { email } = useLocalSearchParams<{ email: string }>();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,6 +31,7 @@ export default function VerifyScreen() {
 
   const handleVerify = async () => {
     if (!valid || !email) return;
+    play('transition_up');
     try {
       setLoading(true);
       await authService.verifyOtp(email, code.trim());
@@ -42,6 +45,7 @@ export default function VerifyScreen() {
   };
 
   const handleResend = async () => {
+    play('tap');
     try {
       await authService.sendOtp(email ?? '');
       Alert.alert('已重新發送', '新的驗證碼已寄出，請檢查信箱。');

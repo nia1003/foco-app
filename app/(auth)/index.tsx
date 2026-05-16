@@ -4,12 +4,14 @@
 import React from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { Colors } from '@/constants/theme';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { play } = useSound();
 
   const comingSoon = (provider: string) =>
     Alert.alert('即將推出', `${provider} 登入功能即將上線。`);
@@ -35,7 +37,7 @@ export default function WelcomeScreen() {
             <View style={styles.socialRow}>
               <TouchableOpacity
                 style={styles.socialBtn}
-                onPress={() => comingSoon('Apple')}
+                onPress={() => { play('tap'); comingSoon('Apple'); }}
                 activeOpacity={0.75}
               >
                 <Text style={styles.socialIcon}>🍎</Text>
@@ -44,7 +46,7 @@ export default function WelcomeScreen() {
 
               <TouchableOpacity
                 style={styles.socialBtn}
-                onPress={() => comingSoon('Google')}
+                onPress={() => { play('tap'); comingSoon('Google'); }}
                 activeOpacity={0.75}
               >
                 <Text style={[styles.socialIcon, { color: '#4285F4', fontWeight: '700' }]}>G</Text>
@@ -62,7 +64,7 @@ export default function WelcomeScreen() {
             {/* Email Sign In */}
             <TouchableOpacity
               style={styles.emailBtn}
-              onPress={() => router.push('/(auth)/login')}
+              onPress={() => { play('transition_up'); router.push('/(auth)/login'); }}
               activeOpacity={0.85}
             >
               <Text style={styles.emailBtnText}>SIGN IN WITH EMAIL</Text>
@@ -71,7 +73,7 @@ export default function WelcomeScreen() {
             {/* Create Account */}
             <TouchableOpacity
               style={styles.createBtn}
-              onPress={() => router.push('/(auth)/signup')}
+              onPress={() => { play('transition_up'); router.push('/(auth)/signup'); }}
               activeOpacity={0.85}
             >
               <Text style={styles.createBtnText}>CREATE ACCOUNT</Text>

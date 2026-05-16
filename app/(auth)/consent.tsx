@@ -5,6 +5,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -24,6 +25,7 @@ function ConsentItem({ label }: { label: string }) {
 
 export default function ConsentScreen() {
   const router = useRouter();
+  const { play } = useSound();
   const { petId } = useLocalSearchParams<{ petId?: string }>();
 
   return (
@@ -47,7 +49,7 @@ export default function ConsentScreen() {
 
             <TouchableOpacity
               style={styles.continueBtn}
-              onPress={() => router.push({ pathname: '/(auth)/done', params: { petId } })}
+              onPress={() => { play('transition_up'); router.push({ pathname: '/(auth)/done', params: { petId } }); }}
               activeOpacity={0.85}
             >
               <Text style={styles.continueBtnText}>CONTINUE →</Text>

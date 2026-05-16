@@ -23,6 +23,7 @@ import { PetRenderer } from '@/components/pets/PetRenderer';
 import { useTimer } from '@/hooks/useTimer';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
+import { useSound } from '@/components/SoundProvider';
 import { completeSession } from '@/services/focoService';
 import { mockSessionResult } from '@/data/mockData';
 import type { SessionPayload } from '@/types';
@@ -44,6 +45,7 @@ export default function FocusScreen() {
         PETS.find((p) => p.id === 'xingwang')
       : PETS.find((p) => p.id === 'xingwang')) ?? PETS[0];
 
+  const { play, playToggle } = useSound();
   const [showQuitModal, setShowQuitModal] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -144,7 +146,7 @@ export default function FocusScreen() {
           <Text style={styles.headerTitle}>Flow State · {durationMin}m</Text>
           <TouchableOpacity
             style={styles.headerBtn}
-            onPress={() => setShowQuitModal(true)}
+            onPress={() => { play('tap'); setShowQuitModal(true); }}
             activeOpacity={0.7}
           >
             <Text style={styles.headerBtnText}>✕</Text>
@@ -163,7 +165,7 @@ export default function FocusScreen() {
                   <TouchableOpacity
                     key={p.id}
                     style={[styles.petSwitchChip, isActive && { borderColor: def.accent, borderWidth: 2 }]}
-                    onPress={() => setActivePet(p.id)}
+                    onPress={() => { play('tap'); setActivePet(p.id); }}
                     activeOpacity={0.75}
                   >
                     <PetRenderer pet={def} size={44} interactive={false} />
@@ -196,7 +198,7 @@ export default function FocusScreen() {
           {/* Exit pill */}
           <TouchableOpacity
             style={styles.exitPill}
-            onPress={() => setShowQuitModal(true)}
+            onPress={() => { play('tap'); setShowQuitModal(true); }}
             activeOpacity={0.7}
           >
             <Text style={styles.exitText}>Exit flowstate</Text>
@@ -207,7 +209,7 @@ export default function FocusScreen() {
         <View style={styles.controls}>
           <TouchableOpacity
             style={styles.controlBtn}
-            onPress={() => setShowQuitModal(true)}
+            onPress={() => { play('tap'); setShowQuitModal(true); }}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✕</Text>
@@ -216,7 +218,7 @@ export default function FocusScreen() {
 
           <TouchableOpacity
             style={[styles.mainBtn, paused && styles.mainBtnPaused]}
-            onPress={() => (paused ? resume() : pause())}
+            onPress={() => { playToggle(!paused); paused ? resume() : pause(); }}
             activeOpacity={0.85}
           >
             <Text style={styles.mainBtnText}>{paused ? '▶ Resume' : '⏸ Pause'}</Text>
@@ -224,7 +226,7 @@ export default function FocusScreen() {
 
           <TouchableOpacity
             style={styles.controlBtn}
-            onPress={() => handleEnd(false)}
+            onPress={() => { play('transition_up'); handleEnd(false); }}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✓</Text>
@@ -244,6 +246,7 @@ export default function FocusScreen() {
             <TouchableOpacity
               style={styles.modalQuitBtn}
               onPress={() => {
+                play('transition_down');
                 setShowQuitModal(false);
                 skipToReflection();
                 handleEnd(true);
@@ -254,7 +257,7 @@ export default function FocusScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.modalKeepBtn}
-              onPress={() => setShowQuitModal(false)}
+              onPress={() => { play('tap'); setShowQuitModal(false); }}
               activeOpacity={0.7}
             >
               <Text style={styles.modalKeepText}>繼續專注</Text>

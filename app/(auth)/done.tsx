@@ -4,6 +4,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -11,6 +12,7 @@ import { Colors } from '@/constants/theme';
 
 export default function DoneScreen() {
   const router = useRouter();
+  const { play } = useSound();
 
   return (
     <View style={styles.root}>
@@ -57,7 +59,7 @@ export default function DoneScreen() {
 
         <TouchableOpacity
           style={styles.startBtn}
-          onPress={() => router.replace('/(app)/home')}
+          onPress={() => { play('transition_up'); router.replace('/(app)/home'); }}
           activeOpacity={0.85}
         >
           <Text style={styles.startBtnText}>START FOCUSING</Text>

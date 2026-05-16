@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -21,6 +22,7 @@ import { authService } from '@/services/authService';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { play } = useSound();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -77,7 +79,7 @@ export default function SignupScreen() {
               <TouchableOpacity
                 style={[styles.sendBtn, (!valid || loading) && styles.disabled]}
                 disabled={!valid || loading}
-                onPress={handleSendCode}
+                onPress={() => { play('transition_up'); handleSendCode(); }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.sendBtnText}>
@@ -87,7 +89,7 @@ export default function SignupScreen() {
 
               <TouchableOpacity
                 style={styles.switchBtn}
-                onPress={() => router.replace('/(auth)/login')}
+                onPress={() => { play('tap'); router.replace('/(auth)/login'); }}
                 activeOpacity={0.7}
               >
                 <Text style={styles.switchText}>
