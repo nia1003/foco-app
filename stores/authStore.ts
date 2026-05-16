@@ -10,6 +10,7 @@ interface AuthState {
   isLoading: boolean;
   userId: string | null;
   userEmail: string | null;
+  userName: string | null;
 
   restoreSession: () => Promise<void>;
   logout: () => Promise<void>;
@@ -20,6 +21,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   userId: null,
   userEmail: null,
+  userName: null,
 
   restoreSession: async () => {
     try {
@@ -31,6 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: !!session,
         userId: session?.user.id ?? null,
         userEmail: session?.user.email ?? null,
+        userName: (session?.user.user_metadata?.name as string) ?? null,
         isLoading: false,
       });
 
@@ -40,6 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           isAuthenticated: !!session,
           userId: session?.user.id ?? null,
           userEmail: session?.user.email ?? null,
+          userName: (session?.user.user_metadata?.name as string) ?? null,
         });
       });
     } catch {
@@ -49,6 +53,6 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     await supabase.auth.signOut();
-    set({ isAuthenticated: false, userId: null, userEmail: null });
+    set({ isAuthenticated: false, userId: null, userEmail: null, userName: null });
   },
 }));

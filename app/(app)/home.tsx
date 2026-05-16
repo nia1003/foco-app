@@ -24,7 +24,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { userId } = useAuthStore();
+  const { userId, userName, userEmail } = useAuthStore();
   const { pet: storePet, setPet } = usePetStore();
 
   const [selectedDuration, setSelectedDuration] = useState(25);
@@ -44,6 +44,10 @@ export default function HomeScreen() {
   // Dynamic greeting
   const now = new Date();
   const dateStr = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
+  const hour = now.getHours();
+  const timeGreet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  // 優先用 name；沒有的話取 email @ 前面；再不行就 'there'
+  const displayName = userName ?? userEmail?.split('@')[0] ?? 'there';
 
   return (
     <View style={styles.root}>
@@ -59,7 +63,7 @@ export default function HomeScreen() {
         {/* Greeting */}
         <View style={styles.greeting}>
           <Text style={styles.date}>{dateStr}</Text>
-          <Text style={styles.greet}>Good morning,{'\n'}Nia.</Text>
+          <Text style={styles.greet}>{timeGreet},{'\n'}{displayName}.</Text>
         </View>
 
         {/* Pet card */}

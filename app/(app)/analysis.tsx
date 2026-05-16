@@ -12,6 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
@@ -53,6 +56,7 @@ export default function AnalysisScreen() {
   const router = useRouter();
   const { result: resultStr } = useLocalSearchParams<{ result: string }>();
   const result: SessionResult = resultStr ? JSON.parse(resultStr) : {};
+  const reportRef = useRef<View>(null);
 
   const discKey = result.focus_type ?? 'steadiness';
   const disc = DISC_INFO[discKey as keyof typeof DISC_INFO] ?? DISC_INFO.steadiness;
@@ -60,24 +64,34 @@ export default function AnalysisScreen() {
   // XP 明細說明
   const xpDetails = buildXPDetails(result);
 
-  // ── 分享 / 儲存（需要 react-native-view-shot + expo-sharing/media-library）
-  // 若套件尚未安裝，這段 import 會 fail → 先用 Alert placeholder
+  // ── 截圖並分享
   const handleShare = async () => {
     try {
-      const ViewShot = (await import('react-native-view-shot')).default;
-      const Sharing = await import('expo-sharing');
-      Alert.alert('分享', '此功能需要安裝 react-native-view-shot 和 expo-sharing。');
+      const uri = await captureRef(reportRef, { format: 'png', quality: 1 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: '分享 FOCO 報告' });
+      } else {
+        Alert.alert('無法分享', '此裝置不支援分享功能');
+      }
     } catch {
-      Alert.alert('提示', '請先執行：npx expo install react-native-view-shot expo-sharing');
+      Alert.alert('錯誤', '截圖失敗，請再試一次');
     }
   };
 
+  // ── 截圖並存入相簿
   const handleSave = async () => {
     try {
-      const MediaLibrary = await import('expo-media-library');
-      Alert.alert('儲存', '此功能需要安裝 expo-media-library。');
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('需要權限', '請允許存取相片庫以儲存圖片');
+        return;
+      }
+      const uri = await captureRef(reportRef, { format: 'png', quality: 1 });
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('已儲存 ✅', '報告圖片已存入相簿！');
     } catch {
-      Alert.alert('提示', '請先執行：npx expo install expo-media-library');
+      Alert.alert('錯誤', '儲存失敗，請再試一次');
     }
   };
 
@@ -91,48 +105,52 @@ export default function AnalysisScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>專注報告</Text>
+        {/* ── 截圖範圍開始（reportRef 包住報告主體）─── */}
+        <View ref={reportRef} collapsable={false} style={styles.captureArea}>
+          <Text style={styles.title}>專注報告</Text>
 
-        {/* 數據卡 */}
-        <View style={styles.section}>
-          <FrostCard radius={24} padded={false}>
-            <View style={styles.statsCard}>
-              <StatRow icon="⏱" label="實際專注" value={formatDuration(result.actual_duration ?? 0)} />
-              <StatRow icon="⏸" label="暫停次數" value={`${result.pause_count ?? 0} 次`} />
-              <StatRow icon="📱" label="切出 App" value={`${result.left_app_count ?? 0} 次`} />
-            </View>
-          </FrostCard>
-        </View>
-
-        {/* DISC 類型卡 */}
-        <View style={styles.section}>
-          <FrostCard radius={24}>
-            <View style={styles.discRow}>
-              <Text style={styles.discEmoji}>{disc.emoji}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.discLabel}>{disc.label}</Text>
-                <Text style={styles.discDesc}>{disc.desc}</Text>
+          {/* 數據卡 */}
+          <View style={styles.section}>
+            <FrostCard radius={24} padded={false}>
+              <View style={styles.statsCard}>
+                <StatRow icon="⏱" label="實際專注" value={formatDuration(result.actual_duration ?? 0)} />
+                <StatRow icon="⏸" label="暫停次數" value={`${result.pause_count ?? 0} 次`} />
+                <StatRow icon="📱" label="切出 App" value={`${result.left_app_count ?? 0} 次`} />
               </View>
-            </View>
-          </FrostCard>
-        </View>
+            </FrostCard>
+          </View>
 
-        {/* XP 明細卡 */}
-        <View style={styles.section}>
-          <FrostCard radius={24} padded={false}>
-            <View style={styles.xpCard}>
-              <Text style={styles.xpTotal}>獲得 XP：+{result.xp_gained ?? 0} XP</Text>
-              {xpDetails.map((d, i) => (
-                <View key={i} style={styles.xpRow}>
-                  <Text style={styles.xpItemLabel}>{d.label}</Text>
-                  <Text style={[styles.xpItemValue, d.value < 0 && styles.negative]}>
-                    {d.value > 0 ? `+${d.value}` : d.value} XP
-                  </Text>
+          {/* DISC 類型卡 */}
+          <View style={styles.section}>
+            <FrostCard radius={24}>
+              <View style={styles.discRow}>
+                <Text style={styles.discEmoji}>{disc.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.discLabel}>{disc.label}</Text>
+                  <Text style={styles.discDesc}>{disc.desc}</Text>
                 </View>
-              ))}
-            </View>
-          </FrostCard>
+              </View>
+            </FrostCard>
+          </View>
+
+          {/* XP 明細卡 */}
+          <View style={styles.section}>
+            <FrostCard radius={24} padded={false}>
+              <View style={styles.xpCard}>
+                <Text style={styles.xpTotal}>獲得 XP：+{result.xp_gained ?? 0} XP</Text>
+                {xpDetails.map((d, i) => (
+                  <View key={i} style={styles.xpRow}>
+                    <Text style={styles.xpItemLabel}>{d.label}</Text>
+                    <Text style={[styles.xpItemValue, d.value < 0 && styles.negative]}>
+                      {d.value > 0 ? `+${d.value}` : d.value} XP
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </FrostCard>
+          </View>
         </View>
+        {/* ── 截圖範圍結束 ─────────────────────────── */}
 
         {/* 操作按鈕 */}
         <View style={styles.actions}>
@@ -196,6 +214,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.softBg },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 60 },
+  captureArea: { backgroundColor: Colors.softBg, paddingBottom: 4 },
   title: {
     fontFamily: 'Fraunces_500Medium',
     fontSize: 36,
