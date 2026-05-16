@@ -1,11 +1,10 @@
 /**
- * HomeScreen — daily dashboard hub (FOCO 完整版)
- * - 橫向寵物選擇器：點擊 = 設為今日夥伴，長按 = 查看詳情
- * - 永遠顯示所有寵物（merge real data onto mockPets template）
- * - 時長選擇器（15 / 25 / 50 / 90 min）
- * - Focus 卡顯示「今日夥伴: [name]」
+ * HomeScreen — daily dashboard hub
+ * - 寵物排只提供點擊查看詳情，不影響 Focus 區
+ * - FocusLauncher 是獨立 memo component，擁有自己的 selectedDuration state
+ *   → 選時長不會觸發寵物列 re-render / 3D 動畫重置
  */
-import React, { useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import {
   Dimensions,
   ScrollView,
@@ -44,14 +43,69 @@ function mergeWithMock(real: FocoPet[]): FocoPet[] {
   });
 }
 
+// ── Focus Launcher（獨立 memo — selectedDuration 改變時只有這裡 re-render）──
+const FocusLauncher = memo(function FocusLauncher() {
+  const router = useRouter();
+  const { play } = useSound();
+  const [selectedDuration, setSelectedDuration] = useState(25);
+
+  return (
+    <View style={styles.section}>
+      <FrostCard radius={28} padded={false}>
+        <View style={styles.focusCard}>
+          <Text style={styles.eyebrow}>START FOCUS</Text>
+          <Text style={styles.focusTitle}>How long?</Text>
+
+          <View style={styles.durationRow}>
+            {DURATION_OPTIONS.map((min) => (
+              <TouchableOpacity
+                key={min}
+                style={[
+                  styles.durationChip,
+                  selectedDuration === min && styles.durationChipActive,
+                ]}
+                onPress={() => {
+                  play('tap');
+                  setSelectedDuration(min);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.durationChipText,
+                    selectedDuration === min && styles.durationChipTextActive,
+                  ]}
+                >
+                  {min}m
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={styles.startBtn}
+            onPress={() => {
+              play('transition_up');
+              router.push({
+                pathname: '/(app)/focus',
+                params: { durationMin: String(selectedDuration) },
+              });
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.startBtnText}>START FOCUS →</Text>
+          </TouchableOpacity>
+        </View>
+      </FrostCard>
+    </View>
+  );
+});
+
+// ── Main Screen ──────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
   const { userId, userName, userEmail } = useAuthStore();
-  const { pets, activePet, setPets, setActivePet, restoreActivePet } = usePetStore();
-
-  const { play } = useSound();
-  const [selectedDuration, setSelectedDuration] = useState(25);
-  const [selectFeedback, setSelectFeedback] = useState<string | null>(null);
+  const { pets, setPets, restoreActivePet } = usePetStore();
 
   const displayPets: FocoPet[] = pets.length > 0 ? mergeWithMock(pets) : mockPets;
 
@@ -62,36 +116,14 @@ export default function HomeScreen() {
         setPets(fetched);
         restoreActivePet();
       })
-      .catch(() => {
-        setPets(mockPets);
-      });
+      .catch(() => setPets(mockPets));
   }, [userId]);
-
-  const isMockPet = (p: FocoPet) => p.id.startsWith('mock-');
-
-  const handleSelectPet = async (p: FocoPet, defName: string) => {
-    if (isMockPet(p)) return;
-    play('tap');
-    await setActivePet(p.id);
-    setSelectFeedback(defName);
-    setTimeout(() => setSelectFeedback(null), 1800);
-  };
 
   const now = new Date();
   const dateStr   = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
   const hour      = now.getHours();
   const timeGreet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'there';
-
-  // Resolve the active pet's display name for the focus launcher
-  const activeDef =
-    activePet
-      ? PETS.find((d) => d.id === activePet.name.toLowerCase()) ??
-        PETS.find((d) => d.id === 'xingwang') ??
-        PETS[0]
-      : displayPets.length > 0
-        ? PETS.find((d) => d.id === displayPets[0].name.toLowerCase()) ?? PETS[0]
-        : PETS[0];
 
   return (
     <View style={styles.root}>
@@ -103,13 +135,13 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Greeting ───────────────────────────── */}
+        {/* ── Greeting ─────────────────────────────── */}
         <View style={styles.greeting}>
           <Text style={styles.date}>{dateStr}</Text>
           <Text style={styles.greet}>{timeGreet},{'\n'}{displayName}.</Text>
         </View>
 
-        {/* ── Pet Selector ───────────────────────── */}
+        {/* ── Pet Selector（只看，不選）──────────────── */}
         <View style={styles.selectorSection}>
           <View style={styles.selectorHeader}>
             <Text style={styles.selectorEyebrow}>今天的夥伴</Text>
@@ -120,13 +152,6 @@ export default function HomeScreen() {
               <Text style={styles.selectorAll}>全部 →</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Selection feedback toast */}
-          {selectFeedback && (
-            <View style={styles.feedbackToast}>
-              <Text style={styles.feedbackText}>✦ {selectFeedback} 將陪你專注</Text>
-            </View>
-          )}
 
           <ScrollView
             horizontal
@@ -141,36 +166,20 @@ export default function HomeScreen() {
                 PETS.find((d) => d.id === p.name.toLowerCase()) ??
                 PETS.find((d) => d.id === 'xingwang') ??
                 PETS[0];
-              const locked = isMockPet(p);
-              const isActive = !locked && activePet?.id === p.id;
               const xpPct = p.xp_next_level > 0 ? p.xp / p.xp_next_level : 0;
 
               return (
                 <TouchableOpacity
                   key={p.id}
-                  style={[styles.petCard, { width: PET_CARD_W }, isActive && styles.petCardActive, locked && styles.petCardLocked]}
-                  onPress={() => handleSelectPet(p, def.name)}
-                  onLongPress={() =>
-                    !locked && router.push({
+                  style={[styles.petCard, { width: PET_CARD_W }]}
+                  onPress={() =>
+                    router.push({
                       pathname: '/(app)/pet-info',
                       params: { petId: def.id },
                     })
                   }
-                  activeOpacity={locked ? 1 : 0.88}
+                  activeOpacity={0.88}
                 >
-                  {/* 陪伴中 / 鎖定 badge */}
-                  {isActive && (
-                    <View style={[styles.activeBadge, { backgroundColor: def.accent + '22', borderColor: def.accent + '55' }]}>
-                      <Text style={[styles.activeBadgeText, { color: def.accent }]}>陪伴中 ✦</Text>
-                    </View>
-                  )}
-                  {locked && (
-                    <View style={styles.lockedBadge}>
-                      <Text style={styles.lockedBadgeText}>🔒 即將解鎖</Text>
-                    </View>
-                  )}
-
-                  {/* 3D Pet */}
                   <View style={styles.petPreview}>
                     <PetRenderer pet={def} size={150} interactive={false} />
                   </View>
@@ -180,12 +189,14 @@ export default function HomeScreen() {
                     <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
                   </View>
 
-                  {/* XP bar */}
                   <View style={styles.xpBarBg}>
                     <View
                       style={[
                         styles.xpBarFill,
-                        { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent },
+                        {
+                          width: `${Math.min(xpPct * 100, 100)}%` as any,
+                          backgroundColor: def.accent,
+                        },
                       ]}
                     />
                   </View>
@@ -195,83 +206,11 @@ export default function HomeScreen() {
             })}
           </ScrollView>
 
-          <Text style={styles.selectorHint}>點擊選為今日夥伴 · 長按查看詳情</Text>
+          <Text style={styles.selectorHint}>點擊查看詳情</Text>
         </View>
 
-        {/* ── Focus Launcher ─────────────────────── */}
-        <View style={styles.section}>
-          <FrostCard radius={28} padded={false}>
-            <View style={styles.focusCard}>
-              <Text style={styles.eyebrow}>START FOCUS</Text>
-              <Text style={styles.focusTitle}>How long?</Text>
-
-              {/* Pet picker inside START FOCUS — only real (DB) pets */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.focusPetRow}
-              >
-                {(pets.length > 0 ? pets : mockPets.slice(0, 1)).map((p) => {
-                  const def =
-                    PETS.find((d) => d.id === p.name.toLowerCase()) ??
-                    PETS.find((d) => d.id === 'xingwang') ??
-                    PETS[0];
-                  const isActive =
-                    activePet?.id === p.id ||
-                    (!activePet && p === (pets.length > 0 ? pets : mockPets.slice(0, 1))[0]);
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[
-                        styles.focusPetChip,
-                        isActive && { borderColor: def.accent, backgroundColor: def.accent + '18' },
-                      ]}
-                      onPress={() => handleSelectPet(p, def.name)}
-                      activeOpacity={0.8}
-                    >
-                      <PetRenderer pet={def} size={52} interactive={false} />
-                      <Text style={[styles.focusPetName, isActive && { color: def.accent, fontWeight: '700' }]}>
-                        {def.name}
-                      </Text>
-                      {isActive && (
-                        <View style={[styles.focusPetActiveDot, { backgroundColor: def.accent }]} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-
-              <View style={styles.durationRow}>
-                {DURATION_OPTIONS.map((min) => (
-                  <TouchableOpacity
-                    key={min}
-                    style={[styles.durationChip, selectedDuration === min && styles.durationChipActive]}
-                    onPress={() => { play('tap'); setSelectedDuration(min); }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationChipText, selectedDuration === min && styles.durationChipTextActive]}>
-                      {min}m
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                style={styles.startBtn}
-                onPress={() => {
-                  play('transition_up');
-                  router.push({
-                    pathname: '/(app)/focus',
-                    params: { durationMin: String(selectedDuration) },
-                  });
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.startBtnText}>START FOCUS →</Text>
-              </TouchableOpacity>
-            </View>
-          </FrostCard>
-        </View>
+        {/* ── Focus Launcher（memo，狀態獨立）──────────── */}
+        <FocusLauncher />
       </ScrollView>
     </View>
   );
@@ -283,12 +222,15 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 120 },
 
   greeting: { marginTop: 8, paddingHorizontal: 22, paddingBottom: 4 },
-  date:  { fontSize: 13, color: Colors.inkSoft },
+  date: { fontSize: 13, color: Colors.inkSoft },
   greet: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 32, fontWeight: '500',
-    color: Colors.ink, marginTop: 4,
-    letterSpacing: -0.4, lineHeight: 38,
+    fontSize: 32,
+    fontWeight: '500',
+    color: Colors.ink,
+    marginTop: 4,
+    letterSpacing: -0.4,
+    lineHeight: 38,
   },
 
   selectorSection: { marginTop: 20 },
@@ -300,37 +242,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   selectorEyebrow: {
-    fontSize: 11, fontWeight: '700',
-    color: Colors.inkFaint, letterSpacing: 1.4,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.inkFaint,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  selectorAll: {
-    fontSize: 13, fontWeight: '600', color: Colors.pinkText,
-  },
-
-  feedbackToast: {
-    marginHorizontal: 22,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    backgroundColor: Colors.pinkHot,
-    alignSelf: 'flex-start',
-  },
-  feedbackText: {
-    fontSize: 12, fontWeight: '600', color: Colors.pinkText,
-  },
-
+  selectorAll: { fontSize: 13, fontWeight: '600', color: Colors.pinkText },
   selectorHint: {
-    fontSize: 11, color: Colors.inkFaint,
-    textAlign: 'center', marginTop: 10,
+    fontSize: 11,
+    color: Colors.inkFaint,
+    textAlign: 'center',
+    marginTop: 10,
     letterSpacing: 0.3,
   },
 
-  petRow: {
-    paddingHorizontal: 22,
-    gap: 12,
-  },
+  petRow: { paddingHorizontal: 22, gap: 12 },
 
   petCard: {
     borderRadius: 26,
@@ -340,57 +267,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'visible',
   },
-  petCardActive: {
-    backgroundColor: 'rgba(255,255,255,0.55)',
-  },
-  petCardLocked: {
-    opacity: 0.5,
-  },
-
-  activeBadge: {
-    position: 'absolute',
-    top: 8, right: 8,
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 9999,
-    borderWidth: 1,
-  },
-  activeBadgeText: {
-    fontSize: 9, fontWeight: '700', letterSpacing: 0.3,
-  },
-  lockedBadge: {
-    position: 'absolute',
-    top: 8, right: 8,
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(20,16,28,0.08)',
-  },
-  lockedBadgeText: {
-    fontSize: 9, fontWeight: '600', color: Colors.inkFaint,
-  },
 
   petPreview: {
-    width: 150, height: 150,
-    alignItems: 'center', justifyContent: 'center',
+    width: 150,
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 6,
     marginTop: 4,
   },
 
   petCardName: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 17, fontWeight: '500',
-    color: Colors.ink, letterSpacing: -0.2,
+    fontSize: 17,
+    fontWeight: '500',
+    color: Colors.ink,
+    letterSpacing: -0.2,
     marginBottom: 5,
   },
 
   levelPill: {
-    paddingHorizontal: 10, paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
     borderRadius: 9999,
     marginBottom: 10,
   },
   levelPillText: { fontSize: 10, fontWeight: '700' },
 
   xpBarBg: {
-    width: '100%', height: 4,
+    width: '100%',
+    height: 4,
     borderRadius: 9999,
     backgroundColor: 'rgba(20,16,28,0.08)',
     overflow: 'hidden',
@@ -403,67 +309,29 @@ const styles = StyleSheet.create({
 
   focusCard: { padding: 22 },
   eyebrow: {
-    fontSize: 10, fontWeight: '700',
-    color: Colors.inkFaint, letterSpacing: 1.6,
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.inkFaint,
+    letterSpacing: 1.6,
   },
   focusTitle: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 28, fontWeight: '500',
-    color: Colors.ink, marginTop: 6, marginBottom: 12, letterSpacing: -0.3,
-  },
-
-  companionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    fontSize: 28,
+    fontWeight: '500',
+    color: Colors.ink,
+    marginTop: 6,
     marginBottom: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  companionDot: { width: 7, height: 7, borderRadius: 999 },
-  companionLabel: { fontSize: 12, color: Colors.inkSoft, flex: 1 },
-  companionName: { fontSize: 13, fontWeight: '700' },
-
-  focusPetRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingBottom: 4,
-    marginBottom: 16,
-  },
-  focusPetChip: {
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    backgroundColor: 'rgba(20,16,28,0.04)',
-    gap: 4,
-    minWidth: 72,
-    position: 'relative',
-  },
-  focusPetName: {
-    fontSize: 11,
-    color: Colors.inkSoft,
-    letterSpacing: 0.2,
-  },
-  focusPetActiveDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    letterSpacing: -0.3,
   },
 
   durationRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
   durationChip: {
-    flex: 1, paddingVertical: 10, borderRadius: 9999,
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 9999,
     backgroundColor: 'rgba(20,16,28,0.06)',
-    borderWidth: 1, borderColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'transparent',
     alignItems: 'center',
   },
   durationChipActive: {
@@ -472,9 +340,12 @@ const styles = StyleSheet.create({
   },
   durationChipText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
   durationChipTextActive: { color: Colors.pinkText },
+
   startBtn: {
-    paddingVertical: 14, borderRadius: 9999,
-    backgroundColor: Colors.ink, alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 9999,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
   },
   startBtnText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 2 },
 });

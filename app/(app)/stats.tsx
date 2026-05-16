@@ -1,24 +1,40 @@
 /**
- * StatsScreen — Focus analytics (bar chart, streak, breakdown).
- * iOS 26: SoftWallpaper + FrostCard.
- * 資料來源：focoService.getSessions()，後端未好時 fallback mockSessions
+ * StatsScreen — Focus analytics
+ * - Line chart for Daily Focus Time
+ * - Focus type: dominant DISC type + radar chart
+ * - Recent sessions list
  */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Svg, {
+  Circle,
+  Line as SvgLine,
+  Polygon,
+  Polyline,
+  Text as SvgText,
+} from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
-import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
-import { usePetStore } from '@/stores/petStore';
 import { getSessions } from '@/services/focoService';
 import { mockSessions } from '@/data/mockData';
 import type { SessionRecord } from '@/types';
 
-// DISC 顏色對照
+const { width: SCREEN_W } = Dimensions.get('window');
+// scrollContent paddingHorizontal 18×2 + chartCard padding 22×2 = 80
+const CHART_W = SCREEN_W - 80;
+
+// ── DISC config ──────────────────────────────────────────────────
 const DISC_COLOR: Record<string, string> = {
   conscientiousness: '#4A90E2',
   dominance: Colors.pinkText,
@@ -26,7 +42,36 @@ const DISC_COLOR: Record<string, string> = {
   influence: '#F5A623',
 };
 
-// 取最近 7 天的日期（含今天）
+const DISC_EMOJI: Record<string, string> = {
+  dominance:        '☀️',
+  influence:        '🌕',
+  steadiness:       '🌏',
+  conscientiousness:'🪐',
+};
+
+const DISC_LABEL: Record<string, string> = {
+  dominance:        'Dominance',
+  influence:        'Influence',
+  steadiness:       'Steadiness',
+  conscientiousness:'Conscientiousness',
+};
+
+const DISC_SUBLABEL: Record<string, string> = {
+  dominance:        '主導型',
+  influence:        '影響型',
+  steadiness:       '穩健型',
+  conscientiousness:'謹慎型',
+};
+
+// Axes in clockwise order starting from top
+const DISC_AXES: { key: string; angle: number }[] = [
+  { key: 'dominance',        angle: -Math.PI / 2 }, // top
+  { key: 'influence',        angle: 0 },             // right
+  { key: 'steadiness',       angle: Math.PI / 2 },   // bottom
+  { key: 'conscientiousness',angle: Math.PI },        // left
+];
+
+// ── Data helpers ─────────────────────────────────────────────────
 function getLast7Days(): Date[] {
   const days: Date[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -50,10 +95,9 @@ interface DayStat {
 }
 
 function buildWeekStats(sessions: SessionRecord[]): DayStat[] {
-  const days = getLast7Days();
-  return days.map((date) => {
+  return getLast7Days().map((date) => {
     const dayStart = date.getTime();
-    const dayEnd = dayStart + 86400000;
+    const dayEnd = dayStart + 86_400_000;
     const daySessions = sessions.filter((s) => {
       const t = new Date(s.ended_at).getTime();
       return t >= dayStart && t < dayEnd;
@@ -68,44 +112,215 @@ function buildWeekStats(sessions: SessionRecord[]): DayStat[] {
   });
 }
 
-// 依 focus_type_result 算分佈
-function buildDiscBreakdown(sessions: SessionRecord[]) {
-  const counts: Record<string, number> = {};
+// Returns fraction (0–1) for each DISC type across all sessions
+function buildDiscData(sessions: SessionRecord[]): Record<string, number> {
+  const counts: Record<string, number> = {
+    dominance: 0, influence: 0, steadiness: 0, conscientiousness: 0,
+  };
   sessions.forEach((s) => {
-    if (s.focus_type_result) {
-      counts[s.focus_type_result] = (counts[s.focus_type_result] ?? 0) + 1;
+    if (s.focus_type_result && s.focus_type_result in counts) {
+      counts[s.focus_type_result]++;
     }
   });
-  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([type, count]) => ({
-      label: type.charAt(0).toUpperCase() + type.slice(1),
-      pct: count / total,
-      color: DISC_COLOR[type] ?? Colors.inkSoft,
-    }));
+  const total = sessions.length || 1;
+  return Object.fromEntries(
+    Object.entries(counts).map(([k, v]) => [k, v / total]),
+  );
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function getDominantType(data: Record<string, number>): string {
+  const entries = Object.entries(data);
+  if (entries.every(([, v]) => v === 0)) return 'steadiness';
+  return entries.reduce((a, b) => (a[1] >= b[1] ? a : b))[0];
+}
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ── Line Chart ───────────────────────────────────────────────────
+function LineChart({
+  weekStats,
+  selectedDay,
+  onSelect,
+}: {
+  weekStats: DayStat[];
+  selectedDay: number;
+  onSelect: (i: number) => void;
+}) {
+  const W = CHART_W;
+  const H = 80;
+  const PAD_TOP = 22;
+  const PAD_X = 10;
+  const innerW = W - PAD_X * 2;
+  const svgH = H + PAD_TOP + 8;
+
+  const MAX = Math.max(...weekStats.map((d) => d.hours), 0.1);
+
+  const pts = weekStats.map((d, i) => ({
+    x: PAD_X + (i / 6) * innerW,
+    y: PAD_TOP + (1 - d.hours / MAX) * H,
+  }));
+
+  const polylineStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
+
+  // Filled area: follow line, then close at bottom
+  const areaStr = [
+    ...pts.map((p) => `${p.x},${p.y}`),
+    `${pts[6].x},${PAD_TOP + H + 4}`,
+    `${pts[0].x},${PAD_TOP + H + 4}`,
+  ].join(' ');
+
+  return (
+    <View>
+      <Svg width={W} height={svgH}>
+        {/* Gradient-like area fill */}
+        <Polygon points={areaStr} fill="rgba(242,206,220,0.30)" />
+
+        {/* Line */}
+        <Polyline
+          points={polylineStr}
+          fill="none"
+          stroke={Colors.pinkHot}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+
+        {/* Dots */}
+        {pts.map((p, i) =>
+          i === selectedDay ? (
+            <React.Fragment key={i}>
+              <Circle cx={p.x} cy={p.y} r={12} fill="rgba(232,120,90,0.12)" />
+              <Circle cx={p.x} cy={p.y} r={5.5} fill={Colors.pinkHot} />
+            </React.Fragment>
+          ) : (
+            <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill="rgba(232,120,90,0.45)" />
+          ),
+        )}
+      </Svg>
+
+      {/* Tap targets + day labels */}
+      <View style={lcStyles.dayRow}>
+        {weekStats.map((d, i) => (
+          <TouchableOpacity
+            key={i}
+            style={lcStyles.dayBtn}
+            onPress={() => onSelect(i)}
+            activeOpacity={0.7}
+          >
+            <Text style={[lcStyles.dayLabel, i === selectedDay && lcStyles.dayLabelActive]}>
+              {d.day}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const lcStyles = StyleSheet.create({
+  dayRow: { flexDirection: 'row', paddingHorizontal: 4, marginTop: 2 },
+  dayBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
+  dayLabel: { fontSize: 11, color: Colors.inkFaint, fontWeight: '500' },
+  dayLabelActive: { color: Colors.ink, fontWeight: '700' },
+});
+
+// ── Radar Chart ──────────────────────────────────────────────────
+function RadarChart({ data }: { data: Record<string, number> }) {
+  const SIZE = 180;
+  const cx = SIZE / 2;
+  const cy = SIZE / 2;
+  const R = 56;
+
+  const gridLevels = [1 / 3, 2 / 3, 1];
+
+  const gridPolygons = gridLevels.map((level) =>
+    DISC_AXES.map(({ angle }) => {
+      const r = level * R;
+      return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
+    }).join(' '),
+  );
+
+  // Ensure at least a tiny shape even if all values are 0
+  const dataPoints = DISC_AXES.map(({ key, angle }) => {
+    const val = Math.max(data[key] ?? 0, 0.04);
+    return {
+      x: cx + val * R * Math.cos(angle),
+      y: cy + val * R * Math.sin(angle),
+    };
+  });
+  const polygonPoints = dataPoints.map((p) => `${p.x},${p.y}`).join(' ');
+
+  // Emoji label positions (slightly beyond axis end)
+  const labelR = R + 22;
+
+  return (
+    <Svg width={SIZE} height={SIZE}>
+      {/* Grid rings */}
+      {gridPolygons.map((pts, i) => (
+        <Polygon key={i} points={pts} fill="none" stroke="rgba(20,16,28,0.08)" strokeWidth={1} />
+      ))}
+
+      {/* Axis lines */}
+      {DISC_AXES.map(({ key, angle }) => (
+        <SvgLine
+          key={key}
+          x1={cx} y1={cy}
+          x2={cx + R * Math.cos(angle)}
+          y2={cy + R * Math.sin(angle)}
+          stroke="rgba(20,16,28,0.10)"
+          strokeWidth={1}
+        />
+      ))}
+
+      {/* Data fill */}
+      <Polygon
+        points={polygonPoints}
+        fill="rgba(242,140,100,0.20)"
+        stroke={Colors.pinkHot}
+        strokeWidth={2}
+      />
+
+      {/* Data dots */}
+      {dataPoints.map((p, i) => (
+        <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill={Colors.pinkHot} />
+      ))}
+
+      {/* Emoji labels */}
+      {DISC_AXES.map(({ key, angle }) => {
+        const lx = cx + labelR * Math.cos(angle);
+        const ly = cy + labelR * Math.sin(angle);
+        return (
+          <SvgText
+            key={key}
+            x={lx}
+            y={ly + 6}          // +6 ≈ visual center for emoji
+            textAnchor="middle"
+            fontSize={18}
+          >
+            {DISC_EMOJI[key]}
+          </SvgText>
+        );
+      })}
+    </Svg>
+  );
+}
+
+// ── Main Screen ──────────────────────────────────────────────────
 export default function StatsScreen() {
   const router = useRouter();
   const { userId } = useAuthStore();
-  const { activePet } = usePetStore();
-  const activePetDef =
-    (activePet ? PETS.find((p) => p.id === activePet.name.toLowerCase()) : null) ??
-    PETS[0];
 
-  // loading=true 直到資料到位（避免空值→真實資料的「閃爍」）
   const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [summary, setSummary] = useState({ total_focus_sec: 0, streak_days: 0, total_sessions: 0 });
-  const [selectedDay, setSelectedDay] = useState(6); // 預設今天（最後一天）
+  const [summary, setSummary] = useState({
+    total_focus_sec: 0,
+    streak_days: 0,
+    total_sessions: 0,
+  });
+  const [selectedDay, setSelectedDay] = useState(6); // default: today
 
   useEffect(() => {
     if (!userId) {
-      // 未登入：直接顯示 mock
       setSessions(mockSessions.sessions);
       setSummary(mockSessions.summary);
       setLoading(false);
@@ -117,29 +332,26 @@ export default function StatsScreen() {
         setSummary(res.summary);
       })
       .catch(() => {
-        // 後端失敗：fallback mock
         setSessions(mockSessions.sessions);
         setSummary(mockSessions.summary);
       })
       .finally(() => setLoading(false));
   }, [userId]);
 
-  const weekStats = buildWeekStats(sessions);
-  const MAX_H = Math.max(...weekStats.map((d) => d.hours), 0.1);
-  const discBreakdown = buildDiscBreakdown(sessions);
+  const weekStats  = buildWeekStats(sessions);
+  const discData   = buildDiscData(sessions);
+  const dominant   = getDominantType(discData);
 
-  // 日期範圍標題
   const weekStart = weekStats[0]?.date;
-  const weekEnd = weekStats[6]?.date;
-  const weekRangeStr = weekStart && weekEnd
-    ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
-    : '';
+  const weekEnd   = weekStats[6]?.date;
+  const weekRangeStr =
+    weekStart && weekEnd
+      ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
+      : '';
 
   const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
+  const selected   = weekStats[selectedDay];
 
-  const selected = weekStats[selectedDay];
-
-  // 資料尚未到位：只顯示背景 + bar，不渲染任何數字（避免閃爍）
   if (loading) {
     return (
       <View style={styles.root}>
@@ -154,11 +366,15 @@ export default function StatsScreen() {
       <AppBackground />
       <FocoBar />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.title}>Stats</Text>
         <Text style={styles.sub}>Week of {weekRangeStr}</Text>
 
-        {/* Summary row */}
+        {/* ── Summary row ────────────────────────────── */}
         <View style={styles.summaryRow}>
           {[
             { v: `${totalHours}h`, l: 'Total' },
@@ -176,40 +392,16 @@ export default function StatsScreen() {
           ))}
         </View>
 
-        {/* Bar chart */}
+        {/* ── Line chart ─────────────────────────────── */}
         <View style={styles.section}>
           <FrostCard radius={28} padded={false}>
             <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Daily Focus Hours</Text>
-              <View style={styles.bars}>
-                {weekStats.map((d, i) => {
-                  const pct = d.hours / MAX_H;
-                  const active = selectedDay === i;
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      style={styles.barCol}
-                      onPress={() => setSelectedDay(i)}
-                      activeOpacity={0.7}
-                    >
-                      {active && (
-                        <View style={styles.tooltip}>
-                          <Text style={styles.tooltipText}>{d.hours}h</Text>
-                        </View>
-                      )}
-                      <View style={styles.barBg}>
-                        <View style={[
-                          styles.barFill,
-                          { height: `${Math.max(pct * 100, 4)}%` as any },
-                          active && styles.barFillActive,
-                        ]} />
-                      </View>
-                      <Text style={[styles.barDay, active && styles.barDayActive]}>{d.day}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {/* Selected day detail */}
+              <Text style={styles.chartTitle}>Daily Focus Time</Text>
+              <LineChart
+                weekStats={weekStats}
+                selectedDay={selectedDay}
+                onSelect={setSelectedDay}
+              />
               {selected && (
                 <View style={styles.selectedDetail}>
                   <Text style={styles.selectedDetailText}>
@@ -221,28 +413,45 @@ export default function StatsScreen() {
           </FrostCard>
         </View>
 
-        {/* DISC Breakdown */}
-        {discBreakdown.length > 0 && (
-          <View style={styles.section}>
-            <FrostCard radius={24} padded={false}>
-              <View style={styles.breakdownCard}>
-                <Text style={styles.chartTitle}>Focus type breakdown</Text>
-                {discBreakdown.map((b, i) => (
-                  <View key={i} style={styles.breakdownRow}>
-                    <View style={[styles.breakdownDot, { backgroundColor: b.color }]} />
-                    <Text style={styles.breakdownLabel}>{b.label}</Text>
-                    <View style={styles.breakdownBarBg}>
-                      <View style={[styles.breakdownBarFill, { width: `${b.pct * 100}%` as any, backgroundColor: b.color }]} />
-                    </View>
-                    <Text style={styles.breakdownPct}>{Math.round(b.pct * 100)}%</Text>
-                  </View>
-                ))}
-              </View>
-            </FrostCard>
-          </View>
-        )}
+        {/* ── Focus type breakdown ────────────────────── */}
+        <View style={styles.section}>
+          <FrostCard radius={24} padded={false}>
+            <View style={styles.breakdownCard}>
+              <Text style={styles.chartTitle}>Focus type breakdown</Text>
 
-        {/* Recent sessions */}
+              {/* Dominant type row */}
+              <View style={styles.dominantRow}>
+                <Text style={styles.dominantEmoji}>{DISC_EMOJI[dominant]}</Text>
+                <View style={styles.dominantInfo}>
+                  <Text style={styles.dominantLabel}>{DISC_LABEL[dominant]}</Text>
+                  <Text style={styles.dominantSub}>{DISC_SUBLABEL[dominant]}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.dominantBadge,
+                    { backgroundColor: (DISC_COLOR[dominant] ?? Colors.pinkHot) + '22' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dominantBadgeText,
+                      { color: DISC_COLOR[dominant] ?? Colors.pinkHot },
+                    ]}
+                  >
+                    {Math.round((discData[dominant] ?? 0) * 100)}%
+                  </Text>
+                </View>
+              </View>
+
+              {/* Radar chart */}
+              <View style={styles.radarWrapper}>
+                <RadarChart data={discData} />
+              </View>
+            </View>
+          </FrostCard>
+        </View>
+
+        {/* ── Recent sessions ─────────────────────────── */}
         {sessions.length > 0 && (
           <View style={styles.section}>
             <FrostCard radius={24} padded={false}>
@@ -275,11 +484,25 @@ export default function StatsScreen() {
                     >
                       <View style={[styles.sessionDot, { backgroundColor: discColor }]} />
                       <View style={styles.sessionInfo}>
-                        <Text style={styles.sessionTitle}>{mins} min · {s.focus_type_result ?? 'unknown'}</Text>
-                        <Text style={styles.sessionSub}>{dateStr} · +{s.xp_earned} XP</Text>
+                        <Text style={styles.sessionTitle}>
+                          {mins} min · {s.focus_type_result ?? 'unknown'}
+                        </Text>
+                        <Text style={styles.sessionSub}>
+                          {dateStr} · +{s.xp_earned} XP
+                        </Text>
                       </View>
-                      <View style={[styles.sessionBadge, !s.completed && styles.sessionBadgeInactive]}>
-                        <Text style={[styles.sessionBadgeText, !s.completed && styles.sessionBadgeTextInactive]}>
+                      <View
+                        style={[
+                          styles.sessionBadge,
+                          !s.completed && styles.sessionBadgeInactive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.sessionBadgeText,
+                            !s.completed && styles.sessionBadgeTextInactive,
+                          ]}
+                        >
                           {s.completed ? 'Done' : 'Early stop'}
                         </Text>
                       </View>
@@ -290,23 +513,6 @@ export default function StatsScreen() {
             </FrostCard>
           </View>
         )}
-
-        {/* Pet insight card */}
-        <View style={styles.section}>
-          <FrostCard radius={24} padded={false}>
-            <View style={styles.insightCard}>
-              <PetRenderer pet={activePetDef} size={60} interactive={false} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.insightTitle}>Your pet says</Text>
-                <Text style={styles.insightText}>
-                  {summary.streak_days >= 3
-                    ? `${summary.streak_days} days in a row! You're on fire! 🔥`
-                    : 'Keep going — a streak is just around the corner!'}
-                </Text>
-              </View>
-            </View>
-          </FrostCard>
-        </View>
       </ScrollView>
     </View>
   );
@@ -316,50 +522,88 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.beige },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 120 },
-  title: { fontFamily: 'Fraunces_500Medium', fontSize: 42, fontWeight: '500', color: Colors.ink, marginTop: 12, letterSpacing: -0.5 },
+
+  title: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 42,
+    fontWeight: '500',
+    color: Colors.ink,
+    marginTop: 12,
+    letterSpacing: -0.5,
+  },
   sub: { fontSize: 13, color: Colors.inkSoft, marginTop: 4 },
+
+  // Summary
   summaryRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   summaryCard: { flex: 1 },
   summaryInner: { padding: 14 },
-  summaryVal: { fontFamily: 'Fraunces_500Medium', fontSize: 22, fontWeight: '500', color: Colors.ink, letterSpacing: -0.4 },
-  summaryLabel: { fontSize: 9, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 6 },
-  section: { marginTop: 12 },
-  chartCard: { padding: 22, paddingTop: 38, overflow: 'visible' },
-  chartTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink, marginBottom: 18 },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', height: 100, gap: 6, overflow: 'visible' },
-  barCol: { flex: 1, alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end', overflow: 'visible' },
-  tooltip: {
-    position: 'absolute', top: 0,
-    backgroundColor: Colors.ink, borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 2,
+  summaryVal: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 22,
+    fontWeight: '500',
+    color: Colors.ink,
+    letterSpacing: -0.4,
   },
-  tooltipText: { fontSize: 10, color: '#fff', fontWeight: '600' },
-  barBg: { width: '100%', height: 80, justifyContent: 'flex-end', borderRadius: 6, backgroundColor: 'rgba(20,16,28,0.06)' },
-  barFill: { width: '100%', borderRadius: 6, backgroundColor: 'rgba(242,206,220,0.60)' },
-  barFillActive: { backgroundColor: Colors.pinkHot },
-  barDay: { fontSize: 11, color: Colors.inkFaint, fontWeight: '500' },
-  barDayActive: { color: Colors.ink, fontWeight: '700' },
-  selectedDetail: { marginTop: 12 },
+  summaryLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: Colors.inkFaint,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    marginTop: 6,
+  },
+
+  section: { marginTop: 12 },
+
+  // Line chart card
+  chartCard: { padding: 22, paddingTop: 26, overflow: 'visible' },
+  chartTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink, marginBottom: 18 },
+  selectedDetail: { marginTop: 10 },
   selectedDetailText: { fontSize: 12, color: Colors.inkSoft, textAlign: 'center' },
-  breakdownCard: { padding: 22 },
-  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  breakdownDot: { width: 8, height: 8, borderRadius: 4 },
-  breakdownLabel: { fontSize: 12, color: Colors.ink, width: 100, textTransform: 'capitalize' },
-  breakdownBarBg: { flex: 1, height: 6, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
-  breakdownBarFill: { height: 6, borderRadius: 9999 },
-  breakdownPct: { fontSize: 11, fontWeight: '600', color: Colors.ink, width: 30, textAlign: 'right' },
+
+  // DISC breakdown card
+  breakdownCard: { padding: 22, alignItems: 'center' },
+  dominantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    marginBottom: 8,
+  },
+  dominantEmoji: { fontSize: 34 },
+  dominantInfo: { flex: 1 },
+  dominantLabel: { fontSize: 15, fontWeight: '600', color: Colors.ink },
+  dominantSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 2 },
+  dominantBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  dominantBadgeText: { fontSize: 12, fontWeight: '700' },
+  radarWrapper: { alignItems: 'center', marginTop: 4 },
+
+  // Recent sessions
   recentCard: { padding: 22 },
-  sessionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(20,16,28,0.08)' },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(20,16,28,0.08)',
+  },
   sessionDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   sessionInfo: { flex: 1 },
-  sessionTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink, textTransform: 'capitalize' },
+  sessionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.ink,
+    textTransform: 'capitalize',
+  },
   sessionSub: { fontSize: 11, color: Colors.inkSoft, marginTop: 2 },
-  sessionBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9999, backgroundColor: 'rgba(242,206,220,0.50)' },
+  sessionBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(242,206,220,0.50)',
+  },
   sessionBadgeInactive: { backgroundColor: 'rgba(20,16,28,0.06)' },
   sessionBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.pinkText },
   sessionBadgeTextInactive: { color: Colors.inkFaint },
-  insightCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, padding: 18 },
-  insightPet: { width: 60, height: 60 },
-  insightTitle: { fontSize: 13, fontWeight: '700', color: Colors.ink, marginBottom: 4 },
-  insightText: { fontSize: 13, color: Colors.inkSoft, lineHeight: 18 },
 });
