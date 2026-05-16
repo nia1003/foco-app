@@ -94,7 +94,7 @@ export const FontWeight = {
   "medium": "500",
   "semibold": "600",
   "bold": "700"
-};
+} as const;
 
 export const Shadow = {
   sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },

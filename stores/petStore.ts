@@ -1,17 +1,21 @@
 // ─────────────────────────────────────────────
 // Pet Store — 多寵物版本
 //
-// ● pets[]         所有屬於這個 user 的寵物
-// ● activePetId    目前選中（陪伴專注）的寵物 ID
-// ● activePet      computed: pets.find(id) ?? pets[0] ?? null
+// ● pets[]              所有屬於這個 user 的寵物
+// ● activePetId         目前選中（陪伴專注）的寵物 ID（Supabase UUID）
+// ● activePet           computed: pets.find(id) ?? pets[0] ?? null
 //
-// activePetId 會寫入 AsyncStorage，重啟 App 後保留選擇
+// 持久化策略：
+//   @foco/activePetId       — 上次選擇的 Supabase UUID（setActivePet 寫入）
+//   @foco/onboardingPetName — Onboarding 選擇的寵物名稱（saveOnboardingPetName 寫入）
+//     → restoreActivePet() 先嘗試 activePetId，若找不到則按名稱 auto-match
 // ─────────────────────────────────────────────
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FocoPet } from '@/types';
 
 const ACTIVE_PET_KEY = '@foco/activePetId';
+const ONBOARDING_PET_NAME_KEY = '@foco/onboardingPetName';
 
 interface PetStore {
   pets: FocoPet[];
@@ -25,6 +29,8 @@ interface PetStore {
   setPets: (pets: FocoPet[]) => void;
   /** 選擇陪伴的寵物，並寫入 AsyncStorage */
   setActivePet: (petId: string) => Promise<void>;
+  /** Onboarding 選寵物時呼叫，儲存名稱供首次載入自動匹配 */
+  saveOnboardingPetName: (name: string) => Promise<void>;
   /** Session 結束後更新特定寵物的 XP / Level */
   applySessionResult: (
     petId: string,
@@ -32,7 +38,12 @@ interface PetStore {
     newLevel: number,
     xpNextLevel: number,
   ) => void;
-  /** 從 AsyncStorage 恢復 activePetId */
+  /**
+   * 從 AsyncStorage 恢復 activePetId。
+   * 若儲存的 UUID 仍在 pets 中 → 直接使用。
+   * 若找不到（首次登入）→ 嘗試按 onboardingPetName 自動匹配。
+   * 需在 setPets() 之後呼叫，才有 pets 可以比對。
+   */
   restoreActivePet: () => Promise<void>;
   reset: () => void;
 }
@@ -62,6 +73,12 @@ export const usePetStore = create<PetStore>((set, get) => ({
     } catch {}
   },
 
+  saveOnboardingPetName: async (name) => {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_PET_NAME_KEY, name);
+    } catch {}
+  },
+
   applySessionResult: (petId, newXP, newLevel, xpNextLevel) =>
     set((state) => {
       const pets = state.pets.map((p) =>
@@ -73,20 +90,32 @@ export const usePetStore = create<PetStore>((set, get) => ({
     }),
 
   restoreActivePet: async () => {
+    const { pets } = get();
     try {
-      const stored = await AsyncStorage.getItem(ACTIVE_PET_KEY);
-      if (stored) {
-        set((state) => ({
-          activePetId: stored,
-          activePet: deriveActivePet(state.pets, stored),
-        }));
+      const storedId = await AsyncStorage.getItem(ACTIVE_PET_KEY);
+      if (storedId && pets.find((p) => p.id === storedId)) {
+        set({ activePetId: storedId, activePet: deriveActivePet(pets, storedId) });
+        return;
+      }
+
+      // UUID not found — try matching by onboarding pet name
+      const onboardingName = await AsyncStorage.getItem(ONBOARDING_PET_NAME_KEY);
+      if (onboardingName) {
+        const matched = pets.find(
+          (p) => p.name.toLowerCase() === onboardingName.toLowerCase(),
+        );
+        if (matched) {
+          set({ activePetId: matched.id, activePet: matched });
+          await AsyncStorage.setItem(ACTIVE_PET_KEY, matched.id);
+          return;
+        }
       }
     } catch {}
+    // Final fallback: use first pet (already set by setPets via deriveActivePet)
   },
 
   reset: () => {
     set({ pets: [], activePetId: null, activePet: null });
-    // 清除持久化的 activePetId，避免下次登入殘留上個帳號的選擇
-    AsyncStorage.removeItem(ACTIVE_PET_KEY).catch(() => {});
+    AsyncStorage.multiRemove([ACTIVE_PET_KEY, ONBOARDING_PET_NAME_KEY]).catch(() => {});
   },
 }));

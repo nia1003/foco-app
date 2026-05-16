@@ -14,7 +14,7 @@ export interface Pet {
   trait: string;
   accent: string;
   image: any;
-  CustomComponent?: ComponentType<{ size: number; color?: string }>;
+  CustomComponent?: ComponentType<{ size: number; color?: string; interactive?: boolean }>;
   locked?: boolean;
 }
 
