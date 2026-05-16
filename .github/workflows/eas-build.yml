@@ -34,10 +34,10 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # PR → preview build，加 --no-wait 讓 CI 馬上回傳（不等 build 跑完）
+      # PR → iOS-only preview build (Android free-tier quota shared with main builds)
       - name: EAS Preview Build (PR)
         if: github.event_name == 'pull_request'
-        run: eas build --platform all --non-interactive --profile preview --no-wait
+        run: eas build --platform ios --non-interactive --profile preview --no-wait
 
       # push to main → production build (Android only until Apple Developer account is set up)
       - name: EAS Production Build (main)
