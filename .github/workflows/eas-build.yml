@@ -39,7 +39,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: eas build --platform all --non-interactive --profile preview --no-wait
 
-      # push to main → production build
+      # push to main → production build (Android only until Apple Developer account is set up)
       - name: EAS Production Build (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: eas build --platform all --non-interactive --profile production --no-wait
+        run: eas build --platform android --non-interactive --profile production --no-wait
