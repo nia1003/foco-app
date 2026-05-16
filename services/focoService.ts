@@ -3,7 +3,7 @@
 // 全部走 Supabase（DB + Edge Function）
 // ─────────────────────────────────────────────
 import { supabase } from '@/lib/supabase';
-import type { SessionPayload, SessionResult, FocoPet, Task, SessionRecord } from '@/types';
+import type { SessionPayload, SessionResult, FocoPet, Task, SessionRecord, DayData, SessionSummary } from '@/types';
 
 // ── 等級門檻（index = level - 1）────────────────
 const XP_THRESHOLDS = [0, 100, 250, 500, 900];
@@ -69,13 +69,13 @@ export async function getSessions(userId: string): Promise<{
 }> {
   const { data, error } = await supabase
     .from('sessions')
-    .select('id, actual_duration, completed, focus_type_result, xp_earned, ended_at, pause_count, left_app_count')
+    .select('id, actual_duration, completed, focus_type_result, xp_earned, ended_at, pause_count, left_app_count, quality_score, started_at, tasks(title)')
     .eq('user_id', userId)
     .order('ended_at', { ascending: false });
 
   if (error) throw error;
 
-  const sessions = data as SessionRecord[];
+  const sessions = data as unknown as SessionRecord[];
   const totalFocusSec = sessions.reduce((s, r) => s + r.actual_duration, 0);
   const streakDays = calcStreak(sessions.map((r) => r.ended_at));
 
@@ -140,4 +140,98 @@ export async function deleteTask(taskId: string): Promise<void> {
     .update({ status: 'deleted' })
     .eq('id', taskId);
   if (error) throw error;
+}
+
+// ── getCalendarData — 取得某月每天的 session 數量 ──
+export async function getCalendarData(userId: string, year: number, month: number): Promise<DayData[]> {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const rangeStart = `${year}-${pad(month)}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const rangeEnd = `${year}-${pad(month)}-${pad(lastDay)}T23:59:59Z`;
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('id, actual_duration, completed, xp_earned, quality_score, started_at, ended_at, tasks(title)')
+    .eq('user_id', userId)
+    .gte('ended_at', rangeStart)
+    .lte('ended_at', rangeEnd)
+    .order('ended_at', { ascending: true });
+
+  if (error) throw error;
+
+  const byDate = new Map<string, SessionSummary[]>();
+  for (const row of data as any[]) {
+    const date = (row.ended_at as string).slice(0, 10);
+    const tasksData = row.tasks;
+    const task_title = Array.isArray(tasksData)
+      ? (tasksData[0]?.title ?? null)
+      : (tasksData?.title ?? null);
+    const summary: SessionSummary = {
+      id: row.id,
+      duration_min: Math.round(row.actual_duration / 60),
+      task_title,
+      quality_score: row.quality_score ?? 0,
+      xp_earned: row.xp_earned,
+      completed: row.completed,
+      started_at: row.started_at ?? row.ended_at,
+      ended_at: row.ended_at,
+    };
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date)!.push(summary);
+  }
+
+  return Array.from(byDate.entries()).map(([date, sessions]) => ({
+    date,
+    session_count: sessions.length,
+    sessions,
+  }));
+}
+
+// ── getWeekSessions — 取得某週（Mon–Sun）的 sessions ──
+export async function getWeekSessions(userId: string, weekStart: string): Promise<DayData[]> {
+  const monday = new Date(weekStart);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('id, actual_duration, completed, xp_earned, quality_score, started_at, ended_at, tasks(title)')
+    .eq('user_id', userId)
+    .gte('ended_at', weekStart)
+    .lte('ended_at', sunday.toISOString().slice(0, 10) + 'T23:59:59Z')
+    .order('ended_at', { ascending: true });
+
+  if (error) throw error;
+
+  // Build all 7 days (Mon→Sun) with empty defaults
+  const result: DayData[] = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return { date: d.toISOString().slice(0, 10), session_count: 0, sessions: [] };
+  });
+
+  for (const row of data as any[]) {
+    const date = (row.ended_at as string).slice(0, 10);
+    const tasksData = row.tasks;
+    const task_title = Array.isArray(tasksData)
+      ? (tasksData[0]?.title ?? null)
+      : (tasksData?.title ?? null);
+    const summary: SessionSummary = {
+      id: row.id,
+      duration_min: Math.round(row.actual_duration / 60),
+      task_title,
+      quality_score: row.quality_score ?? 0,
+      xp_earned: row.xp_earned,
+      completed: row.completed,
+      started_at: row.started_at ?? row.ended_at,
+      ended_at: row.ended_at,
+    };
+    const entry = result.find((d) => d.date === date);
+    if (entry) {
+      entry.sessions.push(summary);
+      entry.session_count++;
+    }
+  }
+
+  return result;
 }

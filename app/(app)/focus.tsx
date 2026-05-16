@@ -29,19 +29,23 @@ import type { SessionPayload } from '@/types';
 
 export default function FocusScreen() {
   const router = useRouter();
-  const { durationMin = '25', taskId, taskTitle } = useLocalSearchParams<{
+  const { durationMin = '25', taskId, petId: paramPetId, taskTitle } = useLocalSearchParams<{
     durationMin?: string;
     taskId?: string;
+    petId?: string;
     taskTitle?: string;
   }>();
   const { userId } = useAuthStore();
-  const { activePet: storePet } = usePetStore();
+  const { activePet: storePet, pets: allPets } = usePetStore();
+  // Use petId from nav params (set by FocusSetupModal) — falls back to store activePet
+  const resolvedPetId = paramPetId || storePet?.id || 'unknown';
   const durationSeconds = Number(durationMin) * 60;
 
-  // Resolve active pet definition (for 3D render)
+  // Resolve pet definition for 3D render — use the param pet, not necessarily activePet
+  const resolvedPetRecord = allPets.find((p) => p.id === resolvedPetId) ?? storePet;
   const activePetDef =
-    (storePet
-      ? PETS.find((p) => p.id === storePet.name.toLowerCase()) ??
+    (resolvedPetRecord
+      ? PETS.find((p) => p.id === resolvedPetRecord.name.toLowerCase()) ??
         PETS.find((p) => p.id === 'xingwang')
       : PETS.find((p) => p.id === 'xingwang')) ?? PETS[0];
 
@@ -104,7 +108,7 @@ export default function FocusScreen() {
 
     const payload: SessionPayload = {
       user_id: userId ?? 'unknown',
-      pet_id: storePet?.id ?? 'unknown',
+      pet_id: resolvedPetId,
       task_id: snap.taskId,
       planned_duration: snap.plannedDuration,
       actual_duration: actualDuration,
@@ -125,6 +129,7 @@ export default function FocusScreen() {
       started_at: startedAtISO,
       events: snap.events,
       old_xp: storePet?.xp ?? 0,
+      ...(taskTitle ? { task_title: taskTitle } : {}),
     };
 
     try {

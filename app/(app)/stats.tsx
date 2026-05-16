@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,12 +24,15 @@ import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { MonthCalendar } from '@/components/MonthCalendar';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { getSessions } from '@/services/focoService';
 import { mockSessions } from '@/data/mockData';
 import type { SessionRecord } from '@/types';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+// scrollContent paddingHorizontal 18×2 + chartCard padding 22×2 = 80
+const CHART_W = SCREEN_W - 80;
 
 // ── DISC config ──────────────────────────────────────────────────
 const DISC_COLOR: Record<string, string> = {
@@ -38,11 +42,11 @@ const DISC_COLOR: Record<string, string> = {
   influence: '#F5A623',
 };
 
-const DISC_EMOJI: Record<string, string> = {
-  dominance:        '☀️',
-  influence:        '🌕',
-  steadiness:       '🌏',
-  conscientiousness:'🪐',
+const DISC_ICON: Record<string, string> = {
+  dominance:        '▲',
+  influence:        '◆',
+  steadiness:       '◉',
+  conscientiousness:'◈',
 };
 
 const DISC_LABEL: Record<string, string> = {
@@ -68,6 +72,46 @@ const DISC_AXES: { key: string; angle: number }[] = [
 ];
 
 // ── Data helpers ─────────────────────────────────────────────────
+function getLast7Days(): Date[] {
+  const days: Date[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    days.push(d);
+  }
+  return days;
+}
+
+function dayLabel(d: Date): string {
+  return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()];
+}
+
+interface DayStat {
+  date: Date;
+  day: string;
+  hours: number;
+  sessions: number;
+}
+
+function buildWeekStats(sessions: SessionRecord[]): DayStat[] {
+  return getLast7Days().map((date) => {
+    const dayStart = date.getTime();
+    const dayEnd = dayStart + 86_400_000;
+    const daySessions = sessions.filter((s) => {
+      const t = new Date(s.ended_at).getTime();
+      return t >= dayStart && t < dayEnd;
+    });
+    const totalSec = daySessions.reduce((acc, s) => acc + s.actual_duration, 0);
+    return {
+      date,
+      day: dayLabel(date),
+      hours: Math.round((totalSec / 3600) * 10) / 10,
+      sessions: daySessions.length,
+    };
+  });
+}
+
 // Returns fraction (0–1) for each DISC type across all sessions
 function buildDiscData(sessions: SessionRecord[]): Record<string, number> {
   const counts: Record<string, number> = {
@@ -91,6 +135,103 @@ function getDominantType(data: Record<string, number>): string {
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function sessionTimeOfDay(isoStr: string): string {
+  const h = new Date(isoStr).getHours();
+  if (h < 6)  return '深夜';
+  if (h < 12) return '早上';
+  if (h < 17) return '下午';
+  if (h < 21) return '傍晚';
+  return '夜晚';
+}
+
+// ── Line Chart ───────────────────────────────────────────────────
+function LineChart({
+  weekStats,
+  selectedDay,
+  onSelect,
+}: {
+  weekStats: DayStat[];
+  selectedDay: number;
+  onSelect: (i: number) => void;
+}) {
+  const W = CHART_W;
+  const H = 80;
+  const PAD_TOP = 22;
+  const PAD_X = 10;
+  const innerW = W - PAD_X * 2;
+  const svgH = H + PAD_TOP + 8;
+
+  const MAX = Math.max(...weekStats.map((d) => d.hours), 0.1);
+
+  const pts = weekStats.map((d, i) => ({
+    x: PAD_X + (i / 6) * innerW,
+    y: PAD_TOP + (1 - d.hours / MAX) * H,
+  }));
+
+  const polylineStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
+
+  // Filled area: follow line, then close at bottom
+  const areaStr = [
+    ...pts.map((p) => `${p.x},${p.y}`),
+    `${pts[6].x},${PAD_TOP + H + 4}`,
+    `${pts[0].x},${PAD_TOP + H + 4}`,
+  ].join(' ');
+
+  return (
+    <View>
+      <Svg width={W} height={svgH}>
+        {/* Gradient-like area fill */}
+        <Polygon points={areaStr} fill="rgba(242,206,220,0.30)" />
+
+        {/* Line */}
+        <Polyline
+          points={polylineStr}
+          fill="none"
+          stroke={Colors.pinkHot}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+
+        {/* Dots */}
+        {pts.map((p, i) =>
+          i === selectedDay ? (
+            <React.Fragment key={i}>
+              <Circle cx={p.x} cy={p.y} r={12} fill="rgba(232,120,90,0.12)" />
+              <Circle cx={p.x} cy={p.y} r={5.5} fill={Colors.pinkHot} />
+            </React.Fragment>
+          ) : (
+            <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill="rgba(232,120,90,0.45)" />
+          ),
+        )}
+      </Svg>
+
+      {/* Tap targets + day labels */}
+      <View style={lcStyles.dayRow}>
+        {weekStats.map((d, i) => (
+          <TouchableOpacity
+            key={i}
+            style={lcStyles.dayBtn}
+            onPress={() => onSelect(i)}
+            activeOpacity={0.7}
+          >
+            <Text style={[lcStyles.dayLabel, i === selectedDay && lcStyles.dayLabelActive]}>
+              {d.day}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const lcStyles = StyleSheet.create({
+  dayRow: { flexDirection: 'row', paddingHorizontal: 4, marginTop: 2 },
+  dayBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
+  dayLabel: { fontSize: 11, color: Colors.inkFaint, fontWeight: '500' },
+  dayLabelActive: { color: Colors.ink, fontWeight: '700' },
+});
 
 // ── Radar Chart ──────────────────────────────────────────────────
 function RadarChart({ data }: { data: Record<string, number> }) {
@@ -153,7 +294,7 @@ function RadarChart({ data }: { data: Record<string, number> }) {
         <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill={Colors.pinkHot} />
       ))}
 
-      {/* Emoji labels */}
+      {/* Icon labels */}
       {DISC_AXES.map(({ key, angle }) => {
         const lx = cx + labelR * Math.cos(angle);
         const ly = cy + labelR * Math.sin(angle);
@@ -161,11 +302,13 @@ function RadarChart({ data }: { data: Record<string, number> }) {
           <SvgText
             key={key}
             x={lx}
-            y={ly + 6}          // +6 ≈ visual center for emoji
+            y={ly + 5}
             textAnchor="middle"
-            fontSize={18}
+            fontSize={14}
+            fill={DISC_COLOR[key] ?? '#888'}
+            fontWeight="600"
           >
-            {DISC_EMOJI[key]}
+            {DISC_ICON[key]}
           </SvgText>
         );
       })}
@@ -185,8 +328,7 @@ export default function StatsScreen() {
     streak_days: 0,
     total_sessions: 0,
   });
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedDaySessions, setSelectedDaySessions] = useState<SessionRecord[]>([]);
+  const [selectedDay, setSelectedDay] = useState(6); // default: today
 
   useEffect(() => {
     if (!userId) {
@@ -207,14 +349,19 @@ export default function StatsScreen() {
       .finally(() => setLoading(false));
   }, [userId]);
 
+  const weekStats  = buildWeekStats(sessions);
   const discData   = buildDiscData(sessions);
   const dominant   = getDominantType(discData);
-  const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
 
-  function handleDayPress(date: Date, daySessions: SessionRecord[]) {
-    setSelectedDate(date);
-    setSelectedDaySessions(daySessions);
-  }
+  const weekStart = weekStats[0]?.date;
+  const weekEnd   = weekStats[6]?.date;
+  const weekRangeStr =
+    weekStart && weekEnd
+      ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
+      : '';
+
+  const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
+  const selected   = weekStats[selectedDay];
 
   if (loading) {
     return (
@@ -236,13 +383,14 @@ export default function StatsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Stats</Text>
+        <Text style={styles.sub}>Week of {weekRangeStr}</Text>
 
         {/* ── Summary row ────────────────────────────── */}
         <View style={styles.summaryRow}>
           {[
             { v: `${totalHours}h`, l: 'Total' },
             { v: String(summary.total_sessions), l: 'Sessions' },
-            { v: `${summary.streak_days}🔥`, l: 'Streak' },
+            { v: `${summary.streak_days}d`, l: 'Streak' },
           ].map((s, i) => (
             <View key={i} style={styles.summaryCard}>
               <FrostCard radius={20} padded={false}>
@@ -255,74 +403,26 @@ export default function StatsScreen() {
           ))}
         </View>
 
-        {/* ── Month Calendar ──────────────────────────── */}
+        {/* ── Line chart ─────────────────────────────── */}
         <View style={styles.section}>
           <FrostCard radius={28} padded={false}>
             <View style={styles.chartCard}>
-              <MonthCalendar
-                sessions={sessions}
-                selectedDate={selectedDate}
-                onDayPress={handleDayPress}
+              <Text style={styles.chartTitle}>Daily Focus Time</Text>
+              <LineChart
+                weekStats={weekStats}
+                selectedDay={selectedDay}
+                onSelect={setSelectedDay}
               />
+              {selected && (
+                <View style={styles.selectedDetail}>
+                  <Text style={styles.selectedDetailText}>
+                    {selected.sessions} session{selected.sessions !== 1 ? 's' : ''} · {selected.hours}h focused
+                  </Text>
+                </View>
+              )}
             </View>
           </FrostCard>
         </View>
-
-        {/* ── Day detail panel ────────────────────────── */}
-        {selectedDate && (
-          <View style={styles.section}>
-            <FrostCard radius={24} padded={false}>
-              <View style={styles.dayDetailCard}>
-                <Text style={styles.dayDetailTitle}>
-                  {selectedDate.getMonth() + 1}月{selectedDate.getDate()}日
-                </Text>
-                {selectedDaySessions.length === 0 ? (
-                  <Text style={styles.dayDetailEmpty}>這天沒有紀錄</Text>
-                ) : (
-                  selectedDaySessions.map((s) => {
-                    const mins = Math.floor(s.actual_duration / 60);
-                    const t = new Date(s.ended_at);
-                    const timeStr = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-                    const discColor = DISC_COLOR[s.focus_type_result ?? ''] ?? Colors.inkSoft;
-                    return (
-                      <TouchableOpacity
-                        key={s.id}
-                        style={styles.sessionRow}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/(app)/analysis',
-                            params: {
-                              result: JSON.stringify({
-                                focus_type: s.focus_type_result,
-                                actual_duration: s.actual_duration,
-                                pause_count: s.pause_count ?? 0,
-                                left_app_count: s.left_app_count ?? 0,
-                              }),
-                            },
-                          })
-                        }
-                        activeOpacity={0.7}
-                      >
-                        <View style={[styles.sessionDot, { backgroundColor: discColor }]} />
-                        <View style={styles.sessionInfo}>
-                          <Text style={styles.sessionTitle}>
-                            {mins} min · {s.focus_type_result ?? 'unknown'}
-                          </Text>
-                          <Text style={styles.sessionSub}>{timeStr}</Text>
-                        </View>
-                        <View style={[styles.sessionBadge, !s.completed && styles.sessionBadgeInactive]}>
-                          <Text style={[styles.sessionBadgeText, !s.completed && styles.sessionBadgeTextInactive]}>
-                            {s.completed ? 'Done' : 'Early stop'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
-              </View>
-            </FrostCard>
-          </View>
-        )}
 
         {/* ── Focus type breakdown ────────────────────── */}
         <View style={styles.section}>
@@ -332,7 +432,9 @@ export default function StatsScreen() {
 
               {/* Dominant type row */}
               <View style={styles.dominantRow}>
-                <Text style={styles.dominantEmoji}>{DISC_EMOJI[dominant]}</Text>
+                <Text style={[styles.dominantEmoji, { color: DISC_COLOR[dominant] ?? '#888' }]}>
+                  {DISC_ICON[dominant]}
+                </Text>
                 <View style={styles.dominantInfo}>
                   <Text style={styles.dominantLabel}>{DISC_LABEL[dominant]}</Text>
                   <Text style={styles.dominantSub}>{DISC_SUBLABEL[dominant]}</Text>
@@ -370,9 +472,14 @@ export default function StatsScreen() {
                 <Text style={styles.chartTitle}>Recent sessions</Text>
                 {sessions.slice(0, 5).map((s) => {
                   const mins = Math.floor(s.actual_duration / 60);
+                  const refTime = s.started_at ?? s.ended_at;
                   const date = new Date(s.ended_at);
                   const dateStr = `${MONTHS[date.getMonth()]} ${date.getDate()}`;
-                  const discColor = DISC_COLOR[s.focus_type_result ?? ''] ?? Colors.inkSoft;
+                  const timeOfDay = sessionTimeOfDay(refTime);
+                  const tasksData = s.tasks;
+                  const taskName = Array.isArray(tasksData)
+                    ? (tasksData[0]?.title ?? null)
+                    : (tasksData?.title ?? null);
                   return (
                     <TouchableOpacity
                       key={s.id}
@@ -383,39 +490,30 @@ export default function StatsScreen() {
                           params: {
                             result: JSON.stringify({
                               xp_gained: s.xp_earned,
-                              focus_type: s.focus_type_result,
                               actual_duration: s.actual_duration,
                               pause_count: s.pause_count ?? 0,
                               left_app_count: s.left_app_count ?? 0,
+                              quality_score: s.quality_score ?? 0,
+                              started_at: s.started_at,
+                              task_title: taskName,
                             }),
                           },
                         })
                       }
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.sessionDot, { backgroundColor: discColor }]} />
+                      <View style={styles.sessionDot} />
                       <View style={styles.sessionInfo}>
                         <Text style={styles.sessionTitle}>
-                          {mins} min · {s.focus_type_result ?? 'unknown'}
+                          {taskName ?? `${mins}m focus`}
                         </Text>
                         <Text style={styles.sessionSub}>
-                          {dateStr}
+                          {timeOfDay} · {dateStr} · {mins}m
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.sessionBadge,
-                          !s.completed && styles.sessionBadgeInactive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.sessionBadgeText,
-                            !s.completed && styles.sessionBadgeTextInactive,
-                          ]}
-                        >
-                          {s.completed ? 'Done' : 'Early stop'}
-                        </Text>
+                      <View style={styles.sessionRight}>
+                        <Text style={styles.sessionXP}>+{s.xp_earned}</Text>
+                        <Text style={styles.sessionXPLabel}>XP</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -442,6 +540,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     letterSpacing: -0.5,
   },
+  sub: { fontSize: 13, color: Colors.inkSoft, marginTop: 4 },
+
   // Summary
   summaryRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   summaryCard: { flex: 1 },
@@ -464,19 +564,11 @@ const styles = StyleSheet.create({
 
   section: { marginTop: 12 },
 
-  // Calendar card
-  chartCard: { padding: 22, paddingTop: 22 },
+  // Line chart card
+  chartCard: { padding: 22, paddingTop: 26, overflow: 'visible' },
   chartTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink, marginBottom: 18 },
-
-  // Day detail panel
-  dayDetailCard: { padding: 22 },
-  dayDetailTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.ink,
-    marginBottom: 12,
-  },
-  dayDetailEmpty: { fontSize: 13, color: Colors.inkFaint, textAlign: 'center', paddingVertical: 12 },
+  selectedDetail: { marginTop: 10 },
+  selectedDetailText: { fontSize: 12, color: Colors.inkSoft, textAlign: 'center' },
 
   // DISC breakdown card
   breakdownCard: { padding: 22, alignItems: 'center' },
@@ -487,7 +579,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 8,
   },
-  dominantEmoji: { fontSize: 34 },
+  dominantEmoji: { fontSize: 28, fontWeight: '700' },
   dominantInfo: { flex: 1 },
   dominantLabel: { fontSize: 15, fontWeight: '600', color: Colors.ink },
   dominantSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 2 },
@@ -505,7 +597,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(20,16,28,0.08)',
   },
-  sessionDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  sessionDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0, backgroundColor: 'rgba(20,16,28,0.18)' },
   sessionInfo: { flex: 1 },
   sessionTitle: {
     fontSize: 14,
@@ -514,13 +606,7 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   sessionSub: { fontSize: 11, color: Colors.inkSoft, marginTop: 2 },
-  sessionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(242,206,220,0.50)',
-  },
-  sessionBadgeInactive: { backgroundColor: 'rgba(20,16,28,0.06)' },
-  sessionBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.pinkText },
-  sessionBadgeTextInactive: { color: Colors.inkFaint },
+  sessionRight: { alignItems: 'flex-end', gap: 1 },
+  sessionXP: { fontSize: 14, fontWeight: '700', color: Colors.pinkText, letterSpacing: -0.3 },
+  sessionXPLabel: { fontSize: 9, color: Colors.inkFaint, letterSpacing: 0.8 },
 });

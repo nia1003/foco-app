@@ -23,9 +23,10 @@ import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { getPets, getTasks } from '@/services/focoService';
-import { mockPets, mockTasks } from '@/data/mockData';
-import type { Task } from '@/types';
+import { getPets, getTasks, getCalendarData } from '@/services/focoService';
+import { mockPets, mockTasks, getMockCalendarData } from '@/data/mockData';
+import { FocusCalendar } from '@/components/FocusCalendar';
+import type { Task, DayData } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PET_CARD_W = Math.round(SCREEN_W * 0.58);
@@ -47,6 +48,12 @@ export default function HomeScreen() {
   // Pool to look up XP/level — real store data or full 4-pet mock
   const storePool = pets.length > 0 ? pets : mockPets;
 
+  // ── Calendar state ─────────────────────────────────────────────
+  const nowDate = new Date();
+  const [calYear, setCalYear] = useState(nowDate.getFullYear());
+  const [calMonth, setCalMonth] = useState(nowDate.getMonth() + 1);
+  const [calData, setCalData] = useState<DayData[]>([]);
+
   // ── Focus modal state ──────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [modalTasks, setModalTasks] = useState<Task[]>([]);
@@ -57,6 +64,21 @@ export default function HomeScreen() {
       .then((fetched) => { setPets(fetched); restoreActivePet(); })
       .catch(() => setPets(mockPets));
   }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setCalData(getMockCalendarData(calYear, calMonth));
+      return;
+    }
+    getCalendarData(userId, calYear, calMonth)
+      .then(setCalData)
+      .catch(() => setCalData(getMockCalendarData(calYear, calMonth)));
+  }, [userId, calYear, calMonth]);
+
+  const handleMonthChange = (y: number, m: number) => {
+    setCalYear(y);
+    setCalMonth(m);
+  };
 
   // Lazily fetch pending tasks the first time the modal opens
   const openModal = async () => {
@@ -158,6 +180,23 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </FrostCard>
         </View>
+
+        {/* ── Focus Calendar ───────────────────────── */}
+        <View style={styles.calSection}>
+          <View style={styles.calHeader}>
+            <Text style={styles.calEyebrow}>FOCUS HISTORY</Text>
+          </View>
+          <FrostCard radius={24} padded={false}>
+            <View style={styles.calInner}>
+              <FocusCalendar
+                year={calYear}
+                month={calMonth}
+                data={calData}
+                onMonthChange={handleMonthChange}
+              />
+            </View>
+          </FrostCard>
+        </View>
       </ScrollView>
 
       {/* ── Focus Setup Modal ────────────────────────────────────── */}
@@ -224,6 +263,15 @@ const styles = StyleSheet.create({
 
   // START FOCUS card
   section: { marginTop: 14, paddingHorizontal: 18 },
+
+  // Calendar
+  calSection: { marginTop: 18, paddingHorizontal: 18, marginBottom: 8 },
+  calHeader: { marginBottom: 10 },
+  calEyebrow: {
+    fontSize: 11, fontWeight: '700',
+    color: Colors.inkFaint, letterSpacing: 1.4, textTransform: 'uppercase',
+  },
+  calInner: { padding: 16 },
   startFocusBtn: { padding: 28, alignItems: 'center', gap: 6 },
   startFocusEyebrow: { fontSize: 11, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6 },
   startFocusLabel: { fontSize: 20, fontWeight: '700', color: Colors.ink, letterSpacing: 2 },

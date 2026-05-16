@@ -66,6 +66,7 @@ export function FocusSetupModal({
     if (selectedPetId && selectedPetId !== activePet?.id) {
       await setActivePet(selectedPetId);
     }
+    const taskTitle = tasks.find((t) => t.id === selectedTaskId)?.title;
     onClose();
     play('transition_up');
     const selectedTask = tasks.find((t) => t.id === selectedTaskId);
@@ -73,6 +74,7 @@ export function FocusSetupModal({
       pathname: '/(app)/focus',
       params: {
         durationMin: String(selectedDuration),
+        petId: selectedPetId ?? '',
         ...(selectedTaskId ? { taskId: selectedTaskId } : {}),
         ...(selectedTask?.title ? { taskTitle: selectedTask.title } : {}),
       },
