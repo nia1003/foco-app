@@ -333,10 +333,17 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    backgroundColor: 'rgba(250,245,239,0.97)',
+    backgroundColor: 'rgba(255,255,255,0.72)',
     borderRadius: 28,
     padding: 28,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.80)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 4,
   },
   modalTitle: {
     fontFamily: 'Fraunces_500Medium',

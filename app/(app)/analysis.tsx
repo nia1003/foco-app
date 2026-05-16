@@ -293,15 +293,6 @@ export default function AnalysisScreen() {
           </View>
         </View>
 
-        {/* ── 分享按鈕 ─────────────────────────── */}
-        <TouchableOpacity
-          style={[styles.shareBtn, { width: CARD_W }]}
-          onPress={() => { play('tap'); handleShare(); }}
-          activeOpacity={0.82}
-        >
-          <Text style={styles.shareBtnText}>Share ↗</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.homeBtn, { width: CARD_W }]}
           onPress={() => { play('transition_down'); router.replace('/(app)/home'); }}
