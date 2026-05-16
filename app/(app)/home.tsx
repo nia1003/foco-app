@@ -243,11 +243,9 @@ const styles = StyleSheet.create({
 
   petRow: { paddingHorizontal: 22, gap: 12 },
   petCard: {
-    borderRadius: 26, paddingHorizontal: 12,
+    paddingHorizontal: 12,
     paddingTop: 8, paddingBottom: 12,
     alignItems: 'center', overflow: 'visible',
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)',
   },
   petPreview: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center', marginBottom: 6, marginTop: 4 },
   petCardName: {
