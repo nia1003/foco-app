@@ -6,6 +6,7 @@
 import type { ComponentType } from 'react';
 import { XingWangPet3D } from '@/components/pets/XingWangPet3D';
 import { LilyPet3D } from '@/components/pets/LilyPet3D';
+import { FluffPet3D } from '@/components/pets/FluffPet3D';
 
 export interface Pet {
   id: string;
@@ -46,8 +47,8 @@ export const PETS: Pet[] = [
     id: 'fluff',
     name: 'Fluff',
     trait: 'Soft & dreamy',
-    accent: '#e7a0cc',
+    accent: '#4ecdc4',
     image: require('../assets/pets/fluff.png'),
-    locked: true,
+    CustomComponent: FluffPet3D,
   },
 ];

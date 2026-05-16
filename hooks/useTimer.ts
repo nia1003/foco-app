@@ -40,6 +40,11 @@ export function useTimer({
   const leftAppTotalSecRef = useRef(0);
   const leaveAppAtRef = useRef<number | null>(null);
 
+  // ── Previous AppState (to detect transitions correctly) ──
+  // AppState.currentState is already updated to nextState when the handler fires,
+  // so we must track the previous state ourselves.
+  const prevAppStateRef = useRef<AppStateStatus>(AppState.currentState);
+
   // ── Helpers ───────────────────────────────────
   const stopInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -66,7 +71,9 @@ export function useTimer({
   // ── AppState listener ─────────────────────────
   useEffect(() => {
     const handler = (nextState: AppStateStatus) => {
-      const prev = AppState.currentState;
+      // IMPORTANT: AppState.currentState is already updated to nextState by the
+      // time this handler fires, so we use our own ref for the previous state.
+      const prev = prevAppStateRef.current;
 
       // App 切到背景
       if (
@@ -106,6 +113,9 @@ export function useTimer({
           startInterval();
         }
       }
+
+      // 更新前一個狀態（必須在處理邏輯之後）
+      prevAppStateRef.current = nextState;
     };
 
     const sub = AppState.addEventListener('change', handler);

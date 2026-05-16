@@ -48,6 +48,14 @@ export const mockPets: FocoPet[] = [
     xp: 40,
     xp_next_level: 100,
   },
+  {
+    id: 'mock-pet-003',
+    owner_id: 'mock-user-001',
+    name: 'Fluff',
+    level: 1,
+    xp: 20,
+    xp_next_level: 100,
+  },
 ];
 
 export const mockSessions: {

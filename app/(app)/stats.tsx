@@ -97,18 +97,29 @@ export default function StatsScreen() {
     (activePet ? PETS.find((p) => p.id === activePet.name.toLowerCase()) : null) ??
     PETS[0];
 
-  const [sessions, setSessions] = useState<SessionRecord[]>(mockSessions.sessions);
-  const [summary, setSummary] = useState(mockSessions.summary);
+  // 初始為空值，避免 mock → 真實資料的「閃爍」
+  // 後端成功：填入真實資料；失敗：fallback 到 mock
+  const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [summary, setSummary] = useState({ total_focus_sec: 0, streak_days: 0, total_sessions: 0 });
   const [selectedDay, setSelectedDay] = useState(6); // 預設今天（最後一天）
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      // 未登入：直接顯示 mock
+      setSessions(mockSessions.sessions);
+      setSummary(mockSessions.summary);
+      return;
+    }
     getSessions(userId)
       .then((res) => {
         setSessions(res.sessions);
         setSummary(res.summary);
       })
-      .catch(() => {}); // 保持 mock 資料
+      .catch(() => {
+        // 後端失敗：fallback mock（只在這裡設定，避免初始閃爍）
+        setSessions(mockSessions.sessions);
+        setSummary(mockSessions.summary);
+      });
   }, [userId]);
 
   const weekStats = buildWeekStats(sessions);

@@ -1,10 +1,12 @@
 /**
  * MissionsScreen — Quest list + My Tasks (FOCO)
- * v2: emoji picker, memo field, delete task (soft)
+ * v3: Quest cards 與 My Tasks 格式統一（FrostCard + Start + Delete）
+ *     Quest 使用 local state，可刪除
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  GestureResponderEvent,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,7 +20,6 @@ import {
 import { useRouter } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { AppBackground } from '@/components/ui/AppBackground';
-import { Glass } from '@/components/ui/Glass';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
@@ -45,13 +46,29 @@ const MAX_DUR = 120;
 
 function DurationSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [trackWidth, setTrackWidth] = useState(0);
+  const trackRef = useRef<View>(null);
+  // Store the track's absolute pageX so we can convert pageX events to track-local coords.
+  // locationX can drift inside Modals / KeyboardAvoidingView; pageX is always screen-absolute.
+  const trackPageXRef = useRef(0);
+
   const progress = (value - MIN_DUR) / (MAX_DUR - MIN_DUR);
   const thumbLeft = trackWidth > 0 ? progress * (trackWidth - 24) : 0;
 
-  const handleTouch = (x: number) => {
-    if (trackWidth === 0) return;
-    const clamped = Math.max(0, Math.min(trackWidth, x));
-    const ratio = clamped / trackWidth;
+  // Measure the track's absolute position and width.
+  const measureTrack = () => {
+    trackRef.current?.measure((_fx, _fy, w, _h, pageX) => {
+      trackPageXRef.current = pageX;
+      if (w > 0) setTrackWidth(w);
+    });
+  };
+
+  const handleTouch = (pageX: number) => {
+    const w = trackWidth;
+    if (w === 0) return;
+    // Convert absolute pageX → local track x
+    const local = pageX - trackPageXRef.current;
+    const clamped = Math.max(0, Math.min(w, local));
+    const ratio = clamped / w;
     const newVal = Math.round(MIN_DUR + ratio * (MAX_DUR - MIN_DUR));
     onChange(Math.max(MIN_DUR, Math.min(MAX_DUR, newVal)));
   };
@@ -65,12 +82,17 @@ function DurationSlider({ value, onChange }: { value: number; onChange: (v: numb
       </View>
 
       <View
+        ref={trackRef}
         style={sliderStyles.track}
-        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        onLayout={measureTrack}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
-        onResponderGrant={(e) => handleTouch(e.nativeEvent.locationX)}
-        onResponderMove={(e) => handleTouch(e.nativeEvent.locationX)}
+        onResponderGrant={(e: GestureResponderEvent) => {
+          // Re-measure on every press in case the modal shifted (keyboard, scroll)
+          measureTrack();
+          handleTouch(e.nativeEvent.pageX);
+        }}
+        onResponderMove={(e: GestureResponderEvent) => handleTouch(e.nativeEvent.pageX)}
       >
         <View style={[sliderStyles.fill, { width: `${progress * 100}%` as any }]} />
         <View style={[sliderStyles.thumb, { left: thumbLeft }]} />
@@ -102,21 +124,33 @@ const sliderStyles = StyleSheet.create({
   },
 });
 
-// ── Quest data ───────────────────────────────
+// ── Quest types & data ───────────────────────
 type TabType = 'active' | 'daily' | 'special';
 
-const QUESTS = {
+type Quest = {
+  id: string;
+  title: string;
+  sub: string;
+  progress: number;
+  reward: string;
+  emoji: string;
+  duration_min: number;
+};
+
+type QuestsState = Record<TabType, Quest[]>;
+
+const INITIAL_QUESTS: QuestsState = {
   active: [
-    { id: '1', title: 'Morning Focus Sprint', sub: 'Complete 3 sessions before noon', progress: 0.66, reward: '+30 XP', emoji: '🌅' },
-    { id: '2', title: 'Book Worm', sub: 'Read for 2 hours total', progress: 0.45, reward: '+25 XP', emoji: '📚' },
-    { id: '3', title: 'Inbox Zero', sub: 'Clear your email queue', progress: 0.2, reward: '+15 XP', emoji: '📬' },
+    { id: 'q1', title: 'Morning Focus Sprint', sub: 'Complete 3 sessions before noon', progress: 0.66, reward: '+30 XP', emoji: '🌅', duration_min: 25 },
+    { id: 'q2', title: 'Book Worm',             sub: 'Read for 2 hours total',          progress: 0.45, reward: '+25 XP', emoji: '📚', duration_min: 50 },
+    { id: 'q3', title: 'Inbox Zero',             sub: 'Clear your email queue',          progress: 0.20, reward: '+15 XP', emoji: '📬', duration_min: 15 },
   ],
   daily: [
-    { id: '4', title: 'Daily Checkin', sub: 'Log at least 1 session today', progress: 0.0, reward: '+5 XP', emoji: '✅' },
-    { id: '5', title: 'Flow State', sub: 'Complete a 50-min session', progress: 0.0, reward: '+20 XP', emoji: '🌊' },
+    { id: 'q4', title: 'Daily Checkin', sub: 'Log at least 1 session today',  progress: 0.0, reward: '+5 XP',  emoji: '✅', duration_min: 15 },
+    { id: 'q5', title: 'Flow State',    sub: 'Complete a 50-min session',      progress: 0.0, reward: '+20 XP', emoji: '🌊', duration_min: 50 },
   ],
   special: [
-    { id: '6', title: 'First Week!', sub: 'Complete 7 days in a row', progress: 0.43, reward: '🏆 Trophy', emoji: '⭐' },
+    { id: 'q6', title: 'First Week!', sub: 'Complete 7 days in a row', progress: 0.43, reward: '🏆 Trophy', emoji: '⭐', duration_min: 25 },
   ],
 };
 
@@ -126,8 +160,12 @@ export default function MissionsScreen() {
   const router = useRouter();
   const { userId } = useAuthStore();
 
+  // My Tasks state
   const [tasks, setTasks] = useState<Task[]>(mockTasks.tasks);
   const [showModal, setShowModal] = useState(false);
+
+  // Quest state（local only，可刪除）
+  const [questsState, setQuestsState] = useState<QuestsState>(INITIAL_QUESTS);
 
   // New task form state
   const [newTitle, setNewTitle] = useState('');
@@ -155,7 +193,6 @@ export default function MissionsScreen() {
     try {
       setCreating(true);
       const task = await createTask(userId, newTitle.trim(), newDuration);
-      // Merge local-only fields (emoji, memo) into the returned task
       const enriched: Task = { ...task, emoji: newEmoji, memo: newMemo.trim() || undefined };
       setTasks((prev) => [enriched, ...prev]);
       resetModal();
@@ -167,7 +204,8 @@ export default function MissionsScreen() {
     }
   };
 
-  const handleDelete = (taskId: string, taskTitle: string) => {
+  // My Tasks delete
+  const handleDeleteTask = (taskId: string, taskTitle: string) => {
     Alert.alert(
       '刪除任務',
       `確定要刪除「${taskTitle}」嗎？\n已完成的計時紀錄不受影響。`,
@@ -176,13 +214,30 @@ export default function MissionsScreen() {
         {
           text: '刪除',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteTask(taskId);
-              setTasks((prev) => prev.filter((t) => t.id !== taskId));
-            } catch {
-              Alert.alert('刪除失敗', '請稍後再試');
-            }
+          onPress: () => {
+            setTasks((prev) => prev.filter((t) => t.id !== taskId));
+            deleteTask(taskId).catch(() => {});
+          },
+        },
+      ],
+    );
+  };
+
+  // Quest delete（local state only）
+  const handleDeleteQuest = (questId: string, questTitle: string) => {
+    Alert.alert(
+      '移除任務',
+      `確定要移除「${questTitle}」嗎？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '移除',
+          style: 'destructive',
+          onPress: () => {
+            setQuestsState((prev) => ({
+              ...prev,
+              [tab]: prev[tab].filter((q) => q.id !== questId),
+            }));
           },
         },
       ],
@@ -190,7 +245,7 @@ export default function MissionsScreen() {
   };
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending');
-  const quests = QUESTS[tab];
+  const currentQuests = questsState[tab];
 
   return (
     <View style={styles.root}>
@@ -230,35 +285,66 @@ export default function MissionsScreen() {
           ))}
         </View>
 
-        {/* Quest cards */}
+        {/* ── Quest cards（格式與 My Tasks 統一）── */}
         <View style={styles.list}>
-          {quests.map((q) => (
-            <TouchableOpacity
-              key={q.id}
-              onPress={() => router.push(`/(app)/missions/${q.id}` as any)}
-              activeOpacity={0.85}
-            >
-              <Glass radius={24} tone="chrome" padded={false}>
-                <View style={styles.questCard}>
-                  <Text style={styles.questEmoji}>{q.emoji}</Text>
-                  <View style={styles.questInfo}>
-                    <Text style={styles.questTitle}>{q.title}</Text>
-                    <Text style={styles.questSub}>{q.sub}</Text>
+          {currentQuests.length === 0 && (
+            <FrostCard radius={20} padded={false}>
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No quests in this category.</Text>
+              </View>
+            </FrostCard>
+          )}
+
+          {currentQuests.map((q) => (
+            <View key={q.id} style={styles.myTaskWrap}>
+              <FrostCard radius={20} padded={false}>
+                <View style={styles.myTaskCard}>
+                  {/* Emoji badge */}
+                  <View style={styles.taskEmojiWrap}>
+                    <Text style={styles.taskEmoji}>{q.emoji}</Text>
+                  </View>
+
+                  {/* Info */}
+                  <View style={styles.myTaskInfo}>
+                    <Text style={styles.myTaskTitle}>{q.title}</Text>
+                    <Text style={styles.myTaskSub}>{q.sub}</Text>
+                    {/* Progress bar */}
                     <View style={styles.progressBg}>
                       <View style={[styles.progressFill, { width: `${q.progress * 100}%` as any }]} />
                     </View>
-                    <View style={styles.questMeta}>
-                      <Text style={styles.questPct}>{Math.round(q.progress * 100)}% complete</Text>
-                      <Text style={styles.questReward}>{q.reward}</Text>
-                    </View>
+                    <Text style={styles.questReward}>{q.reward} · {q.duration_min} min</Text>
+                  </View>
+
+                  {/* Actions */}
+                  <View style={styles.taskActions}>
+                    <TouchableOpacity
+                      style={styles.myTaskStartBtn}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(app)/focus',
+                          params: { durationMin: String(q.duration_min) },
+                        })
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.myTaskStartText}>▶ Start</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDeleteQuest(q.id, q.title)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Trash2 size={16} color={Colors.inkFaint} />
+                    </TouchableOpacity>
                   </View>
                 </View>
-              </Glass>
-            </TouchableOpacity>
+              </FrostCard>
+            </View>
           ))}
         </View>
 
-        {/* My Tasks */}
+        {/* ── My Tasks ──────────────────────────── */}
         <View style={styles.myTasksSection}>
           <Text style={styles.myTasksLabel}>MY TASKS</Text>
 
@@ -304,7 +390,7 @@ export default function MissionsScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteBtn}
-                      onPress={() => handleDelete(task.id, task.title)}
+                      onPress={() => handleDeleteTask(task.id, task.title)}
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -423,35 +509,32 @@ const styles = StyleSheet.create({
   tabPillActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
   tabLabel: { fontSize: 13, fontWeight: '500', color: Colors.inkSoft },
   tabLabelActive: { color: '#fff', fontWeight: '600' },
-  list: { gap: 12, marginTop: 8 },
-  questCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18 },
-  questEmoji: { fontSize: 30, width: 44, textAlign: 'center' },
-  questInfo: { flex: 1 },
-  questTitle: { fontSize: 16, fontWeight: '600', color: Colors.ink },
-  questSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 2 },
-  progressBg: { marginTop: 10, height: 5, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
-  progressFill: { height: 5, borderRadius: 9999, backgroundColor: PINK },
-  questMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
-  questPct: { fontSize: 10, color: Colors.inkFaint, letterSpacing: 0.3 },
-  questReward: { fontSize: 10, fontWeight: '600', color: PINK_TEXT },
-  // My Tasks
+
+  // Unified quest + task card styles
+  list: { gap: 10, marginTop: 8 },
   myTasksSection: { marginTop: 24 },
   myTasksLabel: { fontSize: 10, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6, marginBottom: 10 },
   emptyState: { padding: 20, alignItems: 'center' },
   emptyText: { fontSize: 13, color: Colors.inkFaint },
-  myTaskWrap: { marginBottom: 10 },
+  myTaskWrap: { marginBottom: 0 },
   myTaskCard: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   taskEmojiWrap: {
     width: 42, height: 42, borderRadius: 14,
     backgroundColor: 'rgba(242,206,220,0.35)',
     alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   taskEmoji: { fontSize: 22 },
   myTaskInfo: { flex: 1 },
   myTaskTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
   myTaskSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 1 },
   myTaskMemo: { fontSize: 11, color: Colors.inkFaint, marginTop: 2, fontStyle: 'italic' },
-  taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // Quest-specific info elements
+  progressBg: { marginTop: 7, height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
+  progressFill: { height: 4, borderRadius: 9999, backgroundColor: PINK },
+  questReward: { fontSize: 10, fontWeight: '600', color: PINK_TEXT, marginTop: 4 },
+  // Action buttons
+  taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   myTaskStartBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999, backgroundColor: PINK },
   myTaskStartText: { fontSize: 12, fontWeight: '700', color: PINK_TEXT },
   deleteBtn: {
@@ -471,7 +554,6 @@ const styles = StyleSheet.create({
     fontSize: 11, fontWeight: '700', color: Colors.inkFaint,
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10,
   },
-  // Emoji grid
   emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   emojiCell: {
     width: 44, height: 44, borderRadius: 12,
@@ -484,13 +566,11 @@ const styles = StyleSheet.create({
     borderColor: PINK_TEXT,
   },
   emojiCellText: { fontSize: 22 },
-  // Input
   modalInput: { fontSize: 17, fontWeight: '500', color: Colors.ink, paddingVertical: 6 },
   modalUnderline: { height: 1.2, backgroundColor: 'rgba(20,16,28,0.15)', marginTop: 4 },
   modalUnderlineRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   charCount: { fontSize: 10, color: Colors.inkFaint },
   optionalTag: { fontSize: 10, fontWeight: '400', color: Colors.inkFaint, textTransform: 'none' },
-  // Actions
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
   modalCancelBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 9999,
