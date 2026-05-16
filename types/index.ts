@@ -176,6 +176,7 @@ export interface SessionResult {
   level_up: boolean;
   focus_type: FocusType;
   xp_next_level: number;
+  quality_score: number;       // 0–100 品質分數
   // 由 focus.tsx 在導航前合併進來，讓 analysis 頁可以顯示
   actual_duration?: number;
   pause_count?: number;

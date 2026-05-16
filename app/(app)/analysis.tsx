@@ -1,75 +1,114 @@
 /**
  * AnalysisScreen — DISC 專注報告
- * 顯示：實際時長、暫停次數、切出次數、DISC 類型、XP 明細
- * 功能：截圖分享 / 儲存到相簿 / 回首頁
+ * 可截圖分享的個性化 DISC 卡片（社群媒體分享設計）
  */
 import React, { useRef } from 'react';
 import {
   Alert,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
-import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { Colors } from '@/constants/theme';
 import type { SessionResult } from '@/types';
 
-// ── DISC 對照表 ───────────────────────────────
-const DISC_INFO = {
+const { width: SCREEN_W } = Dimensions.get('window');
+const CARD_W = SCREEN_W - 32;
+
+// ── DISC 視覺配置 ─────────────────────────────
+const DISC_CONFIG = {
   conscientiousness: {
-    emoji: '🔵',
-    label: 'Conscientiousness 謹慎型',
-    desc: '精準、有條理，完美執行！每個細節都在掌控之中。',
+    label: 'Conscientiousness',
+    zh: '謹慎型',
+    tagline: '精準執行，掌控每個細節',
+    traits: ['零干擾專注', '高完成率', '完美主義'],
+    gradient: ['#1a1a2e', '#16213e', '#0f3460'] as const,
+    accent: '#4A90E2',
+    accentLight: 'rgba(74,144,226,0.20)',
+    icon: '◈',
+    desc: '你今天的專注品質頂尖。幾乎零干擾地完成了目標，每個細節都在掌控之中。這是最深度的工作狀態。',
+    hashtag: '#謹慎型 #FocusType #FOCO',
   },
   dominance: {
-    emoji: '🔴',
-    label: 'Dominance 主導型',
-    desc: '目標導向、高完成率，勇往直前！完成就是你的動力。',
+    label: 'Dominance',
+    zh: '主導型',
+    tagline: '目標掛帥，勇往直前',
+    traits: ['高執行力', '目標導向', '強韌意志'],
+    gradient: ['#1a0a0a', '#2d1010', '#4a1515'] as const,
+    accent: '#E05A5A',
+    accentLight: 'rgba(224,90,90,0.20)',
+    icon: '▲',
+    desc: '你有清晰的目標感，中途遇到阻礙也能堅持完成。主導型的人不輕易放棄，完成是最大的勝利。',
+    hashtag: '#主導型 #FocusType #FOCO',
   },
   steadiness: {
-    emoji: '🟢',
-    label: 'Steadiness 穩健型',
-    desc: '節奏穩定、踏實推進，細水長流！持續是你的超能力。',
+    label: 'Steadiness',
+    zh: '穩健型',
+    tagline: '節奏穩定，細水長流',
+    traits: ['持續耐力', '踏實推進', '壓力抵抗'],
+    gradient: ['#0a1a0f', '#0f2d18', '#154a22'] as const,
+    accent: '#5BAD6F',
+    accentLight: 'rgba(91,173,111,0.20)',
+    icon: '◉',
+    desc: '穩健是一種力量。你保持著自己的節奏，不急不躁。持續累積比衝刺更能帶來長遠的改變。',
+    hashtag: '#穩健型 #FocusType #FOCO',
   },
   influence: {
-    emoji: '🟡',
-    label: 'Influence 影響型',
-    desc: '彈性十足、靈活應變，熱情滿滿！嘗試更長的專注時段吧。',
+    label: 'Influence',
+    zh: '影響型',
+    tagline: '彈性靈活，熱情滿滿',
+    traits: ['靈活適應', '熱情驅動', '富有彈性'],
+    gradient: ['#1a1400', '#2d2200', '#4a3800'] as const,
+    accent: '#F5A623',
+    accentLight: 'rgba(245,166,35,0.20)',
+    icon: '◆',
+    desc: '今天比較多干擾，但你依然完成了一段專注。嘗試把下次的時段縮短 10 分鐘，更容易進入狀態。',
+    hashtag: '#影響型 #FocusType #FOCO',
   },
 } as const;
+
+type DiscKey = keyof typeof DISC_CONFIG;
 
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return `${m} 分 ${s} 秒`;
+  if (m === 0) return `${s}s`;
+  return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
 export default function AnalysisScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { result: resultStr } = useLocalSearchParams<{ result: string }>();
   const result: SessionResult = resultStr ? JSON.parse(resultStr) : {};
-  const reportRef = useRef<View>(null);
+  const cardRef = useRef<View>(null);
   const { play } = useSound();
 
-  const discKey = result.focus_type ?? 'steadiness';
-  const disc = DISC_INFO[discKey as keyof typeof DISC_INFO] ?? DISC_INFO.steadiness;
+  const discKey: DiscKey = (result.focus_type as DiscKey) ?? 'steadiness';
+  const cfg = DISC_CONFIG[discKey] ?? DISC_CONFIG.steadiness;
 
-  // ── 截圖並分享
+  const qualityScore = result.quality_score ?? 0;
+  const duration = result.actual_duration ?? 0;
+  const pauses = result.pause_count ?? 0;
+  const xpGained = result.xp_gained ?? 0;
+
   const handleShare = async () => {
     try {
-      const uri = await captureRef(reportRef, { format: 'png', quality: 1 });
+      const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: '分享 FOCO 報告' });
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: '分享我的 FOCO 專注類型' });
       } else {
         Alert.alert('無法分享', '此裝置不支援分享功能');
       }
@@ -78,7 +117,6 @@ export default function AnalysisScreen() {
     }
   };
 
-  // ── 截圖並存入相簿
   const handleSave = async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -86,70 +124,107 @@ export default function AnalysisScreen() {
         Alert.alert('需要權限', '請允許存取相片庫以儲存圖片');
         return;
       }
-      const uri = await captureRef(reportRef, { format: 'png', quality: 1 });
+      const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
       await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert('已儲存 ✅', '報告圖片已存入相簿！');
+      Alert.alert('已儲存 ✅', '卡片已存入相簿！');
     } catch {
       Alert.alert('錯誤', '儲存失敗，請再試一次');
     }
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <AppBackground />
       <FocoBar back />
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 截圖範圍開始（reportRef 包住報告主體）─── */}
-        <View ref={reportRef} collapsable={false} style={styles.captureArea}>
-          <Text style={styles.title}>專注報告</Text>
+        {/* ── 截圖卡片 ─────────────────────────── */}
+        <View ref={cardRef} collapsable={false}>
+          <LinearGradient
+            colors={cfg.gradient}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={[styles.card, { width: CARD_W }]}
+          >
+            {/* 頂部品牌 */}
+            <View style={styles.brandRow}>
+              <Text style={styles.brandName}>FOCO</Text>
+              <Text style={[styles.brandTag, { color: cfg.accent }]}>Focus Type</Text>
+            </View>
 
-          {/* 數據卡 */}
-          <View style={styles.section}>
-            <FrostCard radius={24} padded={false}>
-              <View style={styles.statsCard}>
-                <StatRow icon="⏱" label="實際專注" value={formatDuration(result.actual_duration ?? 0)} />
-                <StatRow icon="⏸" label="暫停次數" value={`${result.pause_count ?? 0} 次`} />
-                <StatRow icon="📱" label="切出 App" value={`${result.left_app_count ?? 0} 次`} />
-              </View>
-            </FrostCard>
-          </View>
+            {/* 分隔線 */}
+            <View style={[styles.divider, { backgroundColor: cfg.accentLight }]} />
 
-          {/* DISC 類型卡 */}
-          <View style={styles.section}>
-            <FrostCard radius={24}>
-              <View style={styles.discRow}>
-                <Text style={styles.discEmoji}>{disc.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.discLabel}>{disc.label}</Text>
-                  <Text style={styles.discDesc}>{disc.desc}</Text>
+            {/* 類型主體 */}
+            <View style={styles.typeSection}>
+              <Text style={[styles.typeIcon, { color: cfg.accent }]}>{cfg.icon}</Text>
+              <Text style={[styles.typeName, { color: cfg.accent }]}>{cfg.label}</Text>
+              <Text style={styles.typeZh}>{cfg.zh}</Text>
+              <Text style={styles.tagline}>{cfg.tagline}</Text>
+            </View>
+
+            {/* 特質標籤 */}
+            <View style={styles.traitsRow}>
+              {cfg.traits.map((t) => (
+                <View key={t} style={[styles.traitPill, { backgroundColor: cfg.accentLight, borderColor: cfg.accent + '60' }]}>
+                  <Text style={[styles.traitText, { color: cfg.accent }]}>{t}</Text>
                 </View>
-              </View>
-            </FrostCard>
-          </View>
+              ))}
+            </View>
 
-          {/* XP 卡 */}
-          <View style={styles.section}>
-            <FrostCard radius={24} padded={false}>
-              <View style={styles.xpCard}>
-                <Text style={styles.xpTotal}>獲得 XP：+{result.xp_gained ?? 0} XP</Text>
+            {/* 品質分條 */}
+            <View style={styles.qualitySection}>
+              <View style={styles.qualityLabelRow}>
+                <Text style={styles.qualityLabel}>專注品質</Text>
+                <Text style={[styles.qualityScore, { color: cfg.accent }]}>{qualityScore}<Text style={styles.qualityMax}> / 100</Text></Text>
               </View>
-            </FrostCard>
-          </View>
+              <View style={styles.qualityTrack}>
+                <View style={[styles.qualityFill, { width: `${qualityScore}%` as any, backgroundColor: cfg.accent }]} />
+              </View>
+            </View>
+
+            {/* 數據行 */}
+            <View style={styles.statsRow}>
+              <StatCell label="時長" value={formatDuration(duration)} accent={cfg.accent} />
+              <View style={[styles.statDivider, { backgroundColor: cfg.accentLight }]} />
+              <StatCell label="暫停" value={`${pauses} 次`} accent={cfg.accent} />
+              <View style={[styles.statDivider, { backgroundColor: cfg.accentLight }]} />
+              <StatCell label="獲得 XP" value={`+${xpGained}`} accent={cfg.accent} />
+            </View>
+
+            {/* 描述文字 */}
+            <Text style={styles.desc}>{cfg.desc}</Text>
+
+            {/* 底部分隔線 */}
+            <View style={[styles.divider, { backgroundColor: cfg.accentLight, marginTop: 20 }]} />
+
+            {/* 底部品牌 + hashtag */}
+            <View style={styles.footerRow}>
+              <Text style={styles.footerBrand}>foco.app</Text>
+              <Text style={[styles.footerHash, { color: cfg.accent + 'cc' }]}>{cfg.hashtag}</Text>
+            </View>
+          </LinearGradient>
         </View>
-        {/* ── 截圖範圍結束 ─────────────────────────── */}
 
-        {/* 操作按鈕 */}
+        {/* ── 操作按鈕 ─────────────────────────── */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => { play('tap'); handleShare(); }} activeOpacity={0.75}>
-            <Text style={styles.actionBtnText}>📤  分享</Text>
+          <TouchableOpacity
+            style={[styles.shareBtn, { backgroundColor: cfg.accent }]}
+            onPress={() => { play('tap'); handleShare(); }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.shareBtnText}>分享結果 ↗</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => { play('tap'); handleSave(); }} activeOpacity={0.75}>
-            <Text style={styles.actionBtnText}>💾  儲存圖片</Text>
+          <TouchableOpacity
+            style={styles.saveBtn}
+            onPress={() => { play('tap'); handleSave(); }}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.saveBtnText}>存圖片</Text>
           </TouchableOpacity>
         </View>
 
@@ -165,78 +240,170 @@ export default function AnalysisScreen() {
   );
 }
 
-// ── 輔助元件 ──────────────────────────────────
-function StatRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+function StatCell({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
-    <View style={styles.statRow}>
-      <Text style={styles.statIcon}>{icon}</Text>
+    <View style={styles.statCell}>
+      <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
     </View>
   );
 }
 
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
+  root: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 18, paddingBottom: 60 },
-  captureArea: { backgroundColor: '#f6f4f4', paddingBottom: 4 },
-  title: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 36,
-    fontWeight: '500',
-    color: Colors.ink,
-    marginTop: 8,
-    marginBottom: 4,
-    letterSpacing: -0.5,
+  scrollContent: { alignItems: 'center', paddingTop: 8, paddingHorizontal: 16 },
+
+  // ── Card ─────────────────────────────────
+  card: {
+    borderRadius: 28,
+    padding: 28,
+    overflow: 'hidden',
   },
-  section: { marginTop: 12 },
-  statsCard: { padding: 20, gap: 14 },
-  statRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  statIcon: { fontSize: 20, width: 28 },
-  statLabel: { flex: 1, fontSize: 14, color: Colors.inkSoft },
-  statValue: { fontSize: 15, fontWeight: '600', color: Colors.ink },
-  discRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  discEmoji: { fontSize: 32, marginTop: 2 },
-  discLabel: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 17,
-    fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: -0.2,
+
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  discDesc: { fontSize: 13, color: Colors.inkSoft, marginTop: 4, lineHeight: 19 },
-  xpCard: { padding: 20 },
-  xpTotal: {
+  brandName: {
     fontFamily: 'Fraunces_500Medium',
     fontSize: 20,
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 2,
+  },
+  brandTag: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+
+  divider: { height: 1, borderRadius: 1, marginBottom: 24 },
+
+  typeSection: { alignItems: 'center', marginBottom: 20 },
+  typeIcon: { fontSize: 36, marginBottom: 8 },
+  typeName: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 34,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  typeZh: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.55)',
     fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: -0.3,
+    marginBottom: 8,
+    letterSpacing: 1,
   },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 14,
+  tagline: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.70)',
+    letterSpacing: 0.3,
+  },
+
+  traitsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  traitPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  traitText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
+
+  qualitySection: { marginBottom: 20 },
+  qualityLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  qualityLabel: { fontSize: 12, color: 'rgba(255,255,255,0.50)', letterSpacing: 0.5 },
+  qualityScore: { fontFamily: 'Fraunces_500Medium', fontSize: 22 },
+  qualityMax: { fontSize: 12, color: 'rgba(255,255,255,0.40)', fontFamily: 'System' },
+  qualityTrack: {
+    height: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    overflow: 'hidden',
+  },
+  qualityFill: { height: 4, borderRadius: 4 },
+
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(20,16,28,0.08)',
-    alignItems: 'center',
+    padding: 16,
+    marginBottom: 20,
   },
-  actionBtnText: { fontSize: 14, fontWeight: '600', color: Colors.ink },
-  homeBtn: {
-    marginTop: 12,
-    paddingVertical: 16,
-    borderRadius: 9999,
-    backgroundColor: Colors.ink,
+  statCell: { flex: 1, alignItems: 'center', gap: 3 },
+  statValue: { fontSize: 17, fontWeight: '700' },
+  statLabel: { fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: 0.3 },
+  statDivider: { width: 1, height: 32, borderRadius: 1 },
+
+  desc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+    lineHeight: 20,
+    textAlign: 'center',
+    letterSpacing: 0.1,
+  },
+
+  footerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: Colors.ink,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  footerBrand: { fontSize: 12, color: 'rgba(255,255,255,0.35)', letterSpacing: 1 },
+  footerHash: { fontSize: 11, letterSpacing: 0.2 },
+
+  // ── Buttons ────────────────────────────────
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+    width: CARD_W,
+  },
+  shareBtn: {
+    flex: 2,
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.30,
+    shadowRadius: 16,
     elevation: 6,
   },
-  homeBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 2 },
+  shareBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  saveBtn: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  saveBtnText: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+  homeBtn: {
+    marginTop: 10,
+    width: CARD_W,
+    paddingVertical: 16,
+    borderRadius: 9999,
+    alignItems: 'center',
+  },
+  homeBtnText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    letterSpacing: 1,
+  },
 });
