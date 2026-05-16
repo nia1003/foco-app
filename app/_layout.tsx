@@ -2,7 +2,7 @@
 // Root Layout — Session 恢復、路由守衛
 // ─────────────────────────────────────────────
 import '../global.css';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -23,6 +23,8 @@ export default function RootLayout() {
   const segments = useSegments();
   const { isAuthenticated, isLoading, restoreSession } = useAuthStore();
 
+  const splashHiddenRef = useRef(false);
+
   const [fontsLoaded] = useFonts({
     Fraunces_400Regular,
     Fraunces_500Medium,
@@ -39,7 +41,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (isLoading) return;
 
-    SplashScreen.hideAsync();
+    if (!splashHiddenRef.current) {
+      splashHiddenRef.current = true;
+      SplashScreen.hideAsync().catch(() => {});
+    }
 
     const inAuthGroup = segments[0] === '(auth)';
     if (isAuthenticated && inAuthGroup) {
