@@ -70,26 +70,10 @@ export const mockTasks: { tasks: Task[] } = {
     {
       id: 't001',
       user_id: 'mock-user-001',
-      title: '讀書30頁',
-      duration_min: 25,
+      title: 'focus for data structure exam',
+      duration_min: 50,
       status: 'pending',
       created_at: '2025-05-15T00:00:00Z',
-    },
-    {
-      id: 't002',
-      user_id: 'mock-user-001',
-      title: '寫作業',
-      duration_min: 50,
-      status: 'done',
-      created_at: '2025-05-14T00:00:00Z',
-    },
-    {
-      id: 't003',
-      user_id: 'mock-user-001',
-      title: '複習筆記',
-      duration_min: 15,
-      status: 'pending',
-      created_at: '2025-05-13T00:00:00Z',
     },
   ],
 };
