@@ -50,9 +50,13 @@ export function FocoBar({ back = false, avatar = null, dark = false }: FocoBarPr
       <Text style={[styles.wordmark, { color: fg }]}>FOCO</Text>
 
       {avatar && (
-        <View style={[styles.avatarBadge, { top: btnTop }]}>
+        <TouchableOpacity
+          style={[styles.avatarBadge, { top: btnTop }]}
+          onPress={() => router.push('/(app)/settings')}
+          activeOpacity={0.75}
+        >
           <Text style={styles.avatarText}>{avatar}</Text>
-        </View>
+        </TouchableOpacity>
       )}
     </View>
   );

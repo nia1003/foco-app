@@ -17,10 +17,12 @@ export default function AppLayout() {
       <Tabs.Screen name="stats"    options={{ title: 'Stats' }} />
 
       {/* 不顯示在 tab bar 的頁面 */}
-      <Tabs.Screen name="focus"    options={{ href: null }} />
-      <Tabs.Screen name="reward"   options={{ href: null }} />
-      <Tabs.Screen name="analysis" options={{ href: null }} />
-      <Tabs.Screen name="pet-info" options={{ href: null }} />
+      <Tabs.Screen name="focus"          options={{ href: null }} />
+      <Tabs.Screen name="reward"         options={{ href: null }} />
+      <Tabs.Screen name="analysis"       options={{ href: null }} />
+      <Tabs.Screen name="pet-info"       options={{ href: null }} />
+      <Tabs.Screen name="pet-collection" options={{ href: null }} />
+      <Tabs.Screen name="settings"       options={{ href: null }} />
     </Tabs>
   );
 }

@@ -63,7 +63,7 @@ export default function HomeScreen() {
     <View style={styles.root}>
       <AppBackground />
 
-      <FocoBar />
+      <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
 
       <ScrollView
         style={styles.scroll}

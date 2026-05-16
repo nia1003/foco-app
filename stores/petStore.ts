@@ -84,5 +84,9 @@ export const usePetStore = create<PetStore>((set, get) => ({
     } catch {}
   },
 
-  reset: () => set({ pets: [], activePetId: null, activePet: null }),
+  reset: () => {
+    set({ pets: [], activePetId: null, activePet: null });
+    // 清除持久化的 activePetId，避免下次登入殘留上個帳號的選擇
+    AsyncStorage.removeItem(ACTIVE_PET_KEY).catch(() => {});
+  },
 }));
