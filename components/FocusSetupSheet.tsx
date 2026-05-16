@@ -364,12 +364,10 @@ export function FocusSetupSheet({
 
           {/* ── Bottom nav bar ─────────────────────────────── */}
           <View style={styles.navBar}>
-            {step > 0 ? (
+            {step > 0 && (
               <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.75}>
                 <Text style={styles.backBtnText}>← Back</Text>
               </TouchableOpacity>
-            ) : (
-              <View style={{ width: 80 }} />
             )}
 
             {step < 2 ? (
@@ -530,11 +528,12 @@ const styles = StyleSheet.create({
   underlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   charCount: { fontSize: 11, color: Colors.inkFaint },
 
-  // Pet grid
+  // Pet grid — 2 columns
   petGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    width: SCREEN_W - 48,
   },
   petCard: {
     width: (SCREEN_W - 48 - 12) / 2,
@@ -554,11 +553,12 @@ const styles = StyleSheet.create({
   // Duration
   pickerWrap: { marginTop: 16 },
 
-  // Bottom nav
+  // Bottom nav — centered
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 12,
     paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
@@ -566,16 +566,16 @@ const styles = StyleSheet.create({
   },
 
   backBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    width: 100,
+    paddingVertical: 18,
     borderRadius: 9999,
     backgroundColor: 'rgba(20,16,28,0.07)',
+    alignItems: 'center',
   },
   backBtnText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
 
   nextBtn: {
-    flex: 1,
-    marginLeft: 12,
+    width: 220,
     paddingVertical: 18,
     borderRadius: 9999,
     backgroundColor: Colors.ink,
@@ -589,8 +589,7 @@ const styles = StyleSheet.create({
   nextBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 1.5 },
 
   startBtn: {
-    flex: 1,
-    marginLeft: 12,
+    width: 220,
     paddingVertical: 18,
     borderRadius: 9999,
     backgroundColor: Colors.pinkText,
