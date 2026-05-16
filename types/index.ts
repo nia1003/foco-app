@@ -164,6 +164,7 @@ export interface SessionPayload {
   completed: boolean;
   early_stop: boolean;
   started_at: string;          // ISO string
+  events: SessionEvent[];      // 個別事件時間軸
 }
 
 // Edge Function 回傳（+ focus.tsx 補充的本地計時統計）
@@ -176,10 +177,20 @@ export interface SessionResult {
   level_up: boolean;
   focus_type: FocusType;
   xp_next_level: number;
+  quality_score: number;       // 0–100 品質分數
   // 由 focus.tsx 在導航前合併進來，讓 analysis 頁可以顯示
   actual_duration?: number;
   pause_count?: number;
   left_app_count?: number;
+  started_at?: string;         // ISO string — 用於時間段顯示
+  ended_at?: string;           // ISO string — Edge Function 回傳
+  events?: SessionEvent[];     // 個別事件 — 用於時間軸視覺化
+}
+
+// 單次事件紀錄（在 useTimer 內部累積）
+export interface SessionEvent {
+  type: 'pause' | 'resume' | 'left_app' | 'returned';
+  at: number; // Date.now() ms
 }
 
 // useTimer.getSnapshot() 的快照格式
@@ -191,4 +202,5 @@ export interface TimerSnapshot {
   leftAppCount: number;
   leftAppTotalSec: number;
   taskId: string | null;
+  events: SessionEvent[];    // 個別事件時間軸
 }

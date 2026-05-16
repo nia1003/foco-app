@@ -1,22 +1,13 @@
-/**
- * XingWangPet3D — real Three.js 3D render inside a WebView.
- * Identical geometry to the original xingwang.jsx:
- *   sphere body + concave notch + dot eyes + arm/foot blobs + float idle.
- * Three.js r128 is loaded from cdnjs (bundled in the HTML string —
- * no network needed after first load if the app caches the WebView).
- */
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { PetWebView } from './PetWebView';
 
 interface XingWangPet3DProps {
   size?: number;
-  color?: string;   // CSS hex string, e.g. '#FABD03'
+  color?: string;
   interactive?: boolean;
 }
 
-function buildHTML(color: string, interactive: boolean): string {
-  // hex '#FABD03' → Three.js Color accepts hex strings directly
+function buildHTML(color: string): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -33,7 +24,6 @@ function buildHTML(color: string, interactive: boolean): string {
 <script>
 (function(){
   var W = window.innerWidth, H = window.innerHeight;
-  var interactive = ${interactive ? 'true' : 'false'};
   var bodyHex = '${color}';
 
   var renderer = new THREE.WebGLRenderer({antialias:true,alpha:true});
@@ -75,7 +65,6 @@ function buildHTML(color: string, interactive: boolean): string {
     ch.add(m); return m;
   };
 
-  // Body with concave notch
   var bodyGeo = new THREE.SphereGeometry(1.22,128,128);
   var pos = bodyGeo.attributes.position;
   var notchCenter = new THREE.Vector3(0.0,0.55,1.72);
@@ -93,28 +82,19 @@ function buildHTML(color: string, interactive: boolean): string {
   bodyGeo.computeVertexNormals();
   add(bodyGeo,yMat,0,0,0);
 
-  add(S(0.12),bMat,-0.62, 0.10,1.04); // left eye
-  add(S(0.12),bMat, 0.62, 0.10,1.04); // right eye
-  add(S(0.34),yMat,-0.40,-1.22,0.20); // left foot
-  add(S(0.34),yMat, 0.40,-1.22,0.20); // right foot
-  add(S(0.24),yMat,-1.12,-0.28,0.22); // left arm
-  add(S(0.24),yMat, 1.12,-0.28,0.22); // right arm
+  add(S(0.12),bMat,-0.62, 0.10,1.04);
+  add(S(0.12),bMat, 0.62, 0.10,1.04);
+  add(S(0.34),yMat,-0.40,-1.22,0.20);
+  add(S(0.34),yMat, 0.40,-1.22,0.20);
+  add(S(0.24),yMat,-1.12,-0.28,0.22);
+  add(S(0.24),yMat, 1.12,-0.28,0.22);
 
-  // Drag to rotate
-  var rotY=0, rotX=0.05, tY=0, tX=0.05, dragging=false, lx=0, ly=0;
-  if(interactive){
-    renderer.domElement.addEventListener('pointerdown',function(e){
-      dragging=true; lx=e.clientX; ly=e.clientY;
-    });
-    window.addEventListener('pointermove',function(e){
-      if(!dragging)return;
-      tY+=(e.clientX-lx)*0.007;
-      tX+=(e.clientY-ly)*0.004;
-      tX=Math.max(-0.55,Math.min(0.55,tX));
-      lx=e.clientX; ly=e.clientY;
-    });
-    window.addEventListener('pointerup',function(){ dragging=false; });
-  }
+  // Rotation state — driven by RN PanResponder via window.rotatePet
+  var rotY=0, rotX=0.05, tY=0, tX=0.05;
+  window.rotatePet=function(ddx,ddy){
+    tY+=ddx*0.010; tX+=ddy*0.006;
+    tX=Math.max(-0.55,Math.min(0.55,tX));
+  };
 
   var start=performance.now();
   (function tick(){
@@ -138,39 +118,5 @@ export function XingWangPet3D({
   color = '#FABD03',
   interactive = true,
 }: XingWangPet3DProps) {
-  const html = buildHTML(color, interactive);
-
-  return (
-    <View style={[styles.container, { width: size, height: size }]}>
-      <WebView
-        source={{ html }}
-        style={styles.webview}
-        scrollEnabled={false}
-        bounces={false}
-        overScrollMode="never"
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        backgroundColor="transparent"
-        // Keeps the WebView alive when off-screen
-        renderToHardwareTextureAndroid
-        // Required for transparent background on iOS
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        originWhitelist={['*']}
-        javaScriptEnabled
-      />
-    </View>
-  );
+  return <PetWebView html={buildHTML(color)} size={size} interactive={interactive} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    overflow: 'hidden',
-    borderRadius: 9999,
-    backgroundColor: 'transparent',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-});

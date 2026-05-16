@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '@/components/ui/AppBackground';
@@ -36,6 +37,7 @@ const LEVEL_LABELS: Record<number, string> = {
 export default function PetCollectionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const { pets } = usePetStore();
   const { play } = useSound();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -99,7 +101,7 @@ export default function PetCollectionScreen() {
               <View
                 style={[
                   styles.cardWrap,
-                  { height: CARD_H, paddingBottom: Math.max(insets.bottom, 16) },
+                  { height: CARD_H, paddingBottom: tabBarHeight + 8 },
                 ]}
               >
                 <FrostCard radius={32} padded={false}>

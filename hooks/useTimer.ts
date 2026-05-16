@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import type { TimerSnapshot } from '@/types';
+import type { TimerSnapshot, SessionEvent } from '@/types';
 
 export type TimerPhase = 'detail' | 'timer' | 'reflection' | 'accomplished';
 
@@ -39,6 +39,8 @@ export function useTimer({
   const leftAppCountRef = useRef(0);
   const leftAppTotalSecRef = useRef(0);
   const leaveAppAtRef = useRef<number | null>(null);
+
+  const eventsRef = useRef<SessionEvent[]>([]);
 
   // ── Previous AppState (to detect transitions correctly) ──
   // AppState.currentState is already updated to nextState when the handler fires,
@@ -82,7 +84,9 @@ export function useTimer({
         phase === 'timer' &&
         !paused
       ) {
-        leaveAppAtRef.current = Date.now();
+        const now = Date.now();
+        leaveAppAtRef.current = now;
+        eventsRef.current.push({ type: 'left_app', at: now });
       }
 
       // App 回到前景
@@ -95,10 +99,12 @@ export function useTimer({
       ) {
         // 累計切出時間
         if (leaveAppAtRef.current) {
+          const now = Date.now();
           leftAppCountRef.current += 1;
           leftAppTotalSecRef.current +=
-            (Date.now() - leaveAppAtRef.current) / 1000;
+            (now - leaveAppAtRef.current) / 1000;
           leaveAppAtRef.current = null;
+          eventsRef.current.push({ type: 'returned', at: now });
         }
 
         // 重新同步剩餘秒數
@@ -139,6 +145,7 @@ export function useTimer({
     leftAppCountRef.current = 0;
     leftAppTotalSecRef.current = 0;
     leaveAppAtRef.current = null;
+    eventsRef.current = [];
 
     // Timer state
     startedAtRef.current = now;
@@ -162,7 +169,9 @@ export function useTimer({
 
     // FOCO: track pause
     pauseCountRef.current += 1;
-    pauseStartRef.current = Date.now();
+    const pauseNow = Date.now();
+    pauseStartRef.current = pauseNow;
+    eventsRef.current.push({ type: 'pause', at: pauseNow });
 
     setPaused(true);
   }, [phase, paused, stopInterval]);
@@ -172,8 +181,10 @@ export function useTimer({
 
     // FOCO: accumulate pause duration
     if (pauseStartRef.current) {
-      pauseTotalSecRef.current += (Date.now() - pauseStartRef.current) / 1000;
+      const resumeNow = Date.now();
+      pauseTotalSecRef.current += (resumeNow - pauseStartRef.current) / 1000;
       pauseStartRef.current = null;
+      eventsRef.current.push({ type: 'resume', at: resumeNow });
     }
 
     startedAtRef.current = Date.now();
@@ -196,6 +207,7 @@ export function useTimer({
     pauseTotalSecRef.current = 0;
     leftAppCountRef.current = 0;
     leftAppTotalSecRef.current = 0;
+    eventsRef.current = [];
     setSecs(durationSeconds);
     setPaused(false);
     setPhase('detail');
@@ -218,6 +230,7 @@ export function useTimer({
       leftAppCount: leftAppCountRef.current + (extraLeftAppSec > 0 ? 1 : 0),
       leftAppTotalSec: leftAppTotalSecRef.current + extraLeftAppSec,
       taskId: taskIdRef.current,
+      events: [...eventsRef.current],
     };
   }, []);
 

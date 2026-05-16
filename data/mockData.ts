@@ -18,6 +18,7 @@ export const mockSessionResult: SessionResult = {
   level_up: true,
   focus_type: 'conscientiousness',
   xp_next_level: 250,
+  quality_score: 85,
 };
 
 // Single-pet alias for components that still use mockPet directly
