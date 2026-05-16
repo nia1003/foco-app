@@ -32,7 +32,10 @@ export default function HomeScreen() {
 
   const pet = storePet ?? mockPet;
   const xpProgress = pet.xp_next_level > 0 ? pet.xp / pet.xp_next_level : 1;
-  const activePet = PETS.find((p) => p.id === pet.name.toLowerCase()) ?? PETS[0];
+  const activePet =
+    PETS.find((p) => p.id === pet.name.toLowerCase()) ??
+    PETS.find((p) => p.id === 'xingwang') ??
+    PETS[0];
 
   // Fetch real pet data
   useEffect(() => {
@@ -75,8 +78,8 @@ export default function HomeScreen() {
               onPress={() => router.push('/(app)/pet-info')}
             >
               <View style={styles.petCard}>
-                <View style={[styles.petAvatar, { backgroundColor: activePet.accent + '30' }]}>
-                  <PetRenderer pet={activePet} size={80} />
+                <View style={styles.petAvatar}>
+                  <PetRenderer pet={activePet} size={120} />
                 </View>
                 <View style={styles.petInfo}>
                   <Text style={styles.petName}>{pet.name} · Lv.{pet.level}</Text>
@@ -167,8 +170,9 @@ const styles = StyleSheet.create({
   // Pet card
   petCard: { flexDirection: 'row', alignItems: 'center', gap: 18, padding: 20 },
   petAvatar: {
-    width: 90, height: 90,
+    width: 120, height: 120,
     alignItems: 'center', justifyContent: 'center',
+    // 無背景色、無圓形 clip，讓 3D 角色直接顯示
   },
   petImage: { width: 80, height: 80 },
   petInfo: { flex: 1 },

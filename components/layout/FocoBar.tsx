@@ -67,6 +67,7 @@ const styles = StyleSheet.create({
   iconBtn: {
     position: 'absolute',
     left: 18,
+    top: 16,
     width: 38,
     height: 38,
     borderRadius: 19,

@@ -4,13 +4,13 @@
  */
 import React from 'react';
 import {
-  Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { PetRenderer } from '@/components/pets/PetRenderer';
 import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
@@ -38,8 +38,12 @@ export default function PetInfoScreen() {
   const info = LEVEL_INFO[level];
   const xpProgress = pet.xp_next_level > 0 ? pet.xp / pet.xp_next_level : 1;
 
-  // 找對應的寵物圖片（以 pet.name 小寫比對 PETS id）
-  const petDef = PETS.find((p) => p.id === pet.name.toLowerCase()) ?? PETS[0];
+  // 找對應寵物定義（以 pet.name 小寫比對 PETS id）
+  // fallback → xingwang（測試用）→ PETS[0]
+  const petDef =
+    PETS.find((p) => p.id === pet.name.toLowerCase()) ??
+    PETS.find((p) => p.id === 'xingwang') ??
+    PETS[0];
 
   return (
     <View style={styles.root}>
@@ -53,12 +57,10 @@ export default function PetInfoScreen() {
       >
         {/* 寵物展示區 */}
         <View style={styles.petStage}>
-          <View style={[styles.petGlow, { backgroundColor: petDef.accent + '30' }]}>
-            <Image
-              source={petDef.image}
-              style={[styles.petImage, { transform: [{ scale: info.scale }] }]}
-              resizeMode="contain"
-            />
+          <View style={styles.petStageInner}>
+            <View style={{ transform: [{ scale: info.scale }] }}>
+              <PetRenderer pet={petDef} size={200} />
+            </View>
           </View>
           <Text style={styles.petName}>{pet.name}</Text>
           <View style={styles.levelBadge}>
@@ -138,10 +140,9 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: 18, paddingBottom: 60 },
   petStage: { alignItems: 'center', marginTop: 8, marginBottom: 4 },
-  petGlow: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+  petStageInner: {
+    width: 200,
+    height: 200,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,

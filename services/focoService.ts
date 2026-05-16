@@ -98,6 +98,7 @@ export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
     .from('tasks')
     .select('id, user_id, title, duration_min, status, created_at')
     .eq('user_id', userId)
+    .neq('status', 'deleted')          // 過濾軟刪除
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -121,7 +122,11 @@ export async function createTask(
 }
 
 // ── deleteTask ────────────────────────────────
+// 軟刪除：status → 'deleted'，不影響已關聯的 sessions 紀錄
 export async function deleteTask(taskId: string): Promise<void> {
-  const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+  const { error } = await supabase
+    .from('tasks')
+    .update({ status: 'deleted' })
+    .eq('id', taskId);
   if (error) throw error;
 }

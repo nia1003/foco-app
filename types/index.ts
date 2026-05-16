@@ -130,8 +130,11 @@ export interface Task {
   user_id: string;
   title: string;
   duration_min: number;
-  status: 'pending' | 'done';
+  status: 'pending' | 'done' | 'deleted';
   created_at: string;
+  // local-only fields (not yet persisted to DB)
+  emoji?: string;
+  memo?: string;
 }
 
 // sessions table（歷史清單用）
