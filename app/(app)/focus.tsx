@@ -29,9 +29,10 @@ import type { SessionPayload } from '@/types';
 
 export default function FocusScreen() {
   const router = useRouter();
-  const { durationMin = '25', taskId } = useLocalSearchParams<{
+  const { durationMin = '25', taskId, taskTitle } = useLocalSearchParams<{
     durationMin?: string;
     taskId?: string;
+    taskTitle?: string;
   }>();
   const { userId } = useAuthStore();
   const { activePet: storePet } = usePetStore();
@@ -123,6 +124,7 @@ export default function FocusScreen() {
       left_app_count: snap.leftAppCount,
       started_at: startedAtISO,
       events: snap.events,
+      old_xp: storePet?.xp ?? 0,
     };
 
     try {
@@ -147,9 +149,12 @@ export default function FocusScreen() {
       <AppBackground />
 
       <View style={styles.content}>
-        {/* Header — title only */}
+        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Flow State · {durationMin}m</Text>
+          {taskTitle ? (
+            <Text style={styles.taskName}>{taskTitle}</Text>
+          ) : null}
         </View>
 
         {/* Pet + timer */}
@@ -169,9 +174,9 @@ export default function FocusScreen() {
           {/* Timer display */}
           <View style={styles.timerBox}>
             <Text style={styles.timerNumerals}>{mm}:{ss}</Text>
-            <Text style={styles.timerCaption}>
-              {paused ? 'PAUSED' : 'FLOW STATE'}
-            </Text>
+            {paused && (
+              <Text style={styles.timerCaption}>PAUSED</Text>
+            )}
           </View>
         </View>
 
@@ -214,7 +219,7 @@ export default function FocusScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>提前結束？</Text>
             <Text style={styles.modalSub}>
-              放棄會影響你的 DISC 分析，但還是會獲得基礎 XP。
+              放棄會影響你的 DISC 分析結果。
             </Text>
             <TouchableOpacity
               style={styles.modalQuitBtn}
@@ -251,8 +256,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 60,
     paddingBottom: 10,
+    gap: 6,
   },
-  headerTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
+  headerTitle: { fontSize: 15, fontWeight: '600', color: Colors.inkSoft },
+  taskName: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 28,
+    fontWeight: '500',
+    color: Colors.ink,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
 
   // Pet area
   petArea: {

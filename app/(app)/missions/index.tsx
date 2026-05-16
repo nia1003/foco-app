@@ -240,7 +240,7 @@ export default function MissionsScreen() {
                     <View style={styles.progressBg}>
                       <View style={[styles.progressFill, { width: `${q.progress * 100}%` as any }]} />
                     </View>
-                    <Text style={styles.questReward}>{q.reward} · {q.duration_min} min</Text>
+                    <Text style={styles.questReward}>{q.duration_min} min</Text>
                   </View>
                   <View style={styles.taskActions}>
                     <TouchableOpacity

@@ -6,7 +6,6 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,15 +23,12 @@ import { useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
+import { MonthCalendar } from '@/components/MonthCalendar';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { getSessions } from '@/services/focoService';
 import { mockSessions } from '@/data/mockData';
 import type { SessionRecord } from '@/types';
-
-const { width: SCREEN_W } = Dimensions.get('window');
-// scrollContent paddingHorizontal 18×2 + chartCard padding 22×2 = 80
-const CHART_W = SCREEN_W - 80;
 
 // ── DISC config ──────────────────────────────────────────────────
 const DISC_COLOR: Record<string, string> = {
@@ -72,46 +68,6 @@ const DISC_AXES: { key: string; angle: number }[] = [
 ];
 
 // ── Data helpers ─────────────────────────────────────────────────
-function getLast7Days(): Date[] {
-  const days: Date[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - i);
-    days.push(d);
-  }
-  return days;
-}
-
-function dayLabel(d: Date): string {
-  return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()];
-}
-
-interface DayStat {
-  date: Date;
-  day: string;
-  hours: number;
-  sessions: number;
-}
-
-function buildWeekStats(sessions: SessionRecord[]): DayStat[] {
-  return getLast7Days().map((date) => {
-    const dayStart = date.getTime();
-    const dayEnd = dayStart + 86_400_000;
-    const daySessions = sessions.filter((s) => {
-      const t = new Date(s.ended_at).getTime();
-      return t >= dayStart && t < dayEnd;
-    });
-    const totalSec = daySessions.reduce((acc, s) => acc + s.actual_duration, 0);
-    return {
-      date,
-      day: dayLabel(date),
-      hours: Math.round((totalSec / 3600) * 10) / 10,
-      sessions: daySessions.length,
-    };
-  });
-}
-
 // Returns fraction (0–1) for each DISC type across all sessions
 function buildDiscData(sessions: SessionRecord[]): Record<string, number> {
   const counts: Record<string, number> = {
@@ -135,94 +91,6 @@ function getDominantType(data: Record<string, number>): string {
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-// ── Line Chart ───────────────────────────────────────────────────
-function LineChart({
-  weekStats,
-  selectedDay,
-  onSelect,
-}: {
-  weekStats: DayStat[];
-  selectedDay: number;
-  onSelect: (i: number) => void;
-}) {
-  const W = CHART_W;
-  const H = 80;
-  const PAD_TOP = 22;
-  const PAD_X = 10;
-  const innerW = W - PAD_X * 2;
-  const svgH = H + PAD_TOP + 8;
-
-  const MAX = Math.max(...weekStats.map((d) => d.hours), 0.1);
-
-  const pts = weekStats.map((d, i) => ({
-    x: PAD_X + (i / 6) * innerW,
-    y: PAD_TOP + (1 - d.hours / MAX) * H,
-  }));
-
-  const polylineStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
-
-  // Filled area: follow line, then close at bottom
-  const areaStr = [
-    ...pts.map((p) => `${p.x},${p.y}`),
-    `${pts[6].x},${PAD_TOP + H + 4}`,
-    `${pts[0].x},${PAD_TOP + H + 4}`,
-  ].join(' ');
-
-  return (
-    <View>
-      <Svg width={W} height={svgH}>
-        {/* Gradient-like area fill */}
-        <Polygon points={areaStr} fill="rgba(242,206,220,0.30)" />
-
-        {/* Line */}
-        <Polyline
-          points={polylineStr}
-          fill="none"
-          stroke={Colors.pinkHot}
-          strokeWidth={2.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-
-        {/* Dots */}
-        {pts.map((p, i) =>
-          i === selectedDay ? (
-            <React.Fragment key={i}>
-              <Circle cx={p.x} cy={p.y} r={12} fill="rgba(232,120,90,0.12)" />
-              <Circle cx={p.x} cy={p.y} r={5.5} fill={Colors.pinkHot} />
-            </React.Fragment>
-          ) : (
-            <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill="rgba(232,120,90,0.45)" />
-          ),
-        )}
-      </Svg>
-
-      {/* Tap targets + day labels */}
-      <View style={lcStyles.dayRow}>
-        {weekStats.map((d, i) => (
-          <TouchableOpacity
-            key={i}
-            style={lcStyles.dayBtn}
-            onPress={() => onSelect(i)}
-            activeOpacity={0.7}
-          >
-            <Text style={[lcStyles.dayLabel, i === selectedDay && lcStyles.dayLabelActive]}>
-              {d.day}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-const lcStyles = StyleSheet.create({
-  dayRow: { flexDirection: 'row', paddingHorizontal: 4, marginTop: 2 },
-  dayBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  dayLabel: { fontSize: 11, color: Colors.inkFaint, fontWeight: '500' },
-  dayLabelActive: { color: Colors.ink, fontWeight: '700' },
-});
 
 // ── Radar Chart ──────────────────────────────────────────────────
 function RadarChart({ data }: { data: Record<string, number> }) {
@@ -317,7 +185,8 @@ export default function StatsScreen() {
     streak_days: 0,
     total_sessions: 0,
   });
-  const [selectedDay, setSelectedDay] = useState(6); // default: today
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDaySessions, setSelectedDaySessions] = useState<SessionRecord[]>([]);
 
   useEffect(() => {
     if (!userId) {
@@ -338,19 +207,14 @@ export default function StatsScreen() {
       .finally(() => setLoading(false));
   }, [userId]);
 
-  const weekStats  = buildWeekStats(sessions);
   const discData   = buildDiscData(sessions);
   const dominant   = getDominantType(discData);
-
-  const weekStart = weekStats[0]?.date;
-  const weekEnd   = weekStats[6]?.date;
-  const weekRangeStr =
-    weekStart && weekEnd
-      ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
-      : '';
-
   const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
-  const selected   = weekStats[selectedDay];
+
+  function handleDayPress(date: Date, daySessions: SessionRecord[]) {
+    setSelectedDate(date);
+    setSelectedDaySessions(daySessions);
+  }
 
   if (loading) {
     return (
@@ -372,7 +236,6 @@ export default function StatsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Stats</Text>
-        <Text style={styles.sub}>Week of {weekRangeStr}</Text>
 
         {/* ── Summary row ────────────────────────────── */}
         <View style={styles.summaryRow}>
@@ -392,26 +255,74 @@ export default function StatsScreen() {
           ))}
         </View>
 
-        {/* ── Line chart ─────────────────────────────── */}
+        {/* ── Month Calendar ──────────────────────────── */}
         <View style={styles.section}>
           <FrostCard radius={28} padded={false}>
             <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Daily Focus Time</Text>
-              <LineChart
-                weekStats={weekStats}
-                selectedDay={selectedDay}
-                onSelect={setSelectedDay}
+              <MonthCalendar
+                sessions={sessions}
+                selectedDate={selectedDate}
+                onDayPress={handleDayPress}
               />
-              {selected && (
-                <View style={styles.selectedDetail}>
-                  <Text style={styles.selectedDetailText}>
-                    {selected.sessions} session{selected.sessions !== 1 ? 's' : ''} · {selected.hours}h focused
-                  </Text>
-                </View>
-              )}
             </View>
           </FrostCard>
         </View>
+
+        {/* ── Day detail panel ────────────────────────── */}
+        {selectedDate && (
+          <View style={styles.section}>
+            <FrostCard radius={24} padded={false}>
+              <View style={styles.dayDetailCard}>
+                <Text style={styles.dayDetailTitle}>
+                  {selectedDate.getMonth() + 1}月{selectedDate.getDate()}日
+                </Text>
+                {selectedDaySessions.length === 0 ? (
+                  <Text style={styles.dayDetailEmpty}>這天沒有紀錄</Text>
+                ) : (
+                  selectedDaySessions.map((s) => {
+                    const mins = Math.floor(s.actual_duration / 60);
+                    const t = new Date(s.ended_at);
+                    const timeStr = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+                    const discColor = DISC_COLOR[s.focus_type_result ?? ''] ?? Colors.inkSoft;
+                    return (
+                      <TouchableOpacity
+                        key={s.id}
+                        style={styles.sessionRow}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(app)/analysis',
+                            params: {
+                              result: JSON.stringify({
+                                focus_type: s.focus_type_result,
+                                actual_duration: s.actual_duration,
+                                pause_count: s.pause_count ?? 0,
+                                left_app_count: s.left_app_count ?? 0,
+                              }),
+                            },
+                          })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.sessionDot, { backgroundColor: discColor }]} />
+                        <View style={styles.sessionInfo}>
+                          <Text style={styles.sessionTitle}>
+                            {mins} min · {s.focus_type_result ?? 'unknown'}
+                          </Text>
+                          <Text style={styles.sessionSub}>{timeStr}</Text>
+                        </View>
+                        <View style={[styles.sessionBadge, !s.completed && styles.sessionBadgeInactive]}>
+                          <Text style={[styles.sessionBadgeText, !s.completed && styles.sessionBadgeTextInactive]}>
+                            {s.completed ? 'Done' : 'Early stop'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+            </FrostCard>
+          </View>
+        )}
 
         {/* ── Focus type breakdown ────────────────────── */}
         <View style={styles.section}>
@@ -488,7 +399,7 @@ export default function StatsScreen() {
                           {mins} min · {s.focus_type_result ?? 'unknown'}
                         </Text>
                         <Text style={styles.sessionSub}>
-                          {dateStr} · +{s.xp_earned} XP
+                          {dateStr}
                         </Text>
                       </View>
                       <View
@@ -531,8 +442,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     letterSpacing: -0.5,
   },
-  sub: { fontSize: 13, color: Colors.inkSoft, marginTop: 4 },
-
   // Summary
   summaryRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   summaryCard: { flex: 1 },
@@ -555,11 +464,19 @@ const styles = StyleSheet.create({
 
   section: { marginTop: 12 },
 
-  // Line chart card
-  chartCard: { padding: 22, paddingTop: 26, overflow: 'visible' },
+  // Calendar card
+  chartCard: { padding: 22, paddingTop: 22 },
   chartTitle: { fontSize: 14, fontWeight: '600', color: Colors.ink, marginBottom: 18 },
-  selectedDetail: { marginTop: 10 },
-  selectedDetailText: { fontSize: 12, color: Colors.inkSoft, textAlign: 'center' },
+
+  // Day detail panel
+  dayDetailCard: { padding: 22 },
+  dayDetailTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.ink,
+    marginBottom: 12,
+  },
+  dayDetailEmpty: { fontSize: 13, color: Colors.inkFaint, textAlign: 'center', paddingVertical: 12 },
 
   // DISC breakdown card
   breakdownCard: { padding: 22, alignItems: 'center' },
