@@ -17,8 +17,6 @@ import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
-import { usePetStore } from '@/stores/petStore';
-import { mockPets } from '@/data/mockData';
 
 // Collect the 4 slots: real pets first, then coming-soon
 const UNLOCKED = PETS.filter((p) => !p.locked);
@@ -33,10 +31,7 @@ const LOCKED_SLOTS = [...LOCKED, ...COMING_SOON].slice(0, Math.max(0, 4 - UNLOCK
 
 export default function PetCollectionScreen() {
   const router = useRouter();
-  const { activePet } = usePetStore();
-  const userPetName = (activePet ?? mockPets[0]).name.toLowerCase();
 
-  // Interleave unlocked + locked to fill 4 slots
   const slots: Array<
     | { kind: 'pet'; data: (typeof PETS)[0] }
     | { kind: 'locked'; data: { id: string; name: string; trait: string; accent: string } }
@@ -64,7 +59,6 @@ export default function PetCollectionScreen() {
           {slots.map((slot) => {
             if (slot.kind === 'pet') {
               const pet = slot.data;
-              const isActive = pet.id === userPetName;
               return (
                 <TouchableOpacity
                   key={pet.id}
@@ -73,23 +67,17 @@ export default function PetCollectionScreen() {
                   onPress={() =>
                     router.push({
                       pathname: '/(app)/pet-info',
-                      params: { petId: pet.id }, // pet.id = 'xingwang' | 'lily' (matched by name in pet-info)
+                      params: { petId: pet.id },
                     })
                   }
                 >
                   <FrostCard radius={24} padded={false}>
-                    <View style={[styles.cell, isActive && { borderColor: pet.accent, borderWidth: 2 }]}>
-                      {isActive && (
-                        <View style={[styles.activeBadge, { backgroundColor: pet.accent + '30' }]}>
-                          <Text style={[styles.activeBadgeText, { color: pet.accent }]}>Your pet</Text>
-                        </View>
-                      )}
+                    <View style={styles.cell}>
                       <View style={styles.petPreview}>
                         <PetRenderer pet={pet} size={110} />
                       </View>
                       <Text style={styles.cellName}>{pet.name}</Text>
                       <Text style={styles.cellTrait}>{pet.trait}</Text>
-                      {/* Accent dot */}
                       <View style={[styles.accentDot, { backgroundColor: pet.accent }]} />
                     </View>
                   </FrostCard>
@@ -155,22 +143,7 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     paddingHorizontal: 10,
     borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'transparent',
     overflow: 'hidden',
-  },
-  activeBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 9999,
-  },
-  activeBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.3,
   },
   petPreview: {
     width: 110,
