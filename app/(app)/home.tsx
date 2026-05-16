@@ -65,7 +65,10 @@ export default function HomeScreen() {
       });
   }, [userId]);
 
+  const isMockPet = (p: FocoPet) => p.id.startsWith('mock-');
+
   const handleSelectPet = async (p: FocoPet, defName: string) => {
+    if (isMockPet(p)) return; // mock pets aren't in the DB, can't actually select
     await setActivePet(p.id);
     setSelectFeedback(defName);
     setTimeout(() => setSelectFeedback(null), 1800);
@@ -135,28 +138,32 @@ export default function HomeScreen() {
                 PETS.find((d) => d.id === p.name.toLowerCase()) ??
                 PETS.find((d) => d.id === 'xingwang') ??
                 PETS[0];
-              const isActive =
-                activePet?.id === p.id ||
-                (!activePet && p.id === displayPets[0].id);
+              const locked = isMockPet(p);
+              const isActive = !locked && activePet?.id === p.id;
               const xpPct = p.xp_next_level > 0 ? p.xp / p.xp_next_level : 0;
 
               return (
                 <TouchableOpacity
                   key={p.id}
-                  style={[styles.petCard, { width: PET_CARD_W }, isActive && styles.petCardActive]}
+                  style={[styles.petCard, { width: PET_CARD_W }, isActive && styles.petCardActive, locked && styles.petCardLocked]}
                   onPress={() => handleSelectPet(p, def.name)}
                   onLongPress={() =>
-                    router.push({
+                    !locked && router.push({
                       pathname: '/(app)/pet-info',
                       params: { petId: def.id },
                     })
                   }
-                  activeOpacity={0.88}
+                  activeOpacity={locked ? 1 : 0.88}
                 >
-                  {/* 陪伴中 badge */}
+                  {/* 陪伴中 / 鎖定 badge */}
                   {isActive && (
                     <View style={[styles.activeBadge, { backgroundColor: def.accent + '22', borderColor: def.accent + '55' }]}>
                       <Text style={[styles.activeBadgeText, { color: def.accent }]}>陪伴中 ✦</Text>
+                    </View>
+                  )}
+                  {locked && (
+                    <View style={styles.lockedBadge}>
+                      <Text style={styles.lockedBadgeText}>🔒 即將解鎖</Text>
                     </View>
                   )}
 
@@ -195,20 +202,20 @@ export default function HomeScreen() {
               <Text style={styles.eyebrow}>START FOCUS</Text>
               <Text style={styles.focusTitle}>How long?</Text>
 
-              {/* Pet picker inside START FOCUS */}
+              {/* Pet picker inside START FOCUS — only real (DB) pets */}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.focusPetRow}
               >
-                {displayPets.map((p) => {
+                {(pets.length > 0 ? pets : mockPets.slice(0, 1)).map((p) => {
                   const def =
                     PETS.find((d) => d.id === p.name.toLowerCase()) ??
                     PETS.find((d) => d.id === 'xingwang') ??
                     PETS[0];
                   const isActive =
                     activePet?.id === p.id ||
-                    (!activePet && p.id === displayPets[0].id);
+                    (!activePet && p === (pets.length > 0 ? pets : mockPets.slice(0, 1))[0]);
                   return (
                     <TouchableOpacity
                       key={p.id}
@@ -332,6 +339,9 @@ const styles = StyleSheet.create({
   petCardActive: {
     backgroundColor: 'rgba(255,255,255,0.55)',
   },
+  petCardLocked: {
+    opacity: 0.5,
+  },
 
   activeBadge: {
     position: 'absolute',
@@ -342,6 +352,16 @@ const styles = StyleSheet.create({
   },
   activeBadgeText: {
     fontSize: 9, fontWeight: '700', letterSpacing: 0.3,
+  },
+  lockedBadge: {
+    position: 'absolute',
+    top: 8, right: 8,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(20,16,28,0.08)',
+  },
+  lockedBadgeText: {
+    fontSize: 9, fontWeight: '600', color: Colors.inkFaint,
   },
 
   petPreview: {
