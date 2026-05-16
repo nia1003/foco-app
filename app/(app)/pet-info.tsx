@@ -1,17 +1,21 @@
 /**
- * PetInfoScreen — 寵物詳情頁
- * 顯示：等級、XP 進度條、寵物圖片（scale 隨等級放大）、特性說明
+ * PetInfoScreen — 上拉式底部卡片
+ * - 全螢幕顯示大寵物（無圓形框）
+ * - 底部卡片：往上拉顯示 XP、個性、成長路線
  */
-import React from 'react';
+import React, { useRef } from 'react';
 import {
+  Animated,
+  Dimensions,
+  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { PetRenderer } from '@/components/pets/PetRenderer';
 import { useRouter } from 'expo-router';
+import { PetRenderer } from '@/components/pets/PetRenderer';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -20,7 +24,14 @@ import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
 import { mockPet } from '@/data/mockData';
 
-// 等級對應的寵物 scale 和描述
+const { height: SCREEN_H } = Dimensions.get('window');
+
+// Sheet geometry
+const PEEK_H   = 148;              // visible when collapsed (handle + name + level)
+const SHEET_H  = SCREEN_H * 0.70; // height when fully expanded
+const MAX_DRAG = SHEET_H - PEEK_H; // translateY range
+
+// Level metadata
 const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }> = {
   1: { scale: 0.7,  label: '新生',   desc: '剛開始旅程，充滿好奇心！' },
   2: { scale: 0.85, label: '成長中', desc: '開始有自己的節奏，越來越有活力！' },
@@ -32,122 +43,239 @@ const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }>
 export default function PetInfoScreen() {
   const router = useRouter();
   const { pet: storePet } = usePetStore();
-  const pet = storePet ?? mockPet;  // 後端未好就用 mock
+  const pet = storePet ?? mockPet;
 
   const level = Math.min(Math.max(pet.level, 1), 5) as 1 | 2 | 3 | 4 | 5;
   const info = LEVEL_INFO[level];
   const xpProgress = pet.xp_next_level > 0 ? pet.xp / pet.xp_next_level : 1;
 
-  // 找對應寵物定義（以 pet.name 小寫比對 PETS id）
-  // fallback → xingwang（測試用）→ PETS[0]
   const petDef =
     PETS.find((p) => p.id === pet.name.toLowerCase()) ??
     PETS.find((p) => p.id === 'xingwang') ??
     PETS[0];
 
+  // ── Bottom sheet animation ───────────────────
+  const sheetY = useRef(new Animated.Value(MAX_DRAG)).current;
+  const lastY  = useRef(MAX_DRAG);
+  const isOpen = useRef(false);
+
+  const springTo = (target: number) => {
+    Animated.spring(sheetY, {
+      toValue: target,
+      useNativeDriver: true,
+      tension: 72,
+      friction: 12,
+    }).start(() => {
+      lastY.current = target;
+      isOpen.current = target === 0;
+    });
+  };
+
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
+    onPanResponderGrant: () => {
+      lastY.current = (sheetY as any)._value;
+    },
+    onPanResponderMove: (_, g) => {
+      const next = Math.max(0, Math.min(MAX_DRAG, lastY.current + g.dy));
+      sheetY.setValue(next);
+    },
+    onPanResponderRelease: (_, g) => {
+      const cur = (sheetY as any)._value;
+      const shouldOpen = g.vy < -0.3 || cur < MAX_DRAG * 0.45;
+      springTo(shouldOpen ? 0 : MAX_DRAG);
+    },
+  });
+
   return (
     <View style={styles.root}>
       <AppBackground />
-      <FocoBar back />
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
+      {/* FocoBar floats above everything */}
+      <View style={styles.barWrap}>
+        <FocoBar back />
+      </View>
+
+      {/* Full-screen pet (behind sheet) */}
+      <View style={styles.petBg} pointerEvents="none">
+        <View style={{ transform: [{ scale: info.scale }] }}>
+          <PetRenderer pet={petDef} size={240} />
+        </View>
+      </View>
+
+      {/* Collection shortcut */}
+      <View style={styles.collectionBtn} pointerEvents="box-none">
+        <TouchableOpacity
+          onPress={() => router.push('/(app)/pet-collection' as any)}
+          style={styles.collectionPill}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.collectionPillText}>見全部寵物 →</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Bottom Sheet ───────────────────────── */}
+      <Animated.View
+        style={[styles.sheet, { transform: [{ translateY: sheetY }] }]}
       >
-        {/* 寵物展示區 */}
-        <View style={styles.petStage}>
-          <View style={styles.petStageInner}>
-            <View style={{ transform: [{ scale: info.scale }] }}>
-              <PetRenderer pet={petDef} size={200} />
-            </View>
-          </View>
+        {/* Drag handle */}
+        <View {...panResponder.panHandlers} style={styles.handleArea}>
+          <View style={styles.handle} />
+        </View>
+
+        {/* Always-visible: name + level */}
+        <View style={styles.peekSection}>
           <Text style={styles.petName}>{pet.name}</Text>
           <View style={styles.levelBadge}>
             <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
           </View>
         </View>
 
-        {/* XP 進度卡 */}
-        <View style={styles.section}>
+        {/* Scrollable details */}
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={styles.sheetScrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* XP */}
           <FrostCard radius={24} padded={false}>
             <View style={styles.xpCard}>
               <View style={styles.xpHeader}>
                 <Text style={styles.xpLabel}>Experience</Text>
                 <Text style={styles.xpNumbers}>
-                  {pet.xp} <Text style={styles.xpMax}>/ {pet.xp_next_level} XP</Text>
+                  {pet.xp}{' '}
+                  <Text style={styles.xpMax}>/ {pet.xp_next_level} XP</Text>
                 </Text>
               </View>
               <View style={styles.xpBarBg}>
-                <View style={[styles.xpBarFill, { width: `${xpProgress * 100}%` }]} />
+                <View style={[styles.xpBarFill, { width: `${Math.min(xpProgress * 100, 100)}%` as any }]} />
               </View>
-              {level < 5 && (
-                <Text style={styles.xpHint}>
-                  再 {pet.xp_next_level - pet.xp} XP 升到 Lv.{level + 1}
-                </Text>
-              )}
-              {level === 5 && (
+              {level < 5 ? (
+                <Text style={styles.xpHint}>再 {pet.xp_next_level - pet.xp} XP 升到 Lv.{level + 1}</Text>
+              ) : (
                 <Text style={styles.xpHint}>已達最高等級 🏆</Text>
               )}
             </View>
           </FrostCard>
-        </View>
 
-        {/* 個性說明卡 */}
-        <View style={styles.section}>
-          <FrostCard radius={24}>
-            <Text style={styles.traitTitle}>個性</Text>
-            <Text style={styles.traitValue}>{petDef.trait}</Text>
-            <Text style={styles.traitDesc}>{info.desc}</Text>
-          </FrostCard>
-        </View>
+          {/* Trait */}
+          <View style={styles.section}>
+            <FrostCard radius={24}>
+              <Text style={styles.traitTitle}>個性</Text>
+              <Text style={styles.traitValue}>{petDef.trait}</Text>
+              <Text style={styles.traitDesc}>{info.desc}</Text>
+            </FrostCard>
+          </View>
 
-        {/* 等級路線 */}
-        <View style={styles.section}>
-          <FrostCard radius={24} padded={false}>
-            <View style={styles.roadmapCard}>
-              <Text style={styles.roadmapTitle}>成長路線</Text>
-              {Object.entries(LEVEL_INFO).map(([lv, d]) => {
-                const lvNum = Number(lv);
-                const reached = lvNum <= level;
-                return (
-                  <View key={lv} style={styles.roadmapRow}>
-                    <View style={[styles.roadmapDot, reached && styles.roadmapDotActive]} />
-                    <Text style={[styles.roadmapLv, reached && styles.roadmapLvActive]}>
-                      Lv.{lv}
-                    </Text>
-                    <Text style={[styles.roadmapLabel, reached && styles.roadmapLabelActive]}>
-                      {d.label}
-                    </Text>
-                    {lvNum === level && (
-                      <View style={styles.currentBadge}>
-                        <Text style={styles.currentBadgeText}>現在</Text>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          </FrostCard>
-        </View>
-      </ScrollView>
+          {/* Growth roadmap */}
+          <View style={styles.section}>
+            <FrostCard radius={24} padded={false}>
+              <View style={styles.roadmapCard}>
+                <Text style={styles.roadmapTitle}>成長路線</Text>
+                {Object.entries(LEVEL_INFO).map(([lv, d]) => {
+                  const lvNum = Number(lv);
+                  const reached = lvNum <= level;
+                  return (
+                    <View key={lv} style={styles.roadmapRow}>
+                      <View style={[styles.roadmapDot, reached && styles.roadmapDotActive]} />
+                      <Text style={[styles.roadmapLv, reached && styles.roadmapLvActive]}>
+                        Lv.{lv}
+                      </Text>
+                      <Text style={[styles.roadmapLabel, reached && styles.roadmapLabelActive]}>
+                        {d.label}
+                      </Text>
+                      {lvNum === level && (
+                        <View style={styles.currentBadge}>
+                          <Text style={styles.currentBadgeText}>現在</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </FrostCard>
+          </View>
+        </ScrollView>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.softBg },
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: 18, paddingBottom: 60 },
-  petStage: { alignItems: 'center', marginTop: 8, marginBottom: 4 },
-  petStageInner: {
-    width: 200,
-    height: 200,
+
+  // FocoBar floats above
+  barWrap: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    zIndex: 20,
+  },
+
+  // Pet fills upper area
+  petBg: {
+    position: 'absolute',
+    top: 56,
+    left: 0,
+    right: 0,
+    bottom: PEEK_H,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
-  petImage: { width: 120, height: 120 },
+
+  // Collection shortcut pill
+  collectionBtn: {
+    position: 'absolute',
+    bottom: PEEK_H + 16,
+    right: 20,
+    zIndex: 10,
+  },
+  collectionPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(20,16,28,0.08)',
+  },
+  collectionPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.inkSoft,
+  },
+
+  // ── Sheet ───────────────────────────────────
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SHEET_H,
+    backgroundColor: Colors.softBg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    shadowColor: '#14101c',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 14,
+  },
+  handleArea: {
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(20,16,28,0.14)',
+  },
+
+  // Peek section (always visible)
+  peekSection: {
+    alignItems: 'center',
+    paddingBottom: 14,
+  },
   petName: {
     fontFamily: 'Fraunces_500Medium',
     fontSize: 32,
@@ -167,10 +295,16 @@ const styles = StyleSheet.create({
   levelBadgeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.pinkText,
+    color: '#b5607a',
     letterSpacing: 0.3,
   },
+
+  // Scrollable detail content
+  sheetScroll: { flex: 1 },
+  sheetScrollContent: { paddingHorizontal: 18, paddingBottom: 40 },
   section: { marginTop: 12 },
+
+  // XP card
   xpCard: { padding: 20 },
   xpHeader: {
     flexDirection: 'row',
@@ -195,9 +329,11 @@ const styles = StyleSheet.create({
   xpBarFill: {
     height: '100%',
     borderRadius: 9999,
-    backgroundColor: Colors.pinkHot,
+    backgroundColor: '#F2CEDC',
   },
   xpHint: { fontSize: 11, color: Colors.inkFaint, marginTop: 8, textAlign: 'right' },
+
+  // Trait
   traitTitle: {
     fontSize: 11,
     fontWeight: '700',
@@ -213,12 +349,9 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     letterSpacing: -0.2,
   },
-  traitDesc: {
-    fontSize: 13,
-    color: Colors.inkSoft,
-    marginTop: 6,
-    lineHeight: 19,
-  },
+  traitDesc: { fontSize: 13, color: Colors.inkSoft, marginTop: 6, lineHeight: 19 },
+
+  // Roadmap
   roadmapCard: { padding: 20 },
   roadmapTitle: {
     fontSize: 12,
@@ -228,28 +361,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 14,
   },
-  roadmapRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
+  roadmapRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   roadmapDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 10, height: 10, borderRadius: 5,
     backgroundColor: 'rgba(20,16,28,0.12)',
   },
-  roadmapDotActive: { backgroundColor: Colors.pinkHot },
+  roadmapDotActive: { backgroundColor: '#F2CEDC' },
   roadmapLv: { fontSize: 12, color: Colors.inkFaint, width: 36 },
   roadmapLvActive: { color: Colors.ink, fontWeight: '700' },
   roadmapLabel: { flex: 1, fontSize: 13, color: Colors.inkFaint },
   roadmapLabelActive: { color: Colors.ink },
   currentBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 8, paddingVertical: 2,
     borderRadius: 9999,
     backgroundColor: 'rgba(242,206,220,0.50)',
   },
-  currentBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.pinkText },
+  currentBadgeText: { fontSize: 10, fontWeight: '700', color: '#b5607a' },
 });
