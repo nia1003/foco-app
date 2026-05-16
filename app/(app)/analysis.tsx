@@ -1,7 +1,6 @@
 /**
- * AnalysisScreen — DISC 專注報告
- * 可截圖分享的個性化 DISC 卡片（社群媒體分享設計）
- * 包含：時間軸視覺化、時段分析、品質分數
+ * AnalysisScreen — 單次專注完成卡片
+ * 以品質分數為視覺核心，不分 DISC 類型
  */
 import React, { useRef } from 'react';
 import {
@@ -16,144 +15,65 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, {
+  Circle,
+  Line as SvgLine,
+  Polygon,
+  Rect,
+} from 'react-native-svg';
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FocoBar } from '@/components/layout/FocoBar';
 import type { SessionResult, SessionEvent } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W = SCREEN_W - 32;
+const CARD_W   = SCREEN_W - 32;
+const HERO_H   = Math.round(CARD_W * 0.58);
+const OVERLAY_H = 52;
 
-// ── DISC 視覺配置 ─────────────────────────────
-const DISC_CONFIG = {
-  conscientiousness: {
-    label: 'Conscientiousness',
-    zh: '謹慎型',
-    tagline: '精準執行，掌控每個細節',
-    traits: ['零干擾專注', '高完成率', '完美主義'],
-    gradient: ['#1a1a2e', '#16213e', '#0f3460'] as const,
-    accent: '#4A90E2',
-    accentLight: 'rgba(74,144,226,0.20)',
-    icon: '◈',
-    desc: '你今天的專注品質頂尖。幾乎零干擾地完成了目標，每個細節都在掌控之中。這是最深度的工作狀態。',
-    hashtag: '#謹慎型 #FocusType #FOCO',
+// ── 品質分等級配置 ────────────────────────────
+const QUALITY_LEVELS = [
+  {
+    min: 85,
+    gradient: ['#0f1923', '#162538', '#0c2040'] as const,
+    accent: '#4A8FD4',
+    tagline: 'Exceptional. Every second earned.',
   },
-  dominance: {
-    label: 'Dominance',
-    zh: '主導型',
-    tagline: '目標掛帥，勇往直前',
-    traits: ['高執行力', '目標導向', '強韌意志'],
-    gradient: ['#1a0a0a', '#2d1010', '#4a1515'] as const,
-    accent: '#E05A5A',
-    accentLight: 'rgba(224,90,90,0.20)',
-    icon: '▲',
-    desc: '你有清晰的目標感，中途遇到阻礙也能堅持完成。主導型的人不輕易放棄，完成是最大的勝利。',
-    hashtag: '#主導型 #FocusType #FOCO',
-  },
-  steadiness: {
-    label: 'Steadiness',
-    zh: '穩健型',
-    tagline: '節奏穩定，細水長流',
-    traits: ['持續耐力', '踏實推進', '壓力抵抗'],
-    gradient: ['#0a1a0f', '#0f2d18', '#154a22'] as const,
+  {
+    min: 65,
+    gradient: ['#0a1a10', '#112b18', '#0d3320'] as const,
     accent: '#5BAD6F',
-    accentLight: 'rgba(91,173,111,0.20)',
-    icon: '◉',
-    desc: '穩健是一種力量。你保持著自己的節奏，不急不躁。持續累積比衝刺更能帶來長遠的改變。',
-    hashtag: '#穩健型 #FocusType #FOCO',
+    tagline: 'Strong session. Momentum building.',
   },
-  influence: {
-    label: 'Influence',
-    zh: '影響型',
-    tagline: '彈性靈活，熱情滿滿',
-    traits: ['靈活適應', '熱情驅動', '富有彈性'],
-    gradient: ['#1a1400', '#2d2200', '#4a3800'] as const,
-    accent: '#F5A623',
-    accentLight: 'rgba(245,166,35,0.20)',
-    icon: '◆',
-    desc: '今天比較多干擾，但你依然完成了一段專注。嘗試把下次的時段縮短 10 分鐘，更容易進入狀態。',
-    hashtag: '#影響型 #FocusType #FOCO',
+  {
+    min: 40,
+    gradient: ['#1a1500', '#2d2500', '#3c2f00'] as const,
+    accent: '#C9961A',
+    tagline: 'Steady progress. Keep the streak.',
   },
-} as const;
+  {
+    min: 0,
+    gradient: ['#141218', '#1e1a24', '#18151e'] as const,
+    accent: '#8B8BAE',
+    tagline: 'Every session shapes the habit.',
+  },
+] as const;
 
-type DiscKey = keyof typeof DISC_CONFIG;
-
-// ── 時段判斷 ──────────────────────────────────
-function getTimeOfDay(startedAt: string): string {
-  const hour = new Date(startedAt).getHours();
-  if (hour < 6)  return '🌙 深夜';
-  if (hour < 12) return '🌅 早上';
-  if (hour < 17) return '☀️ 下午';
-  if (hour < 21) return '🌆 傍晚';
-  return '🌙 夜晚';
+function getLevel(score: number) {
+  return QUALITY_LEVELS.find((l) => score >= l.min) ?? QUALITY_LEVELS[QUALITY_LEVELS.length - 1];
 }
 
-function formatStartTime(startedAt: string): string {
-  const d = new Date(startedAt);
+// ── 時間格式 ──────────────────────────────────
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const h = d.getHours().toString().padStart(2, '0');
   const m = d.getMinutes().toString().padStart(2, '0');
-  return `${h}:${m}`;
+  return `${months[d.getMonth()]} ${d.getDate()} · ${h}:${m}`;
 }
 
-// ── 時間軸分段 ────────────────────────────────
-type SegmentType = 'focus' | 'pause' | 'left_app';
-
-interface Segment {
-  type: SegmentType;
-  widthPct: number;
-}
-
-function buildSegments(
-  events: SessionEvent[],
-  startedAt: string,
-  totalSec: number,
-): Segment[] {
-  if (!events?.length || totalSec <= 0) {
-    return [{ type: 'focus', widthPct: 100 }];
-  }
-
-  const startMs = new Date(startedAt).getTime();
-  const totalMs = totalSec * 1000;
-  const endMs = startMs + totalMs;
-
-  const filtered = events
-    .filter(e => e.at >= startMs && e.at <= endMs)
-    .sort((a, b) => a.at - b.at);
-
-  const segments: Segment[] = [];
-  let cursor = startMs;
-  let current: SegmentType = 'focus';
-
-  for (const ev of filtered) {
-    const dur = ev.at - cursor;
-    if (dur > 500) {
-      segments.push({ type: current, widthPct: (dur / totalMs) * 100 });
-    }
-    cursor = ev.at;
-    if (ev.type === 'pause')    current = 'pause';
-    if (ev.type === 'resume')   current = 'focus';
-    if (ev.type === 'left_app') current = 'left_app';
-    if (ev.type === 'returned') current = 'focus';
-  }
-
-  const remaining = endMs - cursor;
-  if (remaining > 500) {
-    segments.push({ type: current, widthPct: (remaining / totalMs) * 100 });
-  }
-
-  return segments.length ? segments : [{ type: 'focus', widthPct: 100 }];
-}
-
-function segmentColor(type: SegmentType, accent: string): string {
-  if (type === 'focus')    return accent;
-  if (type === 'pause')    return 'rgba(255,255,255,0.22)';
-  return 'rgba(255,80,80,0.55)';
-}
-
-// ── 格式化 ────────────────────────────────────
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
@@ -161,6 +81,80 @@ function formatDuration(sec: number): string {
   return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
+// ── 時間軸 ────────────────────────────────────
+type SegmentType = 'focus' | 'pause' | 'left_app';
+
+interface Segment { type: SegmentType; widthPct: number }
+
+function buildSegments(events: SessionEvent[], startedAt: string, totalSec: number): Segment[] {
+  if (!events?.length || totalSec <= 0) return [{ type: 'focus', widthPct: 100 }];
+  const startMs = new Date(startedAt).getTime();
+  const totalMs = totalSec * 1000;
+  const endMs = startMs + totalMs;
+  const filtered = events.filter(e => e.at >= startMs && e.at <= endMs).sort((a, b) => a.at - b.at);
+  const segs: Segment[] = [];
+  let cursor = startMs;
+  let cur: SegmentType = 'focus';
+  for (const ev of filtered) {
+    const dur = ev.at - cursor;
+    if (dur > 500) segs.push({ type: cur, widthPct: (dur / totalMs) * 100 });
+    cursor = ev.at;
+    if (ev.type === 'pause')    cur = 'pause';
+    if (ev.type === 'resume')   cur = 'focus';
+    if (ev.type === 'left_app') cur = 'left_app';
+    if (ev.type === 'returned') cur = 'focus';
+  }
+  const rem = endMs - cursor;
+  if (rem > 500) segs.push({ type: cur, widthPct: (rem / totalMs) * 100 });
+  return segs.length ? segs : [{ type: 'focus', widthPct: 100 }];
+}
+
+function segColor(type: SegmentType, accent: string): string {
+  if (type === 'focus')    return accent;
+  if (type === 'pause')    return 'rgba(0,0,0,0.12)';
+  return 'rgba(220,50,50,0.40)';
+}
+
+// ── 幾何圖示 ──────────────────────────────────
+function ClockIcon({ size = 15, color = '#333' }: { size?: number; color?: string }) {
+  const cx = size / 2, cy = size / 2, r = size / 2 - 1.5;
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={1.3} />
+      <SvgLine x1={cx} y1={cy} x2={cx} y2={cy - r * 0.55} stroke={color} strokeWidth={1.3} strokeLinecap="round" />
+      <SvgLine x1={cx} y1={cy} x2={cx + r * 0.45} y2={cy} stroke={color} strokeWidth={1.3} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function BarsIcon({ size = 15, color = '#333' }: { size?: number; color?: string }) {
+  const bw = size * 0.18, gap = size * 0.10;
+  const hs = [size * 0.38, size * 0.58, size * 0.76];
+  const total = 3 * bw + 2 * gap;
+  const sx = (size - total) / 2;
+  const base = size * 0.86;
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {hs.map((h, i) => (
+        <Rect key={i} x={sx + i * (bw + gap)} y={base - h} width={bw} height={h} rx={0.6} fill={color} opacity={0.35 + i * 0.28} />
+      ))}
+    </Svg>
+  );
+}
+
+function DiamondIcon({ size = 15, color = '#333' }: { size?: number; color?: string }) {
+  const cx = size / 2, cy = size / 2, hw = size * 0.38, hh = size * 0.44;
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Polygon
+        points={`${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`}
+        fill="none" stroke={color} strokeWidth={1.3} strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// ── 主畫面 ────────────────────────────────────
 export default function AnalysisScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -169,19 +163,17 @@ export default function AnalysisScreen() {
   const cardRef = useRef<View>(null);
   const { play } = useSound();
 
-  const discKey: DiscKey = (result.focus_type as DiscKey) ?? 'steadiness';
-  const cfg = DISC_CONFIG[discKey] ?? DISC_CONFIG.steadiness;
+  const qualityScore = result.quality_score ?? 0;
+  const duration     = result.actual_duration ?? 0;
+  const pauses       = result.pause_count ?? 0;
+  const xpGained     = result.xp_gained ?? 0;
+  const startedAt    = result.started_at ?? new Date().toISOString();
+  const events       = result.events ?? [];
+  const taskTitle    = result.task_title;
 
-  const qualityScore  = result.quality_score ?? 0;
-  const duration      = result.actual_duration ?? 0;
-  const pauses        = result.pause_count ?? 0;
-  const xpGained      = result.xp_gained ?? 0;
-  const startedAt     = result.started_at ?? new Date().toISOString();
-  const events        = result.events ?? [];
-
-  const timeOfDay  = getTimeOfDay(startedAt);
-  const startTime  = formatStartTime(startedAt);
-  const segments   = buildSegments(events, startedAt, duration);
+  const level       = getLevel(qualityScore);
+  const dateTime    = formatDateTime(startedAt);
+  const segments    = buildSegments(events, startedAt, duration);
   const hasTimeline = events.length > 0;
 
   const handleShare = async () => {
@@ -189,27 +181,12 @@ export default function AnalysisScreen() {
       const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: '分享我的 FOCO 專注類型' });
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: '分享專注紀錄' });
       } else {
         Alert.alert('無法分享', '此裝置不支援分享功能');
       }
     } catch {
       Alert.alert('錯誤', '截圖失敗，請再試一次');
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('需要權限', '請允許存取相片庫以儲存圖片');
-        return;
-      }
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
-      await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert('已儲存 ✅', '卡片已存入相簿！');
-    } catch {
-      Alert.alert('錯誤', '儲存失敗，請再試一次');
     }
   };
 
@@ -223,125 +200,110 @@ export default function AnalysisScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 截圖卡片 ─────────────────────────── */}
-        <View ref={cardRef} collapsable={false}>
+        {/* ── 分享卡片 ─────────────────────────── */}
+        <View ref={cardRef} collapsable={false} style={[styles.card, { width: CARD_W }]}>
+
+          {/* ── 上半：漸層視覺區 ─────────────────── */}
           <LinearGradient
-            colors={cfg.gradient}
-            start={{ x: 0.1, y: 0 }}
-            end={{ x: 0.9, y: 1 }}
-            style={[styles.card, { width: CARD_W }]}
+            colors={level.gradient}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={[styles.hero, { height: HERO_H }]}
           >
-            {/* 頂部品牌 */}
-            <View style={styles.brandRow}>
-              <Text style={styles.brandName}>FOCO</Text>
-              <Text style={[styles.brandTag, { color: cfg.accent }]}>Focus Type</Text>
+            {/* 品質分數大數字（居中）*/}
+            <View style={[styles.heroCenter, { bottom: OVERLAY_H }]}>
+              <Text style={[styles.heroScore, { color: level.accent }]}>{qualityScore}</Text>
+              <Text style={styles.heroScoreSub}>/100</Text>
             </View>
 
-            <View style={[styles.divider, { backgroundColor: cfg.accentLight }]} />
-
-            {/* 類型主體 */}
-            <View style={styles.typeSection}>
-              <Text style={[styles.typeIcon, { color: cfg.accent }]}>{cfg.icon}</Text>
-              <Text style={[styles.typeName, { color: cfg.accent }]}>{cfg.label}</Text>
-              <Text style={styles.typeZh}>{cfg.zh}</Text>
-              <Text style={styles.tagline}>{cfg.tagline}</Text>
-              {/* 時段標籤 */}
-              <View style={[styles.timeTag, { backgroundColor: cfg.accentLight, borderColor: cfg.accent + '40' }]}>
-                <Text style={[styles.timeTagText, { color: cfg.accent }]}>
-                  {timeOfDay}  {startTime} 開始
-                </Text>
+            {/* 品牌 + FOCO */}
+            <View style={styles.heroTop}>
+              <Text style={styles.heroBrand}>FOCO</Text>
+              <View style={[styles.timeChip, { borderColor: level.accent + '40' }]}>
+                <Text style={[styles.timeChipText, { color: level.accent }]}>{dateTime}</Text>
               </View>
             </View>
 
-            {/* 特質標籤 */}
-            <View style={styles.traitsRow}>
-              {cfg.traits.map((t) => (
-                <View key={t} style={[styles.traitPill, { backgroundColor: cfg.accentLight, borderColor: cfg.accent + '60' }]}>
-                  <Text style={[styles.traitText, { color: cfg.accent }]}>{t}</Text>
-                </View>
-              ))}
+            {/* 覆蓋資訊條 */}
+            <View style={[styles.overlayStrip, { height: OVERLAY_H }]}>
+              <Text style={styles.overlayTitle}>Focus Complete</Text>
+              <TouchableOpacity style={styles.overlayPill} onPress={() => { play('tap'); handleShare(); }} activeOpacity={0.8}>
+                <Text style={styles.overlayPillText}>Share ↗</Text>
+              </TouchableOpacity>
             </View>
+          </LinearGradient>
 
-            {/* 品質分條 */}
-            <View style={styles.qualitySection}>
-              <View style={styles.qualityLabelRow}>
-                <Text style={styles.qualityLabel}>專注品質</Text>
-                <Text style={[styles.qualityScore, { color: cfg.accent }]}>
-                  {qualityScore}<Text style={styles.qualityMax}> / 100</Text>
-                </Text>
-              </View>
+          {/* ── 下半：白底數據區 ──────────────────── */}
+          <View style={styles.dataSection}>
+
+            {/* 品質進度條 */}
+            <View style={styles.qualityBlock}>
               <View style={styles.qualityTrack}>
-                <View style={[styles.qualityFill, { width: `${qualityScore}%` as any, backgroundColor: cfg.accent }]} />
+                <View style={[styles.qualityFill, { width: `${qualityScore}%` as any, backgroundColor: level.accent }]} />
               </View>
+              <Text style={styles.qualityCaption}>專注品質</Text>
             </View>
+
+            <View style={styles.hairline} />
+
+            {/* 標語 */}
+            <Text style={styles.tagline}>{level.tagline}</Text>
+
+            {/* 完成任務 */}
+            {taskTitle ? (
+              <View style={styles.taskRow}>
+                <Text style={[styles.taskCheck, { color: level.accent }]}>✓</Text>
+                <Text style={styles.taskTitle} numberOfLines={1}>{taskTitle}</Text>
+              </View>
+            ) : null}
 
             {/* 時間軸 */}
             {hasTimeline && (
-              <View style={styles.timelineSection}>
-                <Text style={styles.timelineLabel}>專注時間軸</Text>
+              <View style={styles.timelineBlock}>
                 <View style={styles.timelineBar}>
                   {segments.map((seg, i) => (
                     <View
                       key={i}
                       style={[
-                        styles.timelineSegment,
+                        styles.timelineSeg,
                         {
                           width: `${seg.widthPct}%` as any,
-                          backgroundColor: segmentColor(seg.type, cfg.accent),
-                          borderRadius: i === 0 ? 4 : i === segments.length - 1 ? 4 : 0,
+                          backgroundColor: segColor(seg.type, level.accent),
+                          borderRadius: i === 0 || i === segments.length - 1 ? 3 : 0,
                         },
                       ]}
                     />
                   ))}
                 </View>
-                <View style={styles.timelineLegend}>
-                  <LegendDot color={cfg.accent} label="專注" />
-                  <LegendDot color="rgba(255,255,255,0.22)" label="暫停" />
-                  <LegendDot color="rgba(255,80,80,0.55)" label="離開" />
-                </View>
               </View>
             )}
 
-            {/* 數據行 */}
+            <View style={styles.hairline} />
+
+            {/* 數據欄 */}
             <View style={styles.statsRow}>
-              <StatCell label="時長" value={formatDuration(duration)} accent={cfg.accent} />
-              <View style={[styles.statDivider, { backgroundColor: cfg.accentLight }]} />
-              <StatCell label="暫停" value={`${pauses} 次`} accent={cfg.accent} />
+              <StatCol icon="clock"   value={formatDuration(duration)} label="Duration"  accent={level.accent} />
+              <View style={styles.colDivider} />
+              <StatCol icon="bars"    value={`${pauses}`}              label="Pauses"    accent={level.accent} />
+              <View style={styles.colDivider} />
+              <StatCol icon="diamond" value={`+${xpGained}`}           label="XP Gained" accent={level.accent} />
             </View>
 
-            {/* 描述文字 */}
-            <Text style={styles.desc}>{cfg.desc}</Text>
-
-            <View style={[styles.divider, { backgroundColor: cfg.accentLight, marginTop: 20 }]} />
-
-            {/* 底部 */}
-            <View style={styles.footerRow}>
-              <Text style={styles.footerBrand}>foco.app</Text>
-              <Text style={[styles.footerHash, { color: cfg.accent + 'cc' }]}>{cfg.hashtag}</Text>
-            </View>
-          </LinearGradient>
+            <Text style={styles.cardFooter}>foco.app</Text>
+          </View>
         </View>
 
-        {/* ── 操作按鈕 ─────────────────────────── */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.shareBtn, { backgroundColor: cfg.accent }]}
-            onPress={() => { play('tap'); handleShare(); }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.shareBtnText}>分享結果 ↗</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.saveBtn}
-            onPress={() => { play('tap'); handleSave(); }}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.saveBtnText}>存圖片</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ── 分享按鈕 ─────────────────────────── */}
+        <TouchableOpacity
+          style={[styles.shareBtn, { width: CARD_W }]}
+          onPress={() => { play('tap'); handleShare(); }}
+          activeOpacity={0.82}
+        >
+          <Text style={styles.shareBtnText}>Share ↗</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.homeBtn}
+          style={[styles.homeBtn, { width: CARD_W }]}
           onPress={() => { play('transition_down'); router.replace('/(app)/home'); }}
           activeOpacity={0.85}
         >
@@ -352,23 +314,25 @@ export default function AnalysisScreen() {
   );
 }
 
-function StatCell({ label, value, accent }: { label: string; value: string; accent: string }) {
+function StatCol({ icon, value, label, accent }: {
+  icon: 'clock' | 'bars' | 'diamond'; value: string; label: string; accent: string;
+}) {
   return (
-    <View style={styles.statCell}>
-      <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={colStyles.col}>
+      {icon === 'clock'   && <ClockIcon   size={14} color={accent} />}
+      {icon === 'bars'    && <BarsIcon    size={14} color={accent} />}
+      {icon === 'diamond' && <DiamondIcon size={14} color={accent} />}
+      <Text style={colStyles.value}>{value}</Text>
+      <Text style={colStyles.label}>{label}</Text>
     </View>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text style={styles.legendText}>{label}</Text>
-    </View>
-  );
-}
+const colStyles = StyleSheet.create({
+  col:   { flex: 1, alignItems: 'center', gap: 4 },
+  value: { fontSize: 15, fontWeight: '700', color: 'rgba(0,0,0,0.80)', letterSpacing: -0.3 },
+  label: { fontSize: 9, color: 'rgba(0,0,0,0.35)', letterSpacing: 0.8, textTransform: 'uppercase' },
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -376,181 +340,149 @@ const styles = StyleSheet.create({
   scrollContent: { alignItems: 'center', paddingTop: 8, paddingHorizontal: 16 },
 
   card: {
-    borderRadius: 28,
-    padding: 28,
+    borderRadius: 24,
     overflow: 'hidden',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    elevation: 8,
   },
 
-  brandRow: {
+  // Hero
+  hero: { paddingHorizontal: 20, paddingTop: 18 },
+
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroBrand: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.60)',
+    letterSpacing: 2.5,
+  },
+  timeChip: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  timeChipText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
+
+  heroCenter: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroScore: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 72,
+    letterSpacing: -3,
+    lineHeight: 80,
+    includeFontPadding: false,
+  },
+  heroScoreSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.38)',
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    marginTop: -4,
+  },
+
+  overlayStrip: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.40)',
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
-  brandName: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 20,
-    color: 'rgba(255,255,255,0.9)',
-    letterSpacing: 2,
-  },
-  brandTag: {
-    fontSize: 11,
+  overlayTitle: {
+    fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
+  overlayPill: {
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  overlayPillText: { fontSize: 11, fontWeight: '700', color: '#111', letterSpacing: 0.2 },
+
+  // Data section
+  dataSection: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
 
-  divider: { height: 1, borderRadius: 1, marginBottom: 24 },
+  qualityBlock: { marginBottom: 10 },
+  qualityTrack: {
+    height: 3, borderRadius: 3,
+    backgroundColor: 'rgba(0,0,0,0.07)',
+    overflow: 'hidden', marginBottom: 5,
+  },
+  qualityFill: { height: 3, borderRadius: 3 },
+  qualityCaption: { fontSize: 9, color: 'rgba(0,0,0,0.32)', letterSpacing: 1.0, textTransform: 'uppercase' },
 
-  typeSection: { alignItems: 'center', marginBottom: 20 },
-  typeIcon: { fontSize: 36, marginBottom: 8 },
-  typeName: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 34,
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  typeZh: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.55)',
-    fontWeight: '500',
-    marginBottom: 8,
-    letterSpacing: 1,
-  },
+  hairline: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(0,0,0,0.08)', marginVertical: 12 },
+
   tagline: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.70)',
-    letterSpacing: 0.3,
-    marginBottom: 12,
-  },
-  timeTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  timeTagText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
-
-  traitsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  traitPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  traitText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
-
-  qualitySection: { marginBottom: 20 },
-  qualityLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 8,
-  },
-  qualityLabel: { fontSize: 12, color: 'rgba(255,255,255,0.50)', letterSpacing: 0.5 },
-  qualityScore: { fontFamily: 'Fraunces_500Medium', fontSize: 22 },
-  qualityMax: { fontSize: 12, color: 'rgba(255,255,255,0.40)', fontFamily: 'System' },
-  qualityTrack: {
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    overflow: 'hidden',
-  },
-  qualityFill: { height: 4, borderRadius: 4 },
-
-  timelineSection: { marginBottom: 20 },
-  timelineLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.45)',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  timelineBar: {
-    height: 8,
-    borderRadius: 4,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    gap: 1,
-  },
-  timelineSegment: { height: 8 },
-  timelineLegend: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 8,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 10, color: 'rgba(255,255,255,0.40)' },
-
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  statCell: { flex: 1, alignItems: 'center', gap: 3 },
-  statValue: { fontSize: 17, fontWeight: '700' },
-  statLabel: { fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: 0.3 },
-  statDivider: { width: 1, height: 32, borderRadius: 1 },
-
-  desc: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.65)',
-    lineHeight: 20,
-    textAlign: 'center',
+    color: 'rgba(0,0,0,0.46)',
     letterSpacing: 0.1,
+    fontStyle: 'italic',
+    marginBottom: 10,
   },
 
-  footerRow: {
+  taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 16,
+    gap: 6,
+    marginBottom: 10,
   },
-  footerBrand: { fontSize: 12, color: 'rgba(255,255,255,0.35)', letterSpacing: 1 },
-  footerHash: { fontSize: 11, letterSpacing: 0.2 },
+  taskCheck: { fontSize: 13, fontWeight: '700' },
+  taskTitle: { fontSize: 13, fontWeight: '600', color: 'rgba(0,0,0,0.65)', flex: 1 },
 
-  actions: { flexDirection: 'row', gap: 10, marginTop: 20, width: CARD_W },
+  timelineBlock: { marginBottom: 10 },
+  timelineBar: {
+    height: 5, borderRadius: 3,
+    flexDirection: 'row', overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.06)', gap: 1,
+  },
+  timelineSeg: { height: 5 },
+
+  statsRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 },
+  colDivider: { width: StyleSheet.hairlineWidth, height: 34, backgroundColor: 'rgba(0,0,0,0.08)' },
+
+  cardFooter: {
+    marginTop: 14,
+    fontSize: 10,
+    color: 'rgba(0,0,0,0.20)',
+    letterSpacing: 1.4,
+    textAlign: 'center',
+    fontFamily: 'Fraunces_500Medium',
+  },
+
   shareBtn: {
-    flex: 2,
-    paddingVertical: 15,
-    borderRadius: 16,
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 999,
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.30,
-    shadowRadius: 16,
-    elevation: 6,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  shareBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
-  saveBtn: {
-    flex: 1,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  saveBtnText: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
-  homeBtn: {
-    marginTop: 10,
-    width: CARD_W,
-    paddingVertical: 16,
-    borderRadius: 9999,
-    alignItems: 'center',
-  },
-  homeBtnText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.45)',
-    letterSpacing: 1,
-  },
+  shareBtnText: { fontSize: 14, fontWeight: '700', color: '#111', letterSpacing: 0.3 },
+
+  homeBtn: { marginTop: 8, paddingVertical: 16, alignItems: 'center' },
+  homeBtnText: { fontSize: 13, color: 'rgba(255,255,255,0.38)', letterSpacing: 1 },
 });

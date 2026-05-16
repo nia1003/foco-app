@@ -8,6 +8,7 @@ import { TabBar } from '@/components/layout/TabBar';
 export default function AppLayout() {
   return (
     <Tabs
+      initialRouteName="home"
       tabBar={() => <TabBar />}
       screenOptions={{ headerShown: false }}
     >
@@ -23,6 +24,7 @@ export default function AppLayout() {
       <Tabs.Screen name="pet-info"       options={{ href: null }} />
       <Tabs.Screen name="pet-collection" options={{ href: null }} />
       <Tabs.Screen name="settings"       options={{ href: null }} />
+      <Tabs.Screen name="day-log"        options={{ href: null }} />
     </Tabs>
   );
 }

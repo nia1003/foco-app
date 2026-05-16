@@ -148,6 +148,9 @@ export interface SessionRecord {
   // 追蹤欄位（sessions table 儲存，歷史報告頁會用到）
   pause_count?: number;
   left_app_count?: number;
+  quality_score?: number;
+  started_at?: string;
+  tasks?: { title: string }[] | { title: string } | null;  // join from tasks table (Supabase)
 }
 
 // POST /functions/v1/session-complete 的 request body
@@ -186,6 +189,7 @@ export interface SessionResult {
   ended_at?: string;           // ISO string — Edge Function 回傳
   events?: SessionEvent[];     // 個別事件 — 用於時間軸視覺化
   old_xp?: number;             // 本次 session 前的 XP（用於進度條起始位置）
+  task_title?: string;         // 完成的任務名稱
 }
 
 // 單次事件紀錄（在 useTimer 內部累積）
@@ -204,4 +208,22 @@ export interface TimerSnapshot {
   leftAppTotalSec: number;
   taskId: string | null;
   events: SessionEvent[];    // 個別事件時間軸
+}
+
+// ── Calendar / Day-log ────────────────────────
+export interface SessionSummary {
+  id: string;
+  duration_min: number;
+  task_title: string | null;
+  quality_score: number;
+  xp_earned: number;
+  completed: boolean;
+  started_at: string;
+  ended_at: string;
+}
+
+export interface DayData {
+  date: string;           // 'YYYY-MM-DD'
+  session_count: number;
+  sessions: SessionSummary[];
 }

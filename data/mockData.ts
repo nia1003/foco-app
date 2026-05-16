@@ -7,6 +7,7 @@ import type {
   FocoPet,
   SessionRecord,
   Task,
+  DayData,
 } from '@/types';
 
 export const mockSessionResult: SessionResult = {
@@ -103,6 +104,62 @@ export const mockSessions: {
     total_sessions: 8,
   },
 };
+
+export const mockCalendarData: DayData[] = [
+  {
+    date: '2026-05-02',
+    session_count: 1,
+    sessions: [{ id: 'mc1', duration_min: 25, task_title: 'Morning review', quality_score: 78, xp_earned: 22, completed: true, started_at: '2026-05-02T09:00:00Z', ended_at: '2026-05-02T09:25:00Z' }],
+  },
+  {
+    date: '2026-05-05',
+    session_count: 2,
+    sessions: [
+      { id: 'mc2', duration_min: 45, task_title: 'Data structure', quality_score: 88, xp_earned: 35, completed: true, started_at: '2026-05-05T10:00:00Z', ended_at: '2026-05-05T10:45:00Z' },
+      { id: 'mc3', duration_min: 25, task_title: null, quality_score: 65, xp_earned: 15, completed: true, started_at: '2026-05-05T15:00:00Z', ended_at: '2026-05-05T15:25:00Z' },
+    ],
+  },
+  {
+    date: '2026-05-07',
+    session_count: 1,
+    sessions: [{ id: 'mc4', duration_min: 50, task_title: 'Algorithm study', quality_score: 92, xp_earned: 45, completed: true, started_at: '2026-05-07T09:00:00Z', ended_at: '2026-05-07T09:50:00Z' }],
+  },
+  {
+    date: '2026-05-10',
+    session_count: 3,
+    sessions: [
+      { id: 'mc5', duration_min: 25, task_title: 'Reading', quality_score: 80, xp_earned: 25, completed: true, started_at: '2026-05-10T08:00:00Z', ended_at: '2026-05-10T08:25:00Z' },
+      { id: 'mc6', duration_min: 25, task_title: 'Reading', quality_score: 75, xp_earned: 20, completed: true, started_at: '2026-05-10T14:00:00Z', ended_at: '2026-05-10T14:25:00Z' },
+      { id: 'mc7', duration_min: 50, task_title: 'Exam prep', quality_score: 88, xp_earned: 38, completed: true, started_at: '2026-05-10T19:00:00Z', ended_at: '2026-05-10T19:50:00Z' },
+    ],
+  },
+  {
+    date: '2026-05-12',
+    session_count: 1,
+    sessions: [{ id: 'mc8', duration_min: 45, task_title: 'Project work', quality_score: 70, xp_earned: 25, completed: true, started_at: '2026-05-12T11:00:00Z', ended_at: '2026-05-12T11:45:00Z' }],
+  },
+  {
+    date: '2026-05-14',
+    session_count: 2,
+    sessions: [
+      { id: 'mc9', duration_min: 25, task_title: 'Coding practice', quality_score: 85, xp_earned: 30, completed: true, started_at: '2026-05-14T09:30:00Z', ended_at: '2026-05-14T09:55:00Z' },
+      { id: 'mc10', duration_min: 50, task_title: 'System design', quality_score: 90, xp_earned: 42, completed: true, started_at: '2026-05-14T14:00:00Z', ended_at: '2026-05-14T14:50:00Z' },
+    ],
+  },
+  {
+    date: '2026-05-17',
+    session_count: 2,
+    sessions: [
+      { id: 'mc11', duration_min: 45, task_title: 'focus for data structure exam', quality_score: 85, xp_earned: 32, completed: true, started_at: '2026-05-17T09:00:00Z', ended_at: '2026-05-17T09:45:00Z' },
+      { id: 'mc12', duration_min: 25, task_title: null, quality_score: 72, xp_earned: 18, completed: true, started_at: '2026-05-17T15:00:00Z', ended_at: '2026-05-17T15:25:00Z' },
+    ],
+  },
+];
+
+export function getMockCalendarData(year: number, month: number): DayData[] {
+  const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+  return mockCalendarData.filter((d) => d.date.startsWith(prefix));
+}
 
 export const mockTasks: { tasks: Task[] } = {
   tasks: [
