@@ -99,6 +99,8 @@ export default function FocusScreen() {
     );
     const completed = actualDuration >= snap.plannedDuration * 0.9;
 
+    const startedAtISO = new Date(snap.startedAt).toISOString();
+
     const payload: SessionPayload = {
       user_id: userId ?? 'unknown',
       pet_id: storePet?.id ?? 'unknown',
@@ -111,13 +113,16 @@ export default function FocusScreen() {
       left_app_total_sec: Math.round(snap.leftAppTotalSec),
       completed,
       early_stop: earlyStop && !completed,
-      started_at: new Date(snap.startedAt).toISOString(),
+      started_at: startedAtISO,
+      events: snap.events,
     };
 
     const localStats = {
       actual_duration: actualDuration,
       pause_count: snap.pauseCount,
       left_app_count: snap.leftAppCount,
+      started_at: startedAtISO,
+      events: snap.events,
     };
 
     try {

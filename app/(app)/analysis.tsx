@@ -1,6 +1,7 @@
 /**
  * AnalysisScreen — DISC 專注報告
  * 可截圖分享的個性化 DISC 卡片（社群媒體分享設計）
+ * 包含：時間軸視覺化、時段分析、品質分數
  */
 import React, { useRef } from 'react';
 import {
@@ -21,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FocoBar } from '@/components/layout/FocoBar';
-import type { SessionResult } from '@/types';
+import type { SessionResult, SessionEvent } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_W = SCREEN_W - 32;
@@ -80,6 +81,79 @@ const DISC_CONFIG = {
 
 type DiscKey = keyof typeof DISC_CONFIG;
 
+// ── 時段判斷 ──────────────────────────────────
+function getTimeOfDay(startedAt: string): string {
+  const hour = new Date(startedAt).getHours();
+  if (hour < 6)  return '🌙 深夜';
+  if (hour < 12) return '🌅 早上';
+  if (hour < 17) return '☀️ 下午';
+  if (hour < 21) return '🌆 傍晚';
+  return '🌙 夜晚';
+}
+
+function formatStartTime(startedAt: string): string {
+  const d = new Date(startedAt);
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+// ── 時間軸分段 ────────────────────────────────
+type SegmentType = 'focus' | 'pause' | 'left_app';
+
+interface Segment {
+  type: SegmentType;
+  widthPct: number;
+}
+
+function buildSegments(
+  events: SessionEvent[],
+  startedAt: string,
+  totalSec: number,
+): Segment[] {
+  if (!events?.length || totalSec <= 0) {
+    return [{ type: 'focus', widthPct: 100 }];
+  }
+
+  const startMs = new Date(startedAt).getTime();
+  const totalMs = totalSec * 1000;
+  const endMs = startMs + totalMs;
+
+  const filtered = events
+    .filter(e => e.at >= startMs && e.at <= endMs)
+    .sort((a, b) => a.at - b.at);
+
+  const segments: Segment[] = [];
+  let cursor = startMs;
+  let current: SegmentType = 'focus';
+
+  for (const ev of filtered) {
+    const dur = ev.at - cursor;
+    if (dur > 500) {
+      segments.push({ type: current, widthPct: (dur / totalMs) * 100 });
+    }
+    cursor = ev.at;
+    if (ev.type === 'pause')    current = 'pause';
+    if (ev.type === 'resume')   current = 'focus';
+    if (ev.type === 'left_app') current = 'left_app';
+    if (ev.type === 'returned') current = 'focus';
+  }
+
+  const remaining = endMs - cursor;
+  if (remaining > 500) {
+    segments.push({ type: current, widthPct: (remaining / totalMs) * 100 });
+  }
+
+  return segments.length ? segments : [{ type: 'focus', widthPct: 100 }];
+}
+
+function segmentColor(type: SegmentType, accent: string): string {
+  if (type === 'focus')    return accent;
+  if (type === 'pause')    return 'rgba(255,255,255,0.22)';
+  return 'rgba(255,80,80,0.55)';
+}
+
+// ── 格式化 ────────────────────────────────────
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
@@ -98,10 +172,17 @@ export default function AnalysisScreen() {
   const discKey: DiscKey = (result.focus_type as DiscKey) ?? 'steadiness';
   const cfg = DISC_CONFIG[discKey] ?? DISC_CONFIG.steadiness;
 
-  const qualityScore = result.quality_score ?? 0;
-  const duration = result.actual_duration ?? 0;
-  const pauses = result.pause_count ?? 0;
-  const xpGained = result.xp_gained ?? 0;
+  const qualityScore  = result.quality_score ?? 0;
+  const duration      = result.actual_duration ?? 0;
+  const pauses        = result.pause_count ?? 0;
+  const xpGained      = result.xp_gained ?? 0;
+  const startedAt     = result.started_at ?? new Date().toISOString();
+  const events        = result.events ?? [];
+
+  const timeOfDay  = getTimeOfDay(startedAt);
+  const startTime  = formatStartTime(startedAt);
+  const segments   = buildSegments(events, startedAt, duration);
+  const hasTimeline = events.length > 0;
 
   const handleShare = async () => {
     try {
@@ -156,7 +237,6 @@ export default function AnalysisScreen() {
               <Text style={[styles.brandTag, { color: cfg.accent }]}>Focus Type</Text>
             </View>
 
-            {/* 分隔線 */}
             <View style={[styles.divider, { backgroundColor: cfg.accentLight }]} />
 
             {/* 類型主體 */}
@@ -165,6 +245,12 @@ export default function AnalysisScreen() {
               <Text style={[styles.typeName, { color: cfg.accent }]}>{cfg.label}</Text>
               <Text style={styles.typeZh}>{cfg.zh}</Text>
               <Text style={styles.tagline}>{cfg.tagline}</Text>
+              {/* 時段標籤 */}
+              <View style={[styles.timeTag, { backgroundColor: cfg.accentLight, borderColor: cfg.accent + '40' }]}>
+                <Text style={[styles.timeTagText, { color: cfg.accent }]}>
+                  {timeOfDay}  {startTime} 開始
+                </Text>
+              </View>
             </View>
 
             {/* 特質標籤 */}
@@ -180,12 +266,41 @@ export default function AnalysisScreen() {
             <View style={styles.qualitySection}>
               <View style={styles.qualityLabelRow}>
                 <Text style={styles.qualityLabel}>專注品質</Text>
-                <Text style={[styles.qualityScore, { color: cfg.accent }]}>{qualityScore}<Text style={styles.qualityMax}> / 100</Text></Text>
+                <Text style={[styles.qualityScore, { color: cfg.accent }]}>
+                  {qualityScore}<Text style={styles.qualityMax}> / 100</Text>
+                </Text>
               </View>
               <View style={styles.qualityTrack}>
                 <View style={[styles.qualityFill, { width: `${qualityScore}%` as any, backgroundColor: cfg.accent }]} />
               </View>
             </View>
+
+            {/* 時間軸 */}
+            {hasTimeline && (
+              <View style={styles.timelineSection}>
+                <Text style={styles.timelineLabel}>專注時間軸</Text>
+                <View style={styles.timelineBar}>
+                  {segments.map((seg, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.timelineSegment,
+                        {
+                          width: `${seg.widthPct}%` as any,
+                          backgroundColor: segmentColor(seg.type, cfg.accent),
+                          borderRadius: i === 0 ? 4 : i === segments.length - 1 ? 4 : 0,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+                <View style={styles.timelineLegend}>
+                  <LegendDot color={cfg.accent} label="專注" />
+                  <LegendDot color="rgba(255,255,255,0.22)" label="暫停" />
+                  <LegendDot color="rgba(255,80,80,0.55)" label="離開" />
+                </View>
+              </View>
+            )}
 
             {/* 數據行 */}
             <View style={styles.statsRow}>
@@ -199,10 +314,9 @@ export default function AnalysisScreen() {
             {/* 描述文字 */}
             <Text style={styles.desc}>{cfg.desc}</Text>
 
-            {/* 底部分隔線 */}
             <View style={[styles.divider, { backgroundColor: cfg.accentLight, marginTop: 20 }]} />
 
-            {/* 底部品牌 + hashtag */}
+            {/* 底部 */}
             <View style={styles.footerRow}>
               <Text style={styles.footerBrand}>foco.app</Text>
               <Text style={[styles.footerHash, { color: cfg.accent + 'cc' }]}>{cfg.hashtag}</Text>
@@ -249,12 +363,20 @@ function StatCell({ label, value, accent }: { label: string; value: string; acce
   );
 }
 
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center', paddingTop: 8, paddingHorizontal: 16 },
 
-  // ── Card ─────────────────────────────────
   card: {
     borderRadius: 28,
     padding: 28,
@@ -301,7 +423,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.70)',
     letterSpacing: 0.3,
+    marginBottom: 12,
   },
+  timeTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  timeTagText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
 
   traitsRow: {
     flexDirection: 'row',
@@ -336,6 +466,31 @@ const styles = StyleSheet.create({
   },
   qualityFill: { height: 4, borderRadius: 4 },
 
+  timelineSection: { marginBottom: 20 },
+  timelineLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.45)',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  timelineBar: {
+    height: 8,
+    borderRadius: 4,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    gap: 1,
+  },
+  timelineSegment: { height: 8 },
+  timelineLegend: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 8,
+  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 10, color: 'rgba(255,255,255,0.40)' },
+
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -366,13 +521,7 @@ const styles = StyleSheet.create({
   footerBrand: { fontSize: 12, color: 'rgba(255,255,255,0.35)', letterSpacing: 1 },
   footerHash: { fontSize: 11, letterSpacing: 0.2 },
 
-  // ── Buttons ────────────────────────────────
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
-    width: CARD_W,
-  },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 20, width: CARD_W },
   shareBtn: {
     flex: 2,
     paddingVertical: 15,
