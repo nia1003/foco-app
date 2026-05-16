@@ -30,7 +30,7 @@ export const mockPet: FocoPet = {
   xp_next_level: 250,
 };
 
-// Multi-pet mock — used after petStore refactor
+// Multi-pet mock — all 4 pets, mirrors what DB creates at signup
 export const mockPets: FocoPet[] = [
   {
     id: 'mock-pet-001',
@@ -54,6 +54,14 @@ export const mockPets: FocoPet[] = [
     name: 'Fluff',
     level: 1,
     xp: 20,
+    xp_next_level: 100,
+  },
+  {
+    id: 'mock-pet-004',
+    owner_id: 'mock-user-001',
+    name: 'Stay',
+    level: 1,
+    xp: 0,
     xp_next_level: 100,
   },
 ];

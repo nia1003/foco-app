@@ -25,7 +25,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { getPets, getTasks } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
-import type { FocoPet, Task } from '@/types';
+import type { Task } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PET_CARD_W = Math.round(SCREEN_W * 0.58);
@@ -35,14 +35,8 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 const PINK_TEXT = '#b5607a';
 
-function mergeWithMock(real: FocoPet[]): FocoPet[] {
-  return mockPets.map((mock) => {
-    const found = real.find(
-      (r) => r.name.toLowerCase() === mock.name.toLowerCase() || r.id === mock.id,
-    );
-    return found ?? mock;
-  });
-}
+// Unlocked pet definitions in display order — same list pet-collection uses
+const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -50,7 +44,8 @@ export default function HomeScreen() {
   const { pets, activePet, setPets, setActivePet, restoreActivePet } = usePetStore();
   const { play } = useSound();
 
-  const displayPets: FocoPet[] = pets.length > 0 ? mergeWithMock(pets) : mockPets;
+  // Pool to look up XP/level — real store data or full 4-pet mock
+  const storePool = pets.length > 0 ? pets : mockPets;
 
   // ── Focus modal state ──────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
@@ -82,7 +77,7 @@ export default function HomeScreen() {
   const timeGreet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'there';
 
-  const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
+  const modalPets = pets.length > 0 ? pets : mockPets;
 
   return (
     <View style={styles.root}>
@@ -120,16 +115,13 @@ export default function HomeScreen() {
             snapToInterval={PET_CARD_W + 12}
             snapToAlignment="start"
           >
-            {displayPets.map((p) => {
-              const def =
-                PETS.find((d) => d.id === p.name.toLowerCase()) ??
-                PETS.find((d) => d.id === 'xingwang') ??
-                PETS[0];
+            {UNLOCKED_DEFS.map((def) => {
+              const p = storePool.find((r) => r.name.toLowerCase() === def.id) ?? storePool[0];
               const xpPct = p.xp_next_level > 0 ? p.xp / p.xp_next_level : 0;
 
               return (
                 <TouchableOpacity
-                  key={p.id}
+                  key={def.id}
                   style={[styles.petCard, { width: PET_CARD_W }]}
                   onPress={() => router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } })}
                   activeOpacity={0.88}
