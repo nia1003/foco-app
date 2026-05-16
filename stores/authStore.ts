@@ -1,68 +1,54 @@
 // ─────────────────────────────────────────────
-// Auth Store — 登入狀態、Token 管理
+// Auth Store — Supabase session 管理
+// 取代原本的 SecureStore JWT 版本
 // ─────────────────────────────────────────────
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
-import { TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/constants/config';
-import type { AuthTokens, UserProfile } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 interface AuthState {
-  // State
   isAuthenticated: boolean;
   isLoading: boolean;
-  accessToken: string | null;
-  refreshToken: string | null;
-  user: UserProfile | null;
+  userId: string | null;
+  userEmail: string | null;
 
-  // Actions
-  login: (tokens: AuthTokens, user: UserProfile) => Promise<void>;
-  logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
-  setUser: (user: UserProfile) => void;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
-  accessToken: null,
-  refreshToken: null,
-  user: null,
-
-  login: async (tokens, user) => {
-    await SecureStore.setItemAsync(TOKEN_KEY, tokens.accessToken);
-    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    set({
-      isAuthenticated: true,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      user,
-    });
-  },
-
-  logout: async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-    set({
-      isAuthenticated: false,
-      accessToken: null,
-      refreshToken: null,
-      user: null,
-    });
-  },
+  userId: null,
+  userEmail: null,
 
   restoreSession: async () => {
     try {
-      const accessToken = await SecureStore.getItemAsync(TOKEN_KEY);
-      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-      if (accessToken && refreshToken) {
-        set({ isAuthenticated: true, accessToken, refreshToken });
-      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      set({
+        isAuthenticated: !!session,
+        userId: session?.user.id ?? null,
+        userEmail: session?.user.email ?? null,
+        isLoading: false,
+      });
+
+      // 監聽後續的登入 / 登出事件
+      supabase.auth.onAuthStateChange((_event, session) => {
+        set({
+          isAuthenticated: !!session,
+          userId: session?.user.id ?? null,
+          userEmail: session?.user.email ?? null,
+        });
+      });
     } catch {
-      // Token 讀取失敗，保持未登入狀態
-    } finally {
       set({ isLoading: false });
     }
   },
 
-  setUser: (user) => set({ user }),
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({ isAuthenticated: false, userId: null, userEmail: null });
+  },
 }));

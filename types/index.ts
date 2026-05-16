@@ -103,3 +103,84 @@ export interface ApiError {
   code: string;
   statusCode: number;
 }
+
+// ─────────────────────────────────────────────
+// FOCO 專用型別
+// ─────────────────────────────────────────────
+
+export type FocusType =
+  | 'conscientiousness'
+  | 'dominance'
+  | 'steadiness'
+  | 'influence';
+
+// Supabase pets table 的資料結構
+export interface FocoPet {
+  id: string;
+  owner_id: string;
+  name: string;
+  level: number;       // 1–5
+  xp: number;
+  xp_next_level: number;
+}
+
+// tasks table
+export interface Task {
+  id: string;
+  user_id: string;
+  title: string;
+  duration_min: number;
+  status: 'pending' | 'done';
+  created_at: string;
+}
+
+// sessions table（歷史清單用）
+export interface SessionRecord {
+  id: string;
+  actual_duration: number;   // 秒
+  completed: boolean;
+  focus_type_result: FocusType;
+  xp_earned: number;
+  ended_at: string;
+}
+
+// POST /functions/v1/session-complete 的 request body
+export interface SessionPayload {
+  user_id: string;
+  task_id: string | null;
+  planned_duration: number;    // 秒
+  actual_duration: number;     // 秒
+  pause_count: number;
+  pause_total_sec: number;
+  left_app_count: number;
+  left_app_total_sec: number;
+  completed: boolean;
+  early_stop: boolean;
+  started_at: string;          // ISO string
+}
+
+// Edge Function 回傳（+ focus.tsx 補充的本地計時統計）
+export interface SessionResult {
+  session_id: string;
+  xp_gained: number;
+  new_xp: number;
+  new_level: number;
+  level_up: boolean;
+  focus_type: FocusType;
+  xp_next_level: number;
+  // 由 focus.tsx 在導航前合併進來，讓 analysis 頁可以顯示
+  actual_duration?: number;
+  pause_count?: number;
+  left_app_count?: number;
+}
+
+// useTimer.getSnapshot() 的快照格式
+export interface TimerSnapshot {
+  plannedDuration: number;   // 秒
+  startedAt: number;         // Date.now()
+  pauseCount: number;
+  pauseTotalSec: number;
+  leftAppCount: number;
+  leftAppTotalSec: number;
+  taskId: string | null;
+}
