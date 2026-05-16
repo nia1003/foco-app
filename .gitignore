@@ -43,3 +43,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Claude Code worktrees (local session artifacts — not part of the repo)
+.claude/worktrees/
