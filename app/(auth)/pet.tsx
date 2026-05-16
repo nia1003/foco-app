@@ -70,7 +70,7 @@ export default function CompanionScreen() {
             <View style={styles.btnWrap}>
               <TouchableOpacity
                 style={styles.continueBtn}
-                onPress={() => router.push('/(auth)/consent')}
+                onPress={() => router.push({ pathname: '/(auth)/consent', params: { petId: selected } })}
                 activeOpacity={0.85}
               >
                 <Text style={styles.continueBtnText}>CONTINUE →</Text>

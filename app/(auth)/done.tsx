@@ -4,16 +4,16 @@
  */
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 
-const activePet = PETS[0];
-
 export default function DoneScreen() {
   const router = useRouter();
+  const { petId } = useLocalSearchParams<{ petId?: string }>();
+  const activePet = PETS.find((p) => p.id === petId) ?? PETS[0];
 
   return (
     <View style={styles.root}>
@@ -34,7 +34,7 @@ export default function DoneScreen() {
 
         <Text style={styles.heading}>You're all set!</Text>
         <Text style={styles.sub}>
-          Mochi is ready to focus with you.{'\n'}Let's get started.
+          {activePet.name} is ready to focus with you.{'\n'}Let's get started.
         </Text>
 
         <View style={styles.cardWrap}>
@@ -47,7 +47,7 @@ export default function DoneScreen() {
               <View style={styles.statDivider} />
               <View style={styles.stat}>
                 <Text style={styles.statNum}>Lv.1</Text>
-                <Text style={styles.statLabel}>Mochi</Text>
+                <Text style={styles.statLabel}>{activePet.name}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.stat}>
