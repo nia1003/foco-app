@@ -1,5 +1,5 @@
 /**
- * VerifyScreen — Register Step 2: Enter 6-digit OTP
+ * VerifyScreen — Register Step 2: Enter 4-digit OTP
  */
 import React, { useRef, useState } from 'react';
 import {
@@ -27,7 +27,7 @@ export default function VerifyScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const valid = code.length === 6;
+  const valid = code.length === 4;
 
   const handleVerify = async () => {
     if (!valid || !email) return;
@@ -73,7 +73,7 @@ export default function VerifyScreen() {
 
               <Text style={styles.heading}>Check your inbox</Text>
               <Text style={styles.sub}>
-                We sent a 6-digit code to{'\n'}
+                We sent a 4-digit code to{'\n'}
                 <Text style={styles.emailText}>{email}</Text>
               </Text>
 
@@ -82,11 +82,11 @@ export default function VerifyScreen() {
                 <TextInput
                   style={styles.input}
                   value={code}
-                  onChangeText={(t) => setCode(t.replace(/[^0-9]/g, '').slice(0, 6))}
-                  placeholder="000000"
+                  onChangeText={(t) => setCode(t.replace(/[^0-9]/g, '').slice(0, 4))}
+                  placeholder="0000"
                   placeholderTextColor={Colors.inkFaint}
                   keyboardType="number-pad"
-                  maxLength={6}
+                  maxLength={4}
                   autoFocus
                 />
                 <View style={styles.underline} />
