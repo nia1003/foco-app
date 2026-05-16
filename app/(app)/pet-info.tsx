@@ -47,9 +47,11 @@ export default function PetInfoScreen() {
   const { pets, activePet } = usePetStore();
   const insets = useSafeAreaInsets();
 
-  // Find the specific pet by Supabase UUID or lowercase name; fall back to activePet, then first mock
+  // When the store is empty (backend not yet loaded), fall back to mockPets as the search pool
+  const searchPool = pets.length > 0 ? pets : mockPets;
+  // Find the specific pet by Supabase UUID or lowercase name (e.g. 'xingwang', 'lily')
   const pet =
-    (petId ? pets.find((p) => p.id === petId || p.name.toLowerCase() === petId) : null) ??
+    (petId ? searchPool.find((p) => p.id === petId || p.name.toLowerCase() === petId) : null) ??
     activePet ??
     mockPets[0];
 

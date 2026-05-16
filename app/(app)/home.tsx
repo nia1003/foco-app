@@ -45,7 +45,10 @@ export default function HomeScreen() {
         setPets(pets);
         restoreActivePet();
       })
-      .catch(() => {}); // 後端未好時保持 mock
+      .catch(() => {
+        // 後端未好時把 mock data 塞進 store，讓 petId 路由能正確解析
+        setPets(mockPets);
+      });
   }, [userId]);
 
   // Dynamic greeting
