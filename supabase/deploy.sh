@@ -9,7 +9,7 @@
 
 set -e
 
-PROJECT_REF="your-project-ref"   # ← 改成你的 project ref（Project Settings → General）
+PROJECT_REF="mkdmmadopqgctytzuixw"
 
 echo "🚀 部署 FOCO 後端..."
 
