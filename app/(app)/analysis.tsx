@@ -166,7 +166,7 @@ export default function AnalysisScreen() {
   const qualityScore = result.quality_score ?? 0;
   const duration     = result.actual_duration ?? 0;
   const pauses       = result.pause_count ?? 0;
-  const xpGained     = result.xp_gained ?? 0;
+  const leftApp      = result.left_app_count ?? 0;
   const startedAt    = result.started_at ?? new Date().toISOString();
   const events       = result.events ?? [];
   const taskTitle    = result.task_title;
@@ -286,7 +286,7 @@ export default function AnalysisScreen() {
               <View style={styles.colDivider} />
               <StatCol icon="bars"    value={`${pauses}`}              label="Pauses"    accent={level.accent} />
               <View style={styles.colDivider} />
-              <StatCol icon="diamond" value={`+${xpGained}`}           label="XP Gained" accent={level.accent} />
+              <StatCol icon="diamond" value={`${leftApp}`}             label="Left App"  accent={level.accent} />
             </View>
 
             <Text style={styles.cardFooter}>foco.app</Text>

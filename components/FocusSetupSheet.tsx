@@ -333,7 +333,7 @@ export function FocusSetupSheet({
                         key={p.id}
                         style={[
                           styles.petCard,
-                          active && { borderColor: def.accent, backgroundColor: 'rgba(255,255,255,0.85)' },
+                          active && { borderColor: def.accent },
                         ]}
                         onPress={() => { play('tap'); setSelectedPetId(p.id); }}
                         activeOpacity={0.8}
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 2,
     borderColor: 'transparent',
-    backgroundColor: 'rgba(20,16,28,0.04)',
+    backgroundColor: 'transparent',
     gap: 8,
     position: 'relative',
   },
