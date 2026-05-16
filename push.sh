@@ -1,19 +1,15 @@
 #!/bin/bash
-# FOCO — push all changes to GitHub
 set -e
 cd "$(dirname "$0")"
 rm -f .git/index.lock
 git add -A
-git commit -m "feat: Tabs layout, TabBar auto-hide, signup/profile auth wiring
+git commit -m "fix: TabBar 改為 Home/Missions/Stats，移除 Focus/Sanctuary tab
 
-- app/(app)/_layout.tsx: Stack → Tabs with custom TabBar
-- components/layout/TabBar.tsx: auto-hide on focus/reward/analysis/pet-info routes
-- app/(app)/home.tsx: remove manual TabBar (now from layout)
-- app/(app)/stats.tsx: remove manual TabBar
-- app/(app)/missions/index.tsx: remove manual TabBar
-- app/(app)/focus.tsx: remove manual TabBar
-- app/(auth)/signup.tsx: pass name param to profile, disable button when empty
-- app/(auth)/profile.tsx: receive name, add email+password fields, call authService.signup → pet.tsx"
+- TabId: 'home' | 'missions' | 'stats'（移除 focus, sanctuary）
+- Home icon: 房子 SVG-style
+- href: /(app)/home, /(app)/missions, /(app)/stats
+- isActive 精確比對 home 路由，避免誤判
+- HIDDEN_ROUTES 保留（focus/reward/analysis/pet-info 隱藏 tab bar）"
 git pull --rebase origin main
 git push origin main
 echo ""
