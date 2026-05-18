@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,6 +15,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -462,6 +464,13 @@ export default function MissionsScreen() {
             onPress={() => { setShowModal(false); resetModal(); }}
           />
           <View style={styles.modalSheet}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View>
             <FrostCard radius={28}>
               <Text style={styles.modalTitle}>New Task</Text>
 
@@ -531,6 +540,9 @@ export default function MissionsScreen() {
                 </TouchableOpacity>
               </View>
             </FrostCard>
+            </View>
+            </TouchableWithoutFeedback>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
