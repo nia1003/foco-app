@@ -1,32 +1,166 @@
 /**
  * MissionsScreen — Quest list + My Tasks (FOCO)
- * v4: Start button on any quest/task opens FocusSetupModal (same flow as HomeScreen)
+ * v3: Quest cards 與 My Tasks 格式統一（FrostCard + Start + Delete）
+ *     Quest 使用 local state，可刪除
  */
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { FocusSetupSheet } from '@/components/FocusSetupSheet';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
-import { usePetStore } from '@/stores/petStore';
-import { useSound } from '@/components/SoundProvider';
-import { getTasks, deleteTask } from '@/services/focoService';
-import { mockPets, mockTasks } from '@/data/mockData';
+import { getTasks, createTask, deleteTask } from '@/services/focoService';
+import { mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
-const PINK      = '#F2CEDC';
+// ── 品牌淺粉色 ────────────────────────────────
+const PINK = '#F2CEDC';
 const PINK_TEXT = '#b5607a';
 
+// ── Emoji options ─────────────────────────────
+const EMOJI_OPTIONS = [
+  '📚', '✏️', '💻', '🎯',
+  '💼', '🎨', '🎵', '🏃',
+  '🔬', '🌱', '☕', '💡',
+  '📝', '🎤', '🏋️', '⭐',
+];
+
+// ── Duration Slider（5–120 分鐘）────────────────
+const MIN_DUR = 5;
+const MAX_DUR = 120;
+const THUMB = 28; // thumb diameter
+
+function DurationSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const trackW = useSharedValue(0);
+  const thumbX = useSharedValue(0);
+
+  // Sync thumb when value resets externally (e.g., modal resetModal())
+  useEffect(() => {
+    if (trackW.value === 0) return;
+    const progress = (value - MIN_DUR) / (MAX_DUR - MIN_DUR);
+    thumbX.value = progress * (trackW.value - THUMB);
+  }, [value]);
+
+  const clamp = (x: number): number => {
+    'worklet';
+    return Math.max(0, Math.min(trackW.value - THUMB, x - THUMB / 2));
+  };
+
+  const xToVal = (x: number): number => {
+    'worklet';
+    const maxX = trackW.value - THUMB;
+    if (maxX <= 0) return MIN_DUR;
+    return Math.round(MIN_DUR + Math.max(0, Math.min(1, x / maxX)) * (MAX_DUR - MIN_DUR));
+  };
+
+  const gesture = Gesture.Pan()
+    .onBegin((e) => {
+      thumbX.value = clamp(e.x);
+      runOnJS(onChange)(xToVal(thumbX.value));
+    })
+    .onUpdate((e) => {
+      thumbX.value = clamp(e.x);
+      runOnJS(onChange)(xToVal(thumbX.value));
+    });
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: thumbX.value }],
+  }));
+
+  const fillStyle = useAnimatedStyle(() => {
+    const maxX = trackW.value - THUMB;
+    if (maxX <= 0) return { width: 0 };
+    return { width: Math.max(0, (thumbX.value / maxX) * trackW.value) };
+  });
+
+  return (
+    <View style={sliderStyles.wrap}>
+      <View style={sliderStyles.labelRow}>
+        <Text style={sliderStyles.minLabel}>{MIN_DUR}m</Text>
+        <Text style={sliderStyles.valueLabel}>{value} min</Text>
+        <Text style={sliderStyles.maxLabel}>{MAX_DUR}m</Text>
+      </View>
+
+      <GestureDetector gesture={gesture}>
+        <View
+          style={sliderStyles.container}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            trackW.value = w;
+            const progress = (value - MIN_DUR) / (MAX_DUR - MIN_DUR);
+            thumbX.value = progress * (w - THUMB);
+          }}
+        >
+          {/* Track + fill */}
+          <View style={sliderStyles.track} pointerEvents="none">
+            <Animated.View style={[sliderStyles.fill, fillStyle]} />
+          </View>
+          {/* Thumb */}
+          <Animated.View style={[sliderStyles.thumb, thumbStyle]} pointerEvents="none" />
+        </View>
+      </GestureDetector>
+    </View>
+  );
+}
+
+const sliderStyles = StyleSheet.create({
+  wrap: { marginBottom: 24 },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  minLabel: { fontSize: 11, color: Colors.inkFaint },
+  maxLabel: { fontSize: 11, color: Colors.inkFaint },
+  valueLabel: { fontSize: 15, fontWeight: '700', color: PINK_TEXT },
+  // Full-height hit area so touch anywhere on the row works
+  container: {
+    height: THUMB,
+    justifyContent: 'center',
+  },
+  track: {
+    height: 6,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(20,16,28,0.08)',
+    overflow: 'hidden',
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    height: 6,
+    borderRadius: 9999,
+    backgroundColor: PINK,
+  },
+  thumb: {
+    position: 'absolute',
+    top: 0,
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: PINK_TEXT,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+});
+
+// ── Quest types & data ───────────────────────
 type TabType = 'active' | 'daily' | 'special';
 
 type Quest = {
@@ -56,22 +190,25 @@ const INITIAL_QUESTS: QuestsState = {
   ],
 };
 
+// ── Main Screen ──────────────────────────────
 export default function MissionsScreen() {
   const [tab, setTab] = useState<TabType>('active');
+  const router = useRouter();
   const { userId } = useAuthStore();
-  const { pets, activePet } = usePetStore();
-  const { play } = useSound();
 
   // My Tasks state
   const [tasks, setTasks] = useState<Task[]>(mockTasks.tasks);
+  const [showModal, setShowModal] = useState(false);
 
-  // Quest state (local only)
+  // Quest state（local only，可刪除）
   const [questsState, setQuestsState] = useState<QuestsState>(INITIAL_QUESTS);
 
-  // Focus setup sheet (covers both "start" and "create task" flows)
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const [sheetInitialDuration, setSheetInitialDuration] = useState(25);
-  const [sheetInitialTaskId, setSheetInitialTaskId] = useState<string | null>(null);
+  // New task form state
+  const [newTitle, setNewTitle] = useState('');
+  const [newDuration, setNewDuration] = useState(25);
+  const [newEmoji, setNewEmoji] = useState('📚');
+  const [newMemo, setNewMemo] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -80,6 +217,30 @@ export default function MissionsScreen() {
       .catch(() => {});
   }, [userId]);
 
+  const resetModal = () => {
+    setNewTitle('');
+    setNewDuration(25);
+    setNewEmoji('📚');
+    setNewMemo('');
+  };
+
+  const handleCreate = async () => {
+    if (!newTitle.trim() || !userId) return;
+    try {
+      setCreating(true);
+      const task = await createTask(userId, newTitle.trim(), newDuration);
+      const enriched: Task = { ...task, emoji: newEmoji, memo: newMemo.trim() || undefined };
+      setTasks((prev) => [enriched, ...prev]);
+      resetModal();
+      setShowModal(false);
+    } catch {
+      Alert.alert('建立失敗', '請稍後再試');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // My Tasks delete（樂觀刪除 + 失敗還原）
   const handleDeleteTask = (taskId: string, taskTitle: string) => {
     Alert.alert(
       '刪除任務',
@@ -90,9 +251,12 @@ export default function MissionsScreen() {
           text: '刪除',
           style: 'destructive',
           onPress: () => {
+            // 先從 UI 移除（樂觀更新）
             setTasks((prev) => prev.filter((t) => t.id !== taskId));
+            // DB 操作失敗 → 還原任務，並提示使用者
             deleteTask(taskId).catch(() => {
               setTasks((prev) => {
+                // 如果已還原過就不重複加
                 if (prev.find((t) => t.id === taskId)) return prev;
                 const restored = tasks.find((t) => t.id === taskId);
                 return restored ? [restored, ...prev] : prev;
@@ -105,6 +269,7 @@ export default function MissionsScreen() {
     );
   };
 
+  // Quest delete（local state only）
   const handleDeleteQuest = (questId: string, questTitle: string) => {
     Alert.alert(
       '移除任務',
@@ -125,16 +290,8 @@ export default function MissionsScreen() {
     );
   };
 
-  const openFocusSheet = (durationMin: number, taskId: string | null) => {
-    play('tap');
-    setSheetInitialDuration(durationMin);
-    setSheetInitialTaskId(taskId);
-    setSheetVisible(true);
-  };
-
   const pendingTasks = tasks.filter((t) => t.status === 'pending');
   const currentQuests = questsState[tab];
-  const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
 
   return (
     <View style={styles.root}>
@@ -151,7 +308,7 @@ export default function MissionsScreen() {
           <Text style={styles.title}>Missions</Text>
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => { openFocusSheet(25, null); }}
+            onPress={() => setShowModal(true)}
             activeOpacity={0.75}
           >
             <Text style={styles.addBtnText}>+ Task</Text>
@@ -164,7 +321,7 @@ export default function MissionsScreen() {
             <TouchableOpacity
               key={t}
               style={[styles.tabPill, tab === t && styles.tabPillActive]}
-              onPress={() => { play('tap'); setTab(t); }}
+              onPress={() => setTab(t)}
               activeOpacity={0.75}
             >
               <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>
@@ -174,7 +331,7 @@ export default function MissionsScreen() {
           ))}
         </View>
 
-        {/* ── Quest cards ── */}
+        {/* ── Quest cards（格式與 My Tasks 統一）── */}
         <View style={styles.list}>
           {currentQuests.length === 0 && (
             <FrostCard radius={20} padded={false}>
@@ -188,28 +345,39 @@ export default function MissionsScreen() {
             <View key={q.id} style={styles.myTaskWrap}>
               <FrostCard radius={20} padded={false}>
                 <View style={styles.myTaskCard}>
+                  {/* Emoji badge */}
                   <View style={styles.taskEmojiWrap}>
                     <Text style={styles.taskEmoji}>{q.emoji}</Text>
                   </View>
+
+                  {/* Info */}
                   <View style={styles.myTaskInfo}>
                     <Text style={styles.myTaskTitle}>{q.title}</Text>
                     <Text style={styles.myTaskSub}>{q.sub}</Text>
+                    {/* Progress bar */}
                     <View style={styles.progressBg}>
                       <View style={[styles.progressFill, { width: `${q.progress * 100}%` as any }]} />
                     </View>
-                    <Text style={styles.questReward}>{q.duration_min} min</Text>
+                    <Text style={styles.questReward}>{q.reward} · {q.duration_min} min</Text>
                   </View>
+
+                  {/* Actions */}
                   <View style={styles.taskActions}>
                     <TouchableOpacity
                       style={styles.myTaskStartBtn}
-                      onPress={() => openFocusSheet(q.duration_min, null)}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(app)/focus',
+                          params: { durationMin: String(q.duration_min) },
+                        })
+                      }
                       activeOpacity={0.8}
                     >
                       <Text style={styles.myTaskStartText}>▶ Start</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteBtn}
-                      onPress={() => { play('tap'); handleDeleteQuest(q.id, q.title); }}
+                      onPress={() => handleDeleteQuest(q.id, q.title)}
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -222,7 +390,7 @@ export default function MissionsScreen() {
           ))}
         </View>
 
-        {/* ── My Tasks ── */}
+        {/* ── My Tasks ──────────────────────────── */}
         <View style={styles.myTasksSection}>
           <Text style={styles.myTasksLabel}>MY TASKS</Text>
 
@@ -234,76 +402,144 @@ export default function MissionsScreen() {
             </FrostCard>
           )}
 
-          <View style={styles.taskList}>
-            {pendingTasks.map((task) => (
-              <View key={task.id} style={styles.myTaskWrap}>
-                <FrostCard radius={20} padded={false}>
-                  <View style={styles.myTaskCard}>
-                    <View style={styles.taskEmojiWrap}>
-                      <Text style={styles.taskEmoji}>{task.emoji ?? '📝'}</Text>
-                    </View>
-                    <View style={styles.myTaskInfo}>
-                      <Text style={styles.myTaskTitle}>{task.title}</Text>
-                      <Text style={styles.myTaskSub}>{task.duration_min} min</Text>
-                      {task.memo ? (
-                        <Text style={styles.myTaskMemo} numberOfLines={1}>{task.memo}</Text>
-                      ) : null}
-                      {(task.completion_percent ?? 0) > 0 && (
-                        <View style={styles.taskProgressWrap}>
-                          <View style={styles.progressBg}>
-                            <View style={[styles.progressFill, { width: `${task.completion_percent}%` as any, backgroundColor: PINK_TEXT }]} />
-                          </View>
-                          <Text style={styles.taskProgressLabel}>{task.completion_percent}% 完成</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.taskActions}>
-                      <TouchableOpacity
-                        style={styles.myTaskStartBtn}
-                        onPress={() => {
-                          const pct = task.completion_percent ?? 0;
-                          const remaining = pct > 0 && pct < 100
-                            ? Math.max(Math.round(task.duration_min * (1 - pct / 100)), 5)
-                            : task.duration_min;
-                          openFocusSheet(remaining, task.id);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.myTaskStartText}>▶ Start</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.deleteBtn}
-                        onPress={() => { play('tap'); handleDeleteTask(task.id, task.title); }}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Trash2 size={16} color={Colors.inkFaint} />
-                      </TouchableOpacity>
-                    </View>
+          {pendingTasks.map((task) => (
+            <View key={task.id} style={styles.myTaskWrap}>
+              <FrostCard radius={20} padded={false}>
+                <View style={styles.myTaskCard}>
+                  {/* Emoji badge */}
+                  <View style={styles.taskEmojiWrap}>
+                    <Text style={styles.taskEmoji}>{task.emoji ?? '📝'}</Text>
                   </View>
-                </FrostCard>
-              </View>
-            ))}
-          </View>
+
+                  {/* Info */}
+                  <View style={styles.myTaskInfo}>
+                    <Text style={styles.myTaskTitle}>{task.title}</Text>
+                    <Text style={styles.myTaskSub}>{task.duration_min} min</Text>
+                    {task.memo ? (
+                      <Text style={styles.myTaskMemo} numberOfLines={1}>{task.memo}</Text>
+                    ) : null}
+                  </View>
+
+                  {/* Actions */}
+                  <View style={styles.taskActions}>
+                    <TouchableOpacity
+                      style={styles.myTaskStartBtn}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(app)/focus',
+                          params: { durationMin: String(task.duration_min), taskId: task.id },
+                        })
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.myTaskStartText}>▶ Start</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDeleteTask(task.id, task.title)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Trash2 size={16} color={Colors.inkFaint} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </FrostCard>
+            </View>
+          ))}
         </View>
       </ScrollView>
 
-      {/* ── Focus Setup Sheet ── */}
-      <FocusSetupSheet
-        visible={sheetVisible}
-        onClose={() => setSheetVisible(false)}
-        pets={modalPets}
-        tasks={pendingTasks}
-        initialPetId={activePet?.id ?? null}
-        initialDuration={sheetInitialDuration}
-        initialTaskId={sheetInitialTaskId}
-      />
+      {/* ── Add Task Modal ─────────────────────── */}
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowModal(false); resetModal(); }}>
+        <KeyboardAvoidingView
+          style={styles.modalKav}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => { setShowModal(false); resetModal(); }}
+          />
+          <View style={styles.modalSheet}>
+            <FrostCard radius={28}>
+              <Text style={styles.modalTitle}>New Task</Text>
+
+              {/* Emoji picker */}
+              <Text style={styles.modalLabel}>PICK AN EMOJI</Text>
+              <View style={styles.emojiGrid}>
+                {EMOJI_OPTIONS.map((em) => (
+                  <TouchableOpacity
+                    key={em}
+                    style={[styles.emojiCell, newEmoji === em && styles.emojiCellActive]}
+                    onPress={() => setNewEmoji(em)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.emojiCellText}>{em}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Task name */}
+              <Text style={[styles.modalLabel, { marginTop: 20 }]}>TASK NAME</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newTitle}
+                onChangeText={setNewTitle}
+                placeholder="What do you want to focus on?"
+                placeholderTextColor={Colors.inkFaint}
+                returnKeyType="next"
+              />
+              <View style={styles.modalUnderline} />
+
+              {/* Memo */}
+              <Text style={[styles.modalLabel, { marginTop: 20 }]}>MEMO <Text style={styles.optionalTag}>(optional)</Text></Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newMemo}
+                onChangeText={(t) => setNewMemo(t.slice(0, 60))}
+                placeholder="Short note…"
+                placeholderTextColor={Colors.inkFaint}
+                returnKeyType="done"
+                maxLength={60}
+              />
+              <View style={styles.modalUnderlineRow}>
+                <View style={[styles.modalUnderline, { flex: 1 }]} />
+                <Text style={styles.charCount}>{newMemo.length}/60</Text>
+              </View>
+
+              {/* Duration slider */}
+              <Text style={[styles.modalLabel, { marginTop: 20 }]}>FOCUS DURATION</Text>
+              <View style={{ marginTop: 12 }}>
+                <DurationSlider value={newDuration} onChange={setNewDuration} />
+              </View>
+
+              {/* Actions */}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => { setShowModal(false); resetModal(); }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalCreateBtn, (!newTitle.trim() || creating) && styles.disabled]}
+                  disabled={!newTitle.trim() || creating}
+                  onPress={handleCreate}
+                >
+                  <Text style={styles.modalCreateText}>{creating ? 'Creating…' : 'Create'}</Text>
+                </TouchableOpacity>
+              </View>
+            </FrostCard>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
+  root: { flex: 1, backgroundColor: Colors.beige },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 120 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
@@ -320,8 +556,8 @@ const styles = StyleSheet.create({
   tabLabel: { fontSize: 13, fontWeight: '500', color: Colors.inkSoft },
   tabLabelActive: { color: '#fff', fontWeight: '600' },
 
+  // Unified quest + task card styles
   list: { gap: 10, marginTop: 8 },
-  taskList: { gap: 10 },
   myTasksSection: { marginTop: 24 },
   myTasksLabel: { fontSize: 10, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6, marginBottom: 10 },
   emptyState: { padding: 20, alignItems: 'center' },
@@ -339,11 +575,11 @@ const styles = StyleSheet.create({
   myTaskTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
   myTaskSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 1 },
   myTaskMemo: { fontSize: 11, color: Colors.inkFaint, marginTop: 2, fontStyle: 'italic' },
-  taskProgressWrap: { marginTop: 8, gap: 4 },
-  taskProgressLabel: { fontSize: 10, fontWeight: '600', color: PINK_TEXT },
-  progressBg: { height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
+  // Quest-specific info elements
+  progressBg: { marginTop: 7, height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
   progressFill: { height: 4, borderRadius: 9999, backgroundColor: PINK },
   questReward: { fontSize: 10, fontWeight: '600', color: PINK_TEXT, marginTop: 4 },
+  // Action buttons
   taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   myTaskStartBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999, backgroundColor: PINK },
   myTaskStartText: { fontSize: 12, fontWeight: '700', color: PINK_TEXT },
@@ -352,6 +588,45 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(20,16,28,0.06)',
     alignItems: 'center', justifyContent: 'center',
   },
-
+  // Modal
+  modalKav: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  modalSheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
+  modalTitle: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 22, fontWeight: '500', color: Colors.ink, marginBottom: 16,
+  },
+  modalLabel: {
+    fontSize: 11, fontWeight: '700', color: Colors.inkFaint,
+    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10,
+  },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  emojiCell: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(20,16,28,0.05)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'transparent',
+  },
+  emojiCellActive: {
+    backgroundColor: 'rgba(242,206,220,0.45)',
+    borderColor: PINK_TEXT,
+  },
+  emojiCellText: { fontSize: 22 },
+  modalInput: { fontSize: 17, fontWeight: '500', color: Colors.ink, paddingVertical: 6 },
+  modalUnderline: { height: 1.2, backgroundColor: 'rgba(20,16,28,0.15)', marginTop: 4 },
+  modalUnderlineRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  charCount: { fontSize: 10, color: Colors.inkFaint },
+  optionalTag: { fontSize: 10, fontWeight: '400', color: Colors.inkFaint, textTransform: 'none' },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  modalCancelBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: 9999,
+    alignItems: 'center', backgroundColor: 'rgba(20,16,28,0.06)',
+  },
+  modalCancelText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
+  modalCreateBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: 9999,
+    alignItems: 'center', backgroundColor: Colors.ink,
+  },
+  modalCreateText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   disabled: { opacity: 0.4 },
 });
