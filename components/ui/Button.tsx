@@ -25,6 +25,7 @@ interface ButtonProps {
   fullWidth?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  accessibilityLabel?: string;
 }
 
 export function Button({
@@ -37,6 +38,7 @@ export function Button({
   fullWidth = false,
   style,
   textStyle,
+  accessibilityLabel,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
 
@@ -45,6 +47,9 @@ export function Button({
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled: isDisabled }}
       style={[
         styles.base,
         styles[`size_${size}`],
