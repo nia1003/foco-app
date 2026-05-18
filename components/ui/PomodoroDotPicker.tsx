@@ -29,6 +29,9 @@ export function PomodoroDotPicker({
               style={[styles.dot, active && styles.dotActive]}
               onPress={() => onChange(n)}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${n} pomodoro${n !== 1 ? 's' : ''}`}
+              accessibilityState={{ selected: active }}
             />
           );
         })}
