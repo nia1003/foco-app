@@ -1,7 +1,7 @@
 /**
  * VerifyScreen — Register Step 2: Enter 6-digit OTP
  */
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,41 +19,40 @@ import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { authService } from '@/services/authService';
+import { useApiCall } from '@/hooks/useApiCall';
 
 export default function VerifyScreen() {
   const router = useRouter();
   const { play } = useSound();
   const { email } = useLocalSearchParams<{ email: string }>();
   const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const valid = code.length === 6;
 
-  const handleVerify = async () => {
-    if (!valid || !email) return;
-    play('transition_up');
-    try {
-      setLoading(true);
-      await authService.verifyOtp(email, code.trim());
-      router.push({ pathname: '/(auth)/profile', params: { email } });
-    } catch (err: any) {
-      Alert.alert('驗證失敗', err.message ?? '驗證碼錯誤或已過期，請重新發送。');
-      setCode('');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { call: verify, loading: verifying, blocked: verifyBlocked, cooldown: verifyCooldown } =
+    useApiCall(async () => {
+      if (!valid || !email) return;
+      play('transition_up');
+      try {
+        await authService.verifyOtp(email, code.trim());
+        router.push({ pathname: '/(auth)/profile', params: { email } });
+      } catch (err: any) {
+        Alert.alert('驗證失敗', err.message ?? '驗證碼錯誤或已過期，請重新發送。');
+        setCode('');
+      }
+    });
 
-  const handleResend = async () => {
-    play('tap');
-    try {
-      await authService.sendOtp(email ?? '');
-      Alert.alert('已重新發送', '新的驗證碼已寄出，請檢查信箱。');
-      setCode('');
-    } catch (err: any) {
-      Alert.alert('發送失敗', err.message ?? '請稍後再試');
-    }
-  };
+  const { call: resend, loading: resending, blocked: resendBlocked, cooldown: resendCooldown } =
+    useApiCall(async () => {
+      play('tap');
+      try {
+        await authService.sendOtp(email ?? '');
+        Alert.alert('已重新發送', '新的驗證碼已寄出，請檢查信箱。');
+        setCode('');
+      } catch (err: any) {
+        Alert.alert('發送失敗', err.message ?? '請稍後再試');
+      }
+    });
 
   return (
     <View style={styles.root}>
@@ -93,24 +92,29 @@ export default function VerifyScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.verifyBtn, (!valid || loading) && styles.disabled]}
-                disabled={!valid || loading}
-                onPress={handleVerify}
+                style={[styles.verifyBtn, (!valid || verifyBlocked) && styles.disabled]}
+                disabled={!valid || verifyBlocked}
+                onPress={verify}
                 activeOpacity={0.85}
               >
                 <Text style={styles.verifyBtnText}>
-                  {loading ? 'VERIFYING…' : 'VERIFY →'}
+                  {verifying ? 'VERIFYING…' : verifyBlocked ? `WAIT ${verifyCooldown}s` : 'VERIFY →'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.resendBtn}
-                onPress={handleResend}
+                style={[styles.resendBtn, resendBlocked && styles.resendBlocked]}
+                disabled={resendBlocked}
+                onPress={resend}
                 activeOpacity={0.7}
               >
                 <Text style={styles.resendText}>
-                  Didn't receive it?{' '}
-                  <Text style={styles.resendLink}>Resend code</Text>
+                  {resending
+                    ? 'Sending…'
+                    : resendBlocked
+                      ? `Resend in ${resendCooldown}s`
+                      : <Text>Didn't receive it? <Text style={styles.resendLink}>Resend code</Text></Text>
+                  }
                 </Text>
               </TouchableOpacity>
             </FrostCard>
@@ -153,6 +157,7 @@ const styles = StyleSheet.create({
   verifyBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 2.5 },
   disabled: { opacity: 0.4 },
   resendBtn: { marginTop: 20, alignItems: 'center' },
+  resendBlocked: { opacity: 0.4 },
   resendText: { fontSize: 13, color: Colors.inkFaint },
   resendLink: { color: Colors.ink, fontWeight: '600' },
 });

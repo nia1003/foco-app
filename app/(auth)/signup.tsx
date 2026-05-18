@@ -19,27 +19,24 @@ import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { authService } from '@/services/authService';
+import { useApiCall } from '@/hooks/useApiCall';
 
 export default function SignupScreen() {
   const router = useRouter();
   const { play } = useSound();
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const valid = email.includes('@') && email.includes('.');
 
-  const handleSendCode = async () => {
+  const { call: sendCode, loading, blocked, cooldown } = useApiCall(async () => {
     if (!valid) return;
     try {
-      setLoading(true);
       await authService.sendOtp(email.trim());
       router.push({ pathname: '/(auth)/verify', params: { email: email.trim() } });
     } catch (err: any) {
       Alert.alert('發送失敗', err.message ?? '請確認 email 格式是否正確');
-    } finally {
-      setLoading(false);
     }
-  };
+  });
 
   return (
     <View style={styles.root}>
@@ -77,13 +74,13 @@ export default function SignupScreen() {
               </Text>
 
               <TouchableOpacity
-                style={[styles.sendBtn, (!valid || loading) && styles.disabled]}
-                disabled={!valid || loading}
-                onPress={() => { play('transition_up'); handleSendCode(); }}
+                style={[styles.sendBtn, (!valid || blocked) && styles.disabled]}
+                disabled={!valid || blocked}
+                onPress={() => { play('transition_up'); sendCode(); }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.sendBtnText}>
-                  {loading ? 'SENDING…' : 'SEND CODE →'}
+                  {loading ? 'SENDING…' : blocked ? `WAIT ${cooldown}s` : 'SEND CODE →'}
                 </Text>
               </TouchableOpacity>
 

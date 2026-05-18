@@ -26,6 +26,7 @@ import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { getSessions } from '@/services/focoService';
 import { mockSessions } from '@/data/mockData';
 import { useSound } from '@/components/SoundProvider';
@@ -323,32 +324,24 @@ export default function StatsScreen() {
   const { userId } = useAuthStore();
   const { play } = useSound();
 
-  const [loading, setLoading] = useState(true);
-  const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [summary, setSummary] = useState({
-    total_focus_sec: 0,
-    streak_days: 0,
-    total_sessions: 0,
-  });
+  const { sessions, summary, isStale, setData } = useSessionStore();
+  const hasData = sessions.length > 0 || summary.total_sessions > 0;
+  const [fetching, setFetching] = useState(false);
   const [selectedDay, setSelectedDay] = useState(6); // default: today
 
   useEffect(() => {
     if (!userId) {
-      setSessions(mockSessions.sessions);
-      setSummary(mockSessions.summary);
-      setLoading(false);
+      setData({ sessions: mockSessions.sessions, summary: mockSessions.summary });
       return;
     }
+    // Skip fetch if cache is still fresh
+    if (hasData && !isStale()) return;
+
+    setFetching(true);
     getSessions(userId)
-      .then((res) => {
-        setSessions(res.sessions);
-        setSummary(res.summary);
-      })
-      .catch(() => {
-        setSessions(mockSessions.sessions);
-        setSummary(mockSessions.summary);
-      })
-      .finally(() => setLoading(false));
+      .then((res) => setData(res))
+      .catch(() => { if (!hasData) setData({ sessions: mockSessions.sessions, summary: mockSessions.summary }); })
+      .finally(() => setFetching(false));
   }, [userId]);
 
   const weekStats  = buildWeekStats(sessions);
@@ -365,7 +358,8 @@ export default function StatsScreen() {
   const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
   const selected   = weekStats[selectedDay];
 
-  if (loading) {
+  // Show blank screen only on initial load with no cached data
+  if (!hasData && fetching) {
     return (
       <View style={styles.root}>
         <AppBackground />
