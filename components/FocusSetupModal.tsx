@@ -62,6 +62,19 @@ export function FocusSetupModal({
     }
   }, [visible]);
 
+  // When a task with existing progress is selected, pre-fill remaining duration
+  useEffect(() => {
+    if (!selectedTaskId) return;
+    const task = tasks.find((t) => t.id === selectedTaskId);
+    if (task?.completion_percent && task.completion_percent > 0 && task.completion_percent < 100) {
+      const remaining = Math.max(
+        Math.round(task.duration_min * (1 - task.completion_percent / 100)),
+        5,
+      );
+      setSelectedDuration(remaining);
+    }
+  }, [selectedTaskId]);
+
   const handleStart = async () => {
     if (selectedPetId && selectedPetId !== activePet?.id) {
       await setActivePet(selectedPetId);
@@ -150,6 +163,8 @@ export function FocusSetupModal({
 
               {tasks.map((t) => {
                 const active = selectedTaskId === t.id;
+                const pct = t.completion_percent ?? 0;
+                const hasProgress = pct > 0 && pct < 100;
                 return (
                   <TouchableOpacity
                     key={t.id}
@@ -163,6 +178,16 @@ export function FocusSetupModal({
                     >
                       {t.emoji ? `${t.emoji} ` : ''}{t.title}
                     </Text>
+                    {hasProgress && (
+                      <Text style={[styles.taskChipProgress, active && { color: PINK_TEXT }]}>
+                        繼續 {pct}%
+                      </Text>
+                    )}
+                    {hasProgress && (
+                      <View style={styles.taskChipBar}>
+                        <View style={[styles.taskChipBarFill, { width: `${pct}%` as any }]} />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -217,6 +242,12 @@ const styles = StyleSheet.create({
   taskChipActive: { backgroundColor: PINK, borderColor: PINK_TEXT },
   taskChipText: { fontSize: 13, fontWeight: '500', color: Colors.inkSoft, maxWidth: 200 },
   taskChipTextActive: { color: PINK_TEXT, fontWeight: '600' },
+  taskChipProgress: { fontSize: 10, fontWeight: '600', color: Colors.inkFaint, marginTop: 2 },
+  taskChipBar: {
+    height: 3, borderRadius: 9999, width: '100%',
+    backgroundColor: 'rgba(20,16,28,0.08)', marginTop: 4, overflow: 'hidden',
+  },
+  taskChipBarFill: { height: 3, borderRadius: 9999, backgroundColor: PINK },
 
   // Start button
   startBtn: {

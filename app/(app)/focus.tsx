@@ -23,8 +23,6 @@ import { useTimer } from '@/hooks/useTimer';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { useSound } from '@/components/SoundProvider';
-import { completeSession } from '@/services/focoService';
-import { mockSessionResult } from '@/data/mockData';
 import type { SessionPayload } from '@/types';
 
 export default function FocusScreen() {
@@ -90,8 +88,8 @@ export default function FocusScreen() {
     }
   }, [paused, phase]);
 
-  // ── Session complete ──────────────────────────
-  const handleEnd = async (earlyStop: boolean) => {
+  // ── Session complete — navigate to reflection first ──
+  const handleEnd = (earlyStop: boolean) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
 
@@ -103,8 +101,11 @@ export default function FocusScreen() {
       0,
     );
     const completed = actualDuration >= snap.plannedDuration * 0.9;
-
     const startedAtISO = new Date(snap.startedAt).toISOString();
+    const defaultCompletion = Math.min(
+      Math.round((actualDuration / Math.max(snap.plannedDuration, 1)) * 100),
+      100,
+    );
 
     const payload: SessionPayload = {
       user_id: userId ?? 'unknown',
@@ -132,22 +133,17 @@ export default function FocusScreen() {
       ...(taskTitle ? { task_title: taskTitle } : {}),
     };
 
-    try {
-      const result = await completeSession(payload);
-      router.replace({
-        pathname: '/(app)/reward',
-        params: { result: JSON.stringify({ ...result, ...localStats }) },
-      });
-    } catch (err) {
-      console.error('[FOCO] session-complete failed:', err);
-      router.replace({
-        pathname: '/(app)/reward',
-        params: { result: JSON.stringify({ ...mockSessionResult, ...localStats }) },
-      });
-    } finally {
-      // Reset so the user can retry if navigation somehow fails
-      submittingRef.current = false;
-    }
+    submittingRef.current = false;
+
+    // Hand off to reflection screen — it calls the API after collecting user input
+    router.replace({
+      pathname: '/(app)/reflection',
+      params: {
+        payloadJson: JSON.stringify(payload),
+        localStatsJson: JSON.stringify(localStats),
+        defaultCompletion: String(defaultCompletion),
+      },
+    });
   };
 
   return (
@@ -221,8 +217,12 @@ export default function FocusScreen() {
 
       {/* Quit modal */}
       <Modal visible={showQuitModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => { play('tap'); setShowQuitModal(false); }}
+        >
+          <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
             <Text style={styles.modalTitle}>提前結束？</Text>
             <Text style={styles.modalSub}>
               放棄會影響你的 DISC 分析結果。
@@ -246,8 +246,8 @@ export default function FocusScreen() {
             >
               <Text style={styles.modalKeepText}>繼續專注</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
