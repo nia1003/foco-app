@@ -248,11 +248,25 @@ export default function MissionsScreen() {
                       {task.memo ? (
                         <Text style={styles.myTaskMemo} numberOfLines={1}>{task.memo}</Text>
                       ) : null}
+                      {(task.completion_percent ?? 0) > 0 && (
+                        <View style={styles.taskProgressWrap}>
+                          <View style={styles.progressBg}>
+                            <View style={[styles.progressFill, { width: `${task.completion_percent}%` as any, backgroundColor: PINK_TEXT }]} />
+                          </View>
+                          <Text style={styles.taskProgressLabel}>{task.completion_percent}% 完成</Text>
+                        </View>
+                      )}
                     </View>
                     <View style={styles.taskActions}>
                       <TouchableOpacity
                         style={styles.myTaskStartBtn}
-                        onPress={() => openFocusSheet(task.duration_min, task.id)}
+                        onPress={() => {
+                          const pct = task.completion_percent ?? 0;
+                          const remaining = pct > 0 && pct < 100
+                            ? Math.max(Math.round(task.duration_min * (1 - pct / 100)), 5)
+                            : task.duration_min;
+                          openFocusSheet(remaining, task.id);
+                        }}
                         activeOpacity={0.8}
                       >
                         <Text style={styles.myTaskStartText}>▶ Start</Text>
@@ -325,7 +339,9 @@ const styles = StyleSheet.create({
   myTaskTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
   myTaskSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 1 },
   myTaskMemo: { fontSize: 11, color: Colors.inkFaint, marginTop: 2, fontStyle: 'italic' },
-  progressBg: { marginTop: 7, height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
+  taskProgressWrap: { marginTop: 8, gap: 4 },
+  taskProgressLabel: { fontSize: 10, fontWeight: '600', color: PINK_TEXT },
+  progressBg: { height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
   progressFill: { height: 4, borderRadius: 9999, backgroundColor: PINK },
   questReward: { fontSize: 10, fontWeight: '600', color: PINK_TEXT, marginTop: 4 },
   taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
