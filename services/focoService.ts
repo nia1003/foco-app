@@ -131,6 +131,19 @@ export async function createTask(
   return data as Task;
 }
 
+// ── updateTaskProgress — 更新任務完成進度 ──────────
+export async function updateTaskProgress(taskId: string, completionPercent: number): Promise<void> {
+  const isDone = completionPercent >= 100;
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      completion_percent: completionPercent,
+      ...(isDone ? { status: 'done' } : {}),
+    })
+    .eq('id', taskId);
+  if (error) throw error;
+}
+
 // ── deleteTask（軟刪除 — status='deleted'）───────
 // 注意：等亮節執行 supabase/migrations/add_deleted_to_tasks.sql 之後
 // 可改成 update({ deleted: true }) + getTasks 改 .eq('deleted', false)
