@@ -42,7 +42,7 @@ const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 export default function HomeScreen() {
   const router = useRouter();
   const { userId, userName, userEmail } = useAuthStore();
-  const { pets, activePet, setPets, setActivePet, restoreActivePet } = usePetStore();
+  const { pets, activePet, setPets, setActivePet, restoreActivePet, petsLastFetchedAt } = usePetStore();
   const { play } = useSound();
 
   // Pool to look up XP/level — real store data or full 4-pet mock
@@ -60,9 +60,14 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!userId) return;
+    const STALE_MS = 5 * 60 * 1000;
+    const isStale = !petsLastFetchedAt || Date.now() - petsLastFetchedAt > STALE_MS;
+    // Skip fetch if we have fresh data
+    if (pets.length && !isStale) { restoreActivePet(); return; }
+
     getPets(userId)
       .then((fetched) => { setPets(fetched); restoreActivePet(); })
-      .catch(() => setPets(mockPets));
+      .catch(() => { if (!pets.length) setPets(mockPets); });
   }, [userId]);
 
   useEffect(() => {

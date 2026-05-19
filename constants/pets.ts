@@ -4,7 +4,7 @@
  * When set, PetRenderer uses this instead of the image prop.
  */
 import type { ComponentType } from 'react';
-import { XingWangPet3D } from '@/components/pets/XingWangPet3D';
+import { SunionPet3D } from '@/components/pets/SunionPet3D';
 import { LilyPet3D } from '@/components/pets/LilyPet3D';
 import { FluffPet3D } from '@/components/pets/FluffPet3D';
 import { StayPet3D } from '@/components/pets/StayPet3D';
@@ -21,12 +21,12 @@ export interface Pet {
 
 export const PETS: Pet[] = [
   {
-    id: 'xingwang',
-    name: 'Xingwang',
+    id: 'sunion',
+    name: 'Sunion',
     trait: 'Round & cheerful',
     accent: '#FABD03',
     image: require('../assets/pets/bean.png'),
-    CustomComponent: XingWangPet3D,
+    CustomComponent: SunionPet3D,
   },
   {
     id: 'lily',

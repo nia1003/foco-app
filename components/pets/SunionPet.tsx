@@ -1,7 +1,7 @@
 /**
- * XingWangPet — 2D SVG version of the user's drawn 3D character.
+ * SunionPet — 2D SVG version of the user's drawn 3D character.
  * Concave-notch body, dot eyes, arm blobs, foot blobs, floating animation.
- * Proportions ported from the original Three.js xingwang.jsx.
+ * Proportions ported from the original Three.js sunion.jsx.
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
@@ -14,17 +14,17 @@ const EYE_COLOR = '#111111';
 const VW = 200;
 const VH = 240;
 
-interface XingWangPetProps {
+interface SunionPetProps {
   size?: number;       // rendered width in px (height scales proportionally)
   color?: string;      // body colour (defaults to warm yellow)
   animate?: boolean;   // floating idle animation
 }
 
-export function XingWangPet({
+export function SunionPet({
   size = 120,
   color = DEFAULT_COLOR,
   animate = true,
-}: XingWangPetProps) {
+}: SunionPetProps) {
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {

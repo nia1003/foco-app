@@ -20,11 +20,13 @@ import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
+import { useSessionStore } from '@/stores/sessionStore';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { logout, userEmail, userName } = useAuthStore();
   const { reset: resetPets } = usePetStore();
+  const { reset: resetSessions } = useSessionStore();
 
   const { play, playToggle } = useSound();
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -44,8 +46,9 @@ export default function SettingsScreen() {
           text: '登出',
           style: 'destructive',
           onPress: async () => {
-            // 1. 清除 petStore 狀態 + AsyncStorage activePetId
+            // 1. 清除各 store 狀態
             resetPets();
+            resetSessions();
             // 2. 登出 Supabase session + 清除 authStore
             await logout();
             // 3. 回到登入頁
