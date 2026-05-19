@@ -177,21 +177,24 @@ export default function PetInfoScreen() {
       <View style={[styles.petBg, { top: 56 + insets.top }]}>
         <PetRenderer pet={petDef} size={380} />
 
-        {/* Typing indicator */}
-        {chatLoading && (
-          <View style={styles.speechBubble} pointerEvents="none">
-            <View style={styles.speechDotsRow}>
-              <Text style={styles.speechDot}>●</Text>
-              <Text style={[styles.speechDot, { opacity: 0.6 }]}>●</Text>
-              <Text style={[styles.speechDot, { opacity: 0.35 }]}>●</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Pet reply bubble */}
-        {!chatLoading && !!petReply && (
-          <Animated.View style={[styles.speechBubble, { opacity: replyOpacity }]} pointerEvents="none">
-            <Text style={styles.speechBubbleText}>{petReply}</Text>
+        {/* Speech bubble — typing or reply */}
+        {(chatLoading || !!petReply) && (
+          <Animated.View
+            style={[styles.speechBubbleWrap, { opacity: chatLoading ? 1 : replyOpacity }]}
+            pointerEvents="none"
+          >
+            {chatLoading ? (
+              <View style={styles.speechDotsRow}>
+                <Text style={styles.speechDot}>●</Text>
+                <Text style={[styles.speechDot, { opacity: 0.6 }]}>●</Text>
+                <Text style={[styles.speechDot, { opacity: 0.35 }]}>●</Text>
+              </View>
+            ) : (
+              <Text style={styles.speechBubbleText}>{petReply}</Text>
+            )}
+            {/* Tail — two layered triangles for border effect */}
+            <View style={styles.speechTailBorder} />
+            <View style={styles.speechTailFill} />
           </Animated.View>
         )}
       </View>
@@ -283,33 +286,29 @@ export default function PetInfoScreen() {
 
       {/* ── Chat input bar — floats just above the peek section ── */}
       <Animated.View style={[styles.chatBar, { bottom: chatBarBottom }]}>
-        <FrostCard radius={28} padded={false}>
-          <View style={styles.chatInputRow}>
-            <TextInput
-              style={styles.chatInput}
-              value={chatText}
-              onChangeText={setChatText}
-              placeholder={`跟 ${petDef.name} 說…`}
-              placeholderTextColor={Colors.inkFaint}
-              returnKeyType="send"
-              onSubmitEditing={sendChat}
-              editable={!chatLoading}
-              multiline={false}
-            />
+        <View style={styles.chatInputRow}>
+          <TextInput
+            style={styles.chatInput}
+            value={chatText}
+            onChangeText={setChatText}
+            placeholder={`跟 ${petDef.name} 說…`}
+            placeholderTextColor={Colors.inkFaint}
+            returnKeyType="send"
+            onSubmitEditing={sendChat}
+            editable={!chatLoading}
+            multiline={false}
+          />
+          {!!chatText.trim() && (
             <TouchableOpacity
-              style={[
-                styles.chatSendBtn,
-                { backgroundColor: petDef.accent },
-                (!chatText.trim() || chatLoading) && styles.chatSendBtnDisabled,
-              ]}
-              disabled={!chatText.trim() || chatLoading}
+              style={[styles.chatSendBtn, { backgroundColor: petDef.accent }, chatLoading && styles.chatSendBtnDisabled]}
+              disabled={chatLoading}
               onPress={sendChat}
               activeOpacity={0.8}
             >
               <Text style={styles.chatSendIcon}>↑</Text>
             </TouchableOpacity>
-          </View>
-        </FrostCard>
+          )}
+        </View>
       </Animated.View>
     </View>
   );
@@ -335,37 +334,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Speech bubble ────────────────────────────
-  speechBubble: {
+  // ── Speech bubble (wireframe outline style) ──
+  speechBubbleWrap: {
     position: 'absolute',
-    top: 16,
+    top: 20,
     left: 20,
-    right: 20,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    right: 80,          // not full-width; leaves space on right
+    backgroundColor: '#fff',
     borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(20,16,28,0.18)',
     paddingHorizontal: 18,
     paddingVertical: 14,
-    shadowColor: '#14101c',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 8,
   },
   speechBubbleText: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.ink,
-    textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   speechDotsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: 5,
   },
   speechDot: {
     fontSize: 10,
     color: Colors.inkSoft,
+  },
+  // Tail — outer (border colour)
+  speechTailBorder: {
+    position: 'absolute',
+    bottom: -14,
+    left: 22,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 14,
+    borderTopWidth: 14,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'rgba(20,16,28,0.18)',
+  },
+  // Tail — inner (fill colour, covers border to show only outline)
+  speechTailFill: {
+    position: 'absolute',
+    bottom: -11,
+    left: 23,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 12,
+    borderTopWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#fff',
   },
 
   // ── Sheet ─────────────────────────────────────
@@ -509,7 +531,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 10,
     zIndex: 25,
     elevation: 16,
@@ -517,20 +539,24 @@ const styles = StyleSheet.create({
   chatInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 9999,
+    borderWidth: 1.5,
+    borderColor: 'rgba(20,16,28,0.18)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     gap: 10,
   },
   chatInput: {
     flex: 1,
     fontSize: 15,
     color: Colors.ink,
-    paddingVertical: 4,
+    paddingVertical: 0,
   },
   chatSendBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 32, height: 32, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
   },
   chatSendBtnDisabled: { opacity: 0.35 },
-  chatSendIcon: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  chatSendIcon: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
