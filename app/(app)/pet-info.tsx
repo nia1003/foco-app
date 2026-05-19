@@ -3,7 +3,7 @@
  * - 全螢幕顯示大寵物（無圓形框）
  * - 底部卡片：往上拉顯示 XP、個性、成長路線
  */
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -19,6 +20,7 @@ import { PetRenderer } from '@/components/pets/PetRenderer';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
+import { PetChatModal } from '@/components/PetChatModal';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
@@ -44,6 +46,7 @@ export default function PetInfoScreen() {
   const { petId } = useLocalSearchParams<{ petId?: string }>();
   const { pets, activePet } = usePetStore();
   const insets = useSafeAreaInsets();
+  const [showChat, setShowChat] = useState(false);
 
   // When the store is empty (backend not yet loaded), fall back to mockPets as the search pool
   const searchPool = pets.length > 0 ? pets : mockPets;
@@ -122,11 +125,22 @@ export default function PetInfoScreen() {
           <View style={styles.handle} />
         </View>
 
-        {/* Always-visible: name + level */}
+        {/* Always-visible: name + level + chat button */}
         <View style={styles.peekSection}>
-          <Text style={styles.petName}>{petDef.name}</Text>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
+          <View style={styles.peekRow}>
+            <View>
+              <Text style={styles.petName}>{petDef.name}</Text>
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.chatBtn, { backgroundColor: petDef.accent + '22', borderColor: petDef.accent + '55' }]}
+              onPress={() => setShowChat(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.chatBtnText, { color: petDef.accent }]}>聊天 💬</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -197,6 +211,12 @@ export default function PetInfoScreen() {
           </View>
         </ScrollView>
       </Animated.View>
+
+      <PetChatModal
+        visible={showChat}
+        onClose={() => setShowChat(false)}
+        pet={petDef}
+      />
     </View>
   );
 }
@@ -251,8 +271,23 @@ const styles = StyleSheet.create({
 
   // Peek section (always visible)
   peekSection: {
-    alignItems: 'center',
+    paddingHorizontal: 22,
     paddingBottom: 14,
+  },
+  peekRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  chatBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 9999,
+    borderWidth: 1,
+  },
+  chatBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   petName: {
     fontFamily: 'Fraunces_500Medium',
