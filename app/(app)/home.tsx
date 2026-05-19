@@ -211,7 +211,7 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={def.id}
                   style={[styles.petCard, { width: PET_CARD_W }]}
-                  onPress={() => { play('transition_up'); router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } }); }}
+                  onPress={() => { play('tap'); setHomeChatPetId(def.id); }}
                   activeOpacity={0.88}
                 >
                   <View style={styles.petPreview}>
@@ -224,23 +224,12 @@ export default function HomeScreen() {
                   <View style={styles.xpBarBg}>
                     <View style={[styles.xpBarFill, { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent }]} />
                   </View>
-                  <Text style={styles.xpText}>{p.xp} / {p.xp_next_level} XP</Text>
-
-                  {/* Quick chat button */}
-                  <TouchableOpacity
-                    style={[styles.cardChatBtn, { borderColor: def.accent + '55', backgroundColor: def.accent + '18' }]}
-                    onPress={() => { play('tap'); setHomeChatPetId(def.id); }}
-                    activeOpacity={0.75}
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                  >
-                    <Text style={[styles.cardChatBtnText, { color: def.accent }]}>💬 聊天</Text>
-                  </TouchableOpacity>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          <Text style={styles.selectorHint}>點擊查看詳情</Text>
+          <Text style={styles.selectorHint}>點擊對話 · 詳情請至收藏頁</Text>
         </View>
 
         {/* ── START FOCUS button ───────────────────── */}
@@ -399,20 +388,6 @@ const styles = StyleSheet.create({
   levelPillText: { fontSize: 10, fontWeight: '700' },
   xpBarBg: { width: '100%', height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)', overflow: 'hidden', marginBottom: 4 },
   xpBarFill: { height: 4, borderRadius: 9999 },
-  xpText: { fontSize: 9, color: Colors.inkFaint, letterSpacing: 0.2, marginBottom: 8 },
-
-  // Quick chat button on each card
-  cardChatBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    borderWidth: 1,
-  },
-  cardChatBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
 
   // START FOCUS card
   section: { marginTop: 14, paddingHorizontal: 18 },
