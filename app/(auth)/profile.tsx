@@ -43,7 +43,7 @@ export default function ProfileScreen() {
         data: { name: name.trim() },
       });
       if (error) throw error;
-      router.push('/(auth)/consent');
+      router.push('/(auth)/focus-type');
     } catch (err: any) {
       Alert.alert('設定失敗', err.message ?? '請稍後再試');
     } finally {
