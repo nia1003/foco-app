@@ -150,7 +150,7 @@ Four pets, each with a handcrafted React Native vector/3D component:
 
 | Pet | Trait | Accent |
 |-----|-------|--------|
-| Xingwang | Round & cheerful | `#FABD03` |
+| Sunion | Round & cheerful | `#FABD03` |
 | Lily | Bright & blooming | `#e03060` |
 | Fluff | Soft & dreamy | `#4ecdc4` |
 | Stay | Calm & starry | `#C4A8E8` |

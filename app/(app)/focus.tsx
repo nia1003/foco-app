@@ -44,8 +44,8 @@ export default function FocusScreen() {
   const activePetDef =
     (resolvedPetRecord
       ? PETS.find((p) => p.id === resolvedPetRecord.name.toLowerCase()) ??
-        PETS.find((p) => p.id === 'xingwang')
-      : PETS.find((p) => p.id === 'xingwang')) ?? PETS[0];
+        PETS.find((p) => p.id === 'sunion')
+      : PETS.find((p) => p.id === 'sunion')) ?? PETS[0];
 
   const { play, playToggle } = useSound();
   const [showQuitModal, setShowQuitModal] = React.useState(false);

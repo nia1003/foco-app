@@ -48,12 +48,12 @@ export default function PetInfoScreen() {
   // When the store is empty (backend not yet loaded), fall back to mockPets as the search pool
   const searchPool = pets.length > 0 ? pets : mockPets;
 
-  // petDef (visual definition): petId param is the PETS constant id ('xingwang'/'lily')
+  // petDef (visual definition): petId param is the PETS constant id ('sunion'/'lily')
   // — use it directly first, so collection→pet-info always shows the right 3D model + name
   const petDef =
     (petId ? PETS.find((p) => p.id === petId) : null) ??
     PETS.find((p) => p.id === (activePet?.name ?? '').toLowerCase()) ??
-    PETS.find((p) => p.id === 'xingwang') ??
+    PETS.find((p) => p.id === 'sunion') ??
     PETS[0];
 
   // FocoPet (XP / level data): find by UUID or by name matching the petDef
