@@ -125,14 +125,21 @@ export interface FocoPet {
 }
 
 // tasks table
+export type TaskCategory = 'task' | 'daily';
+
+export type TaskIconType = 'emoji' | 'svg';
+
 export interface Task {
   id: string;
   user_id: string;
   title: string;
   duration_min: number;
   status: 'pending' | 'done' | 'deleted';
+  category?: TaskCategory;
   created_at: string;
-  // local-only fields (not yet persisted to DB)
+  icon_type?: TaskIconType | null;
+  icon_value?: string | null;
+  /** @deprecated use icon_type + icon_value */
   emoji?: string;
   memo?: string;
 }
@@ -140,6 +147,7 @@ export interface Task {
 // sessions table（歷史清單用）
 export interface SessionRecord {
   id: string;
+  task_id?: string | null;
   actual_duration: number;   // 秒
   completed: boolean;
   focus_type_result: FocusType;
@@ -225,5 +233,7 @@ export interface SessionSummary {
 export interface DayData {
   date: string;           // 'YYYY-MM-DD'
   session_count: number;
+  /** Total focus seconds on this day (sum of session durations) */
+  total_focus_sec: number;
   sessions: SessionSummary[];
 }

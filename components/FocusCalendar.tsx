@@ -1,31 +1,48 @@
 /**
- * FocusCalendar — GitHub-style monthly session heatmap
- * Dot darkness = session count (0 / 1 / 2 / 3+)
- * Today: pink ring border
- * Tap a day → navigate to day-log with that week
+ * FocusCalendar — GitHub-style monthly session heatmap (theme-aware)
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import type { AppTheme } from '@/hooks/useAppTheme';
 import type { DayData } from '@/types';
 
-const PINK = Colors.pinkText;
 const MONTHS = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
 ];
 const DAY_LABELS = ['S','M','T','W','T','F','S'];
 
-function getDotBg(count: number): string {
-  if (count === 0) return 'rgba(26,22,34,0.07)';
-  if (count === 1) return 'rgba(181,96,122,0.30)';
-  if (count === 2) return 'rgba(181,96,122,0.60)';
-  return 'rgba(181,96,122,0.90)';
+function dayFocusSec(entry: DayData | undefined): number {
+  if (!entry) return 0;
+  if (entry.total_focus_sec > 0) return entry.total_focus_sec;
+  return entry.sessions.reduce((acc, s) => acc + s.duration_min * 60, 0);
+}
+
+/** Opacity scales with focus time; level 0 = none, 1 = busiest day in this month */
+function getDotBgFromFocusLevel(level: number, isDark: boolean): string {
+  if (level <= 0) {
+    return isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,22,34,0.07)';
+  }
+  const minOp = isDark ? 0.28 : 0.3;
+  const maxOp = isDark ? 0.92 : 0.9;
+  const op = minOp + Math.min(Math.max(level, 0), 1) * (maxOp - minOp);
+  return isDark ? `rgba(201,143,168,${op.toFixed(2)})` : `rgba(181,96,122,${op.toFixed(2)})`;
+}
+
+function formatFocusMinutes(sec: number): string {
+  if (sec <= 0) return '0';
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? `${h}h${rem}m` : `${h}h`;
 }
 
 function toMondayStart(date: Date): Date {
-  const dow = date.getDay(); // 0=Sun
+  const dow = date.getDay();
   const offset = dow === 0 ? -6 : 1 - dow;
   const monday = new Date(date);
   monday.setDate(date.getDate() + offset);
@@ -34,23 +51,35 @@ function toMondayStart(date: Date): Date {
 
 interface Props {
   year: number;
-  month: number; // 1-based
+  month: number;
   data: DayData[];
   onMonthChange: (year: number, month: number) => void;
 }
 
 export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
   const router = useRouter();
+  const { isDark, colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
 
   const todayStr = new Date().toISOString().slice(0, 10);
+  const dataByDate = useMemo(() => new Map(data.map((d) => [d.date, d])), [data]);
 
-  const dataMap = new Map<string, number>();
-  data.forEach((d) => dataMap.set(d.date, d.session_count));
-
-  const firstDow = new Date(year, month - 1, 1).getDay(); // 0=Sun
+  const firstDow = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  // cells: null = padding, number = day of month
+  const { maxFocusSec, focusSecByDay } = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const byDay = new Map<string, number>();
+    let max = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+      const sec = dayFocusSec(dataByDate.get(dateStr));
+      byDay.set(dateStr, sec);
+      if (sec > max) max = sec;
+    }
+    return { maxFocusSec: max, focusSecByDay: byDay };
+  }, [year, month, daysInMonth, dataByDate]);
+
   const cells: (number | null)[] = [
     ...Array(firstDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
@@ -83,7 +112,6 @@ export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Month navigation */}
       <View style={styles.nav}>
         <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.6}>
           <Text style={styles.navArrow}>‹</Text>
@@ -94,7 +122,6 @@ export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* Day-of-week labels */}
       <View style={styles.row}>
         {DAY_LABELS.map((l, i) => (
           <View key={i} style={styles.cell}>
@@ -103,7 +130,6 @@ export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
         ))}
       </View>
 
-      {/* Dot grid */}
       {weeks.map((week, wi) => (
         <View key={wi} style={styles.row}>
           {week.map((day, di) => {
@@ -112,7 +138,8 @@ export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
             }
             const pad = (n: number) => String(n).padStart(2, '0');
             const dateStr = `${year}-${pad(month)}-${pad(day)}`;
-            const count = dataMap.get(dateStr) ?? 0;
+            const focusSec = focusSecByDay.get(dateStr) ?? 0;
+            const level = maxFocusSec > 0 ? focusSec / maxFocusSec : focusSec > 0 ? 1 : 0;
             const isToday = dateStr === todayStr;
 
             return (
@@ -121,12 +148,13 @@ export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
                 style={styles.cell}
                 onPress={() => handleDayPress(day)}
                 activeOpacity={0.7}
+                accessibilityLabel={`${dateStr}, ${formatFocusMinutes(focusSec)} focused`}
               >
                 <View
                   style={[
                     styles.dot,
-                    { backgroundColor: getDotBg(count) },
-                    isToday && styles.dotToday,
+                    { backgroundColor: getDotBgFromFocusLevel(level, isDark) },
+                    isToday && [styles.dotToday, { borderColor: colors.pinkText }],
                   ]}
                 />
               </TouchableOpacity>
@@ -135,13 +163,18 @@ export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
         </View>
       ))}
 
-      {/* Legend */}
       <View style={styles.legend}>
-        <Text style={styles.legendLabel}>fewer</Text>
-        {[0, 1, 2, 3].map((c) => (
-          <View key={c} style={[styles.legendDot, { backgroundColor: getDotBg(c) }]} />
+        <Text style={styles.legendLabel}>少</Text>
+        {[0, 0.33, 0.66, 1].map((level) => (
+          <View
+            key={level}
+            style={[styles.legendDot, { backgroundColor: getDotBgFromFocusLevel(level, isDark) }]}
+          />
         ))}
-        <Text style={styles.legendLabel}>more</Text>
+        <Text style={styles.legendLabel}>多</Text>
+        {maxFocusSec > 0 && (
+          <Text style={styles.legendHint}>（依本月專注時間）</Text>
+        )}
       </View>
     </View>
   );
@@ -150,53 +183,50 @@ export function FocusCalendar({ year, month, data, onMonthChange }: Props) {
 const DOT = 28;
 const CELL_H = 38;
 
-const styles = StyleSheet.create({
-  container: { paddingHorizontal: 4, paddingBottom: 4 },
-
-  nav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-    paddingHorizontal: 4,
-  },
-  navBtn: { padding: 6 },
-  navArrow: { fontSize: 22, color: Colors.inkSoft, fontWeight: '300' },
-  monthTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.ink,
-    letterSpacing: 0.2,
-  },
-
-  row: { flexDirection: 'row', marginBottom: 5 },
-  cell: { flex: 1, alignItems: 'center', justifyContent: 'center', height: CELL_H },
-
-  dayLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.inkFaint,
-    letterSpacing: 0.5,
-  },
-
-  dot: {
-    width: DOT,
-    height: DOT,
-    borderRadius: DOT / 2,
-  },
-  dotToday: {
-    borderWidth: 2,
-    borderColor: PINK,
-  },
-
-  legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
-    marginTop: 6,
-    paddingHorizontal: 4,
-  },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendLabel: { fontSize: 9, color: Colors.inkFaint, letterSpacing: 0.3 },
-});
+function createStyles({ colors }: AppTheme) {
+  return StyleSheet.create({
+    container: { paddingHorizontal: 4, paddingBottom: 4 },
+    nav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 14,
+      paddingHorizontal: 4,
+    },
+    navBtn: { padding: 6 },
+    navArrow: { fontSize: 22, color: colors.inkSoft, fontWeight: '300' },
+    monthTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.ink,
+      letterSpacing: 0.2,
+    },
+    row: { flexDirection: 'row', marginBottom: 5 },
+    cell: { flex: 1, alignItems: 'center', justifyContent: 'center', height: CELL_H },
+    dayLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.inkFaint,
+      letterSpacing: 0.5,
+    },
+    dot: {
+      width: DOT,
+      height: DOT,
+      borderRadius: DOT / 2,
+    },
+    dotToday: {
+      borderWidth: 2,
+    },
+    legend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 4,
+      marginTop: 6,
+      paddingHorizontal: 4,
+    },
+    legendDot: { width: 10, height: 10, borderRadius: 5 },
+    legendLabel: { fontSize: 9, color: colors.inkFaint, letterSpacing: 0.3 },
+    legendHint: { fontSize: 8, color: colors.inkFaint, marginLeft: 4, fontStyle: 'italic' },
+  });
+}

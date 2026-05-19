@@ -59,7 +59,7 @@ function buildMockWeekData(weekStart: string): DayData[] {
     const month = d.getUTCMonth() + 1;
     const mock = getMockCalendarData(year, month);
     const found = mock.find((x) => x.date === dateStr);
-    return found ?? { date: dateStr, session_count: 0, sessions: [] };
+    return found ?? { date: dateStr, session_count: 0, total_focus_sec: 0, sessions: [] };
   });
 }
 

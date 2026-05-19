@@ -5,7 +5,8 @@
  * - 結束時 POST session-complete → 導向 Reward
  * - 寵物直接浮在畫面中央（無圓形 orb）
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Animated,
   Modal,
@@ -16,7 +17,9 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
+import { WavyTimer } from '@/components/ui/WavyTimer';
 import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { PETS } from '@/constants/pets';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { useTimer } from '@/hooks/useTimer';
@@ -50,6 +53,7 @@ export default function FocusScreen() {
       : PETS.find((p) => p.id === 'xingwang')) ?? PETS[0];
 
   const { play, playToggle } = useSound();
+  const { surfaces, screenBg } = useAppTheme();
   const [showQuitModal, setShowQuitModal] = React.useState(false);
 
   // Use a ref so handleEnd always reads the latest value and stale closures can't freeze the screen
@@ -58,16 +62,35 @@ export default function FocusScreen() {
   const floatAnim  = useRef(new Animated.Value(0)).current;
   const scaleAnim  = useRef(new Animated.Value(1)).current;
 
-  const { phase, paused, mm, ss, start, pause, resume, skipToReflection, getSnapshot, setTaskId } =
-    useTimer({
-      durationSeconds,
-      onComplete: () => handleEnd(false),
-    });
+  const {
+    phase,
+    paused,
+    mm,
+    ss,
+    progress,
+    start,
+    pause,
+    resume,
+    skipToReflection,
+    reset,
+    getSnapshot,
+    setTaskId,
+  } = useTimer({
+    durationSeconds,
+    onComplete: () => handleEnd(false),
+  });
 
-  useEffect(() => {
-    setTaskId(taskId ?? null);
-    start();
-  }, []);
+  const elapsedProgress = 1 - progress;
+
+  useFocusEffect(
+    useCallback(() => {
+      setTaskId(taskId ?? null);
+      start();
+      return () => {
+        reset();
+      };
+    }, [durationSeconds, taskId]),
+  );
 
   // Float + subtle pulse when running
   useEffect(() => {
@@ -151,7 +174,7 @@ export default function FocusScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
 
       <View style={styles.content}>
@@ -163,27 +186,25 @@ export default function FocusScreen() {
           ) : null}
         </View>
 
-        {/* Pet + timer */}
+        {/* Wavy ring + pet + countdown */}
         <View style={styles.petArea}>
-          {/* Floating pet */}
-          <Animated.View
-            style={{
-              transform: [
-                { translateY: floatAnim },
-                { scale: scaleAnim },
-              ],
-            }}
+          <WavyTimer
+            progress={elapsedProgress}
+            timeLabel={`${mm}:${ss}`}
+            caption={paused ? 'PAUSED' : undefined}
+            size={320}
           >
-            <PetRenderer pet={activePetDef} size={220} />
-          </Animated.View>
-
-          {/* Timer display */}
-          <View style={styles.timerBox}>
-            <Text style={styles.timerNumerals}>{mm}:{ss}</Text>
-            {paused && (
-              <Text style={styles.timerCaption}>PAUSED</Text>
-            )}
-          </View>
+            <Animated.View
+              style={{
+                transform: [
+                  { translateY: floatAnim },
+                  { scale: scaleAnim },
+                ],
+              }}
+            >
+              <PetRenderer pet={activePetDef} size={160} />
+            </Animated.View>
+          </WavyTimer>
         </View>
 
         {/* Controls: Quit | Pause/Resume | Done */}
@@ -198,14 +219,23 @@ export default function FocusScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.mainBtn, paused && styles.mainBtnPaused]}
+            style={[
+              styles.mainBtn,
+              {
+                backgroundColor: surfaces.ctaBg,
+                shadowColor: surfaces.shadowColor,
+              },
+              paused && { opacity: 0.9 },
+            ]}
             onPress={() => {
               playToggle(paused); // paused→resume: toggle_on; running→pause: toggle_off
               paused ? resume() : pause();
             }}
             activeOpacity={0.85}
           >
-            <Text style={styles.mainBtnText}>{paused ? '▶ Resume' : '⏸ Pause'}</Text>
+            <Text style={[styles.mainBtnText, { color: surfaces.ctaText }]}>
+              {paused ? '▶ Resume' : '⏸ Pause'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -221,8 +251,8 @@ export default function FocusScreen() {
 
       {/* Quit modal */}
       <Modal visible={showQuitModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+        <View style={[styles.modalOverlay, { backgroundColor: surfaces.modalBackdrop }]}>
+          <View style={[styles.modalCard, { backgroundColor: surfaces.modalSheetBg, borderColor: surfaces.dividerStrong }]}>
             <Text style={styles.modalTitle}>提前結束？</Text>
             <Text style={styles.modalSub}>
               放棄會影響你的 DISC 分析結果。
@@ -282,23 +312,6 @@ const styles = StyleSheet.create({
     gap: 20,
   },
 
-  // Timer below pet
-  timerBox: { alignItems: 'center', gap: 4 },
-  timerNumerals: {
-    fontFamily: 'Fraunces_400Regular',
-    fontSize: 60,
-    fontWeight: '400',
-    color: Colors.ink,
-    letterSpacing: -2,
-    lineHeight: 68,
-  },
-  timerCaption: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.inkFaint,
-    letterSpacing: 2.5,
-  },
-
   // Controls
   controls: {
     flexDirection: 'row',
@@ -314,37 +327,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingVertical: 16,
     borderRadius: 9999,
-    backgroundColor: Colors.ink,
-    shadowColor: Colors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 6,
   },
-  mainBtnPaused: { backgroundColor: Colors.inkSoft as string },
-  mainBtnText: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  mainBtnText: { fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
 
   // Quit modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   modalCard: {
     width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.72)',
     borderRadius: 28,
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.80)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.15,
     shadowRadius: 24,
-    elevation: 4,
+    elevation: 12,
+    overflow: 'hidden',
   },
   modalTitle: {
     fontFamily: 'Fraunces_500Medium',

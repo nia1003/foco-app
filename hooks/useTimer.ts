@@ -128,6 +128,15 @@ export function useTimer({
     return () => sub.remove();
   }, [phase, paused, startInterval, stopInterval, onComplete]);
 
+  // ── Sync duration when params change (before timer starts) ──
+  useEffect(() => {
+    if (phase !== 'timer' && phase !== 'reflection') {
+      remainingAtPauseRef.current = durationSeconds;
+      plannedRef.current = durationSeconds;
+      setSecs(durationSeconds);
+    }
+  }, [durationSeconds, phase]);
+
   // ── Cleanup on unmount ────────────────────────
   useEffect(() => () => stopInterval(), [stopInterval]);
 
