@@ -37,6 +37,14 @@ const PEEK_H   = 256;              // visible when collapsed: handle + name + tr
 const SHEET_H  = SCREEN_H * 0.76;
 const MAX_DRAG = SHEET_H - PEEK_H;
 
+// Auto-greeting shown when the page loads (no API call)
+const PET_GREETINGS: Record<string, string> = {
+  sunion: '嗨嗨！今天也要一起加油喔！☀️',
+  lily:   '喲，來了啊！準備好迎接今天了嗎？',
+  fluff:  '……靜靜地，陪你。',
+  stay:   '專注。',
+};
+
 // Level metadata
 const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }> = {
   1: { scale: 0.7,  label: '新生',   desc: '剛開始旅程，充滿好奇心！' },
@@ -76,6 +84,25 @@ export default function PetInfoScreen() {
   const lastChatAt = useRef(0);
   // Chat bar floats above the peek section; slides up when keyboard opens
   const chatBarBottom = useRef(new Animated.Value(PEEK_H + 10)).current;
+  // Chat bar fades in on mount and greeting fades in shortly after
+  const chatBarOpacity = useRef(new Animated.Value(0)).current;
+
+  // On mount: fade in chat bar, then show auto-greeting
+  useEffect(() => {
+    Animated.timing(chatBarOpacity, { toValue: 1, duration: 350, delay: 300, useNativeDriver: true }).start();
+
+    const greeting = PET_GREETINGS[petDef.id] ?? '嗨！';
+    const timer = setTimeout(() => {
+      setPetReply(greeting);
+      replyOpacity.setValue(0);
+      Animated.sequence([
+        Animated.timing(replyOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.delay(9000),
+        Animated.timing(replyOpacity, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ]).start(() => setPetReply(''));
+    }, 700);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const showEv = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -304,8 +331,9 @@ export default function PetInfoScreen() {
         </ScrollView>
       </Animated.View>
 
-      {/* ── Chat input bar — floats just above the peek section ── */}
+      {/* ── Chat input bar — fades in on mount, floats above peek ── */}
       <Animated.View style={[styles.chatBar, { bottom: chatBarBottom }]}>
+        <Animated.View style={{ opacity: chatBarOpacity }}>
         <View style={styles.chatInputRow}>
           <TextInput
             style={styles.chatInput}
@@ -329,6 +357,7 @@ export default function PetInfoScreen() {
             </TouchableOpacity>
           )}
         </View>
+        </Animated.View>
       </Animated.View>
     </View>
   );

@@ -163,32 +163,30 @@ export default function HomeScreen() {
               const xpPct = p.xp_next_level > 0 ? p.xp / p.xp_next_level : 0;
 
               return (
-                <Animated.View
-                  key={def.id}
-                  style={{ transform: [{ scale: getScale(def.id) }] }}
-                >
-                  <TouchableOpacity
-                    style={[styles.petCard, { width: PET_CARD_W }]}
-                    onPress={() => handlePetPress(def)}
-                    activeOpacity={0.92}
-                  >
-                    <View style={styles.petPreview}>
+                <View key={def.id} style={[styles.petCard, { width: PET_CARD_W }]}>
+                  {/* Only the pet figure is tappable */}
+                  <Animated.View style={{ transform: [{ scale: getScale(def.id) }] }}>
+                    <TouchableOpacity
+                      style={styles.petPreview}
+                      onPress={() => handlePetPress(def)}
+                      activeOpacity={0.88}
+                    >
                       <PetRenderer pet={def} size={150} interactive />
-                    </View>
-                    <Text style={styles.petCardName}>{def.name}</Text>
-                    <View style={styles.levelPill}>
-                      <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
-                    </View>
-                    <View style={styles.xpBarBg}>
-                      <View style={[styles.xpBarFill, { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent }]} />
-                    </View>
-                  </TouchableOpacity>
-                </Animated.View>
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <Text style={styles.petCardName}>{def.name}</Text>
+                  <View style={styles.levelPill}>
+                    <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
+                  </View>
+                  <View style={styles.xpBarBg}>
+                    <View style={[styles.xpBarFill, { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent }]} />
+                  </View>
+                </View>
               );
             })}
           </ScrollView>
 
-          <Text style={styles.selectorHint}>點擊夥伴開始對話</Text>
+          <Text style={styles.selectorHint}>點擊夥伴進行對話</Text>
         </View>
 
         {/* ── START FOCUS button ───────────────────── */}
