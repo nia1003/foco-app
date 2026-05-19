@@ -1,19 +1,15 @@
 /**
  * HomeScreen — daily dashboard hub
- * - Pet carousel: tap for detail view, 💬 for quick chat
- * - START FOCUS button → FocusSetupModal (pick pet / duration / mission)
+ * - Pet carousel: tap a card → scale-pop animation → navigate to pet-info (chat lives there)
+ * - START FOCUS button → FocusSetupSheet
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -28,9 +24,10 @@ import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { getPets, getTasks, getCalendarData, chatWithPet } from '@/services/focoService';
+import { getPets, getTasks, getCalendarData } from '@/services/focoService';
 import { mockPets, mockTasks, getMockCalendarData } from '@/data/mockData';
 import { FocusCalendar } from '@/components/FocusCalendar';
+import type { Pet as PetDef } from '@/constants/pets';
 import type { Task, DayData } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -46,10 +43,28 @@ const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 export default function HomeScreen() {
   const router = useRouter();
   const { userId, userName, userEmail } = useAuthStore();
-  const { pets, activePet, setPets, setActivePet, restoreActivePet, petsLastFetchedAt } = usePetStore();
+  const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
   const { play } = useSound();
 
   const storePool = pets.length > 0 ? pets : mockPets;
+
+  // ── Card press-scale animations ────────────────────────────────
+  const cardScales = useRef<Record<string, Animated.Value>>({});
+  const getScale = (id: string) => {
+    if (!cardScales.current[id]) cardScales.current[id] = new Animated.Value(1);
+    return cardScales.current[id];
+  };
+
+  const handlePetPress = (def: PetDef) => {
+    const scale = getScale(def.id);
+    play('transition_up');
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.07, useNativeDriver: true, tension: 300, friction: 8 }),
+      Animated.spring(scale, { toValue: 1,    useNativeDriver: true, tension: 300, friction: 8 }),
+    ]).start(() => {
+      router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
+    });
+  };
 
   // ── Calendar state ─────────────────────────────────────────────
   const nowDate = new Date();
@@ -60,51 +75,6 @@ export default function HomeScreen() {
   // ── Focus modal state ──────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [modalTasks, setModalTasks] = useState<Task[]>([]);
-
-  // ── Quick chat state ───────────────────────────────────────────
-  const [homeChatPetId, setHomeChatPetId] = useState<string | null>(null);
-  const [homeInput, setHomeInput] = useState('');
-  const [homeReply, setHomeReply] = useState<{ petId: string; text: string } | null>(null);
-  const [homeChatLoading, setHomeChatLoading] = useState(false);
-  const homeReplyOpacity = useRef(new Animated.Value(0)).current;
-  const homeLastChatAt = useRef(0);
-
-  const homeChatDef = homeChatPetId ? PETS.find((p) => p.id === homeChatPetId) : null;
-
-  const sendHomeChat = async () => {
-    const trimmed = homeInput.trim();
-    if (!trimmed || homeChatLoading || !homeChatPetId) return;
-    if (Date.now() - homeLastChatAt.current < 10_000) return;
-    homeLastChatAt.current = Date.now();
-
-    const chatPetId = homeChatPetId;
-    setHomeInput('');
-    setHomeChatPetId(null);
-    Keyboard.dismiss();
-    setHomeChatLoading(true);
-
-    try {
-      const reply = await chatWithPet(chatPetId, trimmed);
-      setHomeReply({ petId: chatPetId, text: reply });
-      homeReplyOpacity.setValue(0);
-      Animated.sequence([
-        Animated.timing(homeReplyOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.delay(4000),
-        Animated.timing(homeReplyOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
-      ]).start(() => setHomeReply(null));
-    } catch (e: any) {
-      const errText = e?.message === 'rate_limited' ? '再等一下嘛～' : '嗯…';
-      setHomeReply({ petId: chatPetId, text: errText });
-      homeReplyOpacity.setValue(0);
-      Animated.sequence([
-        Animated.timing(homeReplyOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.delay(2500),
-        Animated.timing(homeReplyOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
-      ]).start(() => setHomeReply(null));
-    } finally {
-      setHomeChatLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (!userId) return;
@@ -153,10 +123,7 @@ export default function HomeScreen() {
   const modalPets = pets.length > 0 ? pets : mockPets;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.root}
-    >
+    <View style={styles.root}>
       <AppBackground />
       <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
 
@@ -164,7 +131,6 @@ export default function HomeScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
         {/* ── Greeting ─────────────────────────────── */}
         <View style={styles.greeting}>
@@ -184,16 +150,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Reply bubble — floats above the carousel */}
-          {homeReply && (
-            <Animated.View
-              style={[styles.homeReplyBubble, { opacity: homeReplyOpacity }]}
-              pointerEvents="none"
-            >
-              <Text style={styles.homeReplyText}>{homeReply.text}</Text>
-            </Animated.View>
-          )}
-
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -201,35 +157,38 @@ export default function HomeScreen() {
             decelerationRate="fast"
             snapToInterval={PET_CARD_W + 12}
             snapToAlignment="start"
-            keyboardShouldPersistTaps="handled"
           >
             {UNLOCKED_DEFS.map((def) => {
               const p = storePool.find((r) => r.name.toLowerCase() === def.id) ?? storePool[0];
               const xpPct = p.xp_next_level > 0 ? p.xp / p.xp_next_level : 0;
 
               return (
-                <TouchableOpacity
+                <Animated.View
                   key={def.id}
-                  style={[styles.petCard, { width: PET_CARD_W }]}
-                  onPress={() => { play('tap'); setHomeChatPetId(def.id); }}
-                  activeOpacity={0.88}
+                  style={{ transform: [{ scale: getScale(def.id) }] }}
                 >
-                  <View style={styles.petPreview}>
-                    <PetRenderer pet={def} size={150} interactive />
-                  </View>
-                  <Text style={styles.petCardName}>{def.name}</Text>
-                  <View style={styles.levelPill}>
-                    <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
-                  </View>
-                  <View style={styles.xpBarBg}>
-                    <View style={[styles.xpBarFill, { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent }]} />
-                  </View>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.petCard, { width: PET_CARD_W }]}
+                    onPress={() => handlePetPress(def)}
+                    activeOpacity={0.92}
+                  >
+                    <View style={styles.petPreview}>
+                      <PetRenderer pet={def} size={150} interactive />
+                    </View>
+                    <Text style={styles.petCardName}>{def.name}</Text>
+                    <View style={styles.levelPill}>
+                      <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
+                    </View>
+                    <View style={styles.xpBarBg}>
+                      <View style={[styles.xpBarFill, { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent }]} />
+                    </View>
+                  </TouchableOpacity>
+                </Animated.View>
               );
             })}
           </ScrollView>
 
-          <Text style={styles.selectorHint}>點擊對話 · 詳情請至收藏頁</Text>
+          <Text style={styles.selectorHint}>點擊夥伴開始對話</Text>
         </View>
 
         {/* ── START FOCUS button ───────────────────── */}
@@ -264,47 +223,6 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Quick chat input bar ─────────────────────────────────── */}
-      {homeChatPetId && (
-        <View style={styles.homeChatBar}>
-          <FrostCard radius={28} padded={false}>
-            <View style={styles.homeChatInputRow}>
-              <TextInput
-                autoFocus
-                style={styles.homeChatInput}
-                value={homeInput}
-                onChangeText={setHomeInput}
-                placeholder={`跟 ${homeChatDef?.name ?? ''} 說…`}
-                placeholderTextColor={Colors.inkFaint}
-                returnKeyType="send"
-                onSubmitEditing={sendHomeChat}
-                editable={!homeChatLoading}
-                multiline={false}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.homeChatSendBtn,
-                  { backgroundColor: homeChatDef?.accent ?? '#F2CEDC' },
-                  (!homeInput.trim() || homeChatLoading) && styles.homeSendDisabled,
-                ]}
-                disabled={!homeInput.trim() || homeChatLoading}
-                onPress={sendHomeChat}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.homeChatSendIcon}>↑</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.homeChatClose}
-                onPress={() => { setHomeChatPetId(null); Keyboard.dismiss(); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.homeChatCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          </FrostCard>
-        </View>
-      )}
-
       {/* ── Focus Setup Sheet ────────────────────────────────────── */}
       <FocusSetupSheet
         visible={showModal}
@@ -313,7 +231,7 @@ export default function HomeScreen() {
         tasks={modalTasks}
         initialPetId={activePet?.id ?? null}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -347,31 +265,6 @@ const styles = StyleSheet.create({
     textAlign: 'center', marginTop: 10, letterSpacing: 0.3,
   },
 
-  // Reply bubble — overlays the top of the carousel
-  homeReplyBubble: {
-    position: 'absolute',
-    top: 44,
-    left: 22,
-    right: 22,
-    zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.97)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#14101c',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  homeReplyText: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 15,
-    color: Colors.ink,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-
   petRow: { paddingHorizontal: 22, gap: 12 },
   petCard: {
     paddingHorizontal: 12,
@@ -386,13 +279,11 @@ const styles = StyleSheet.create({
   },
   levelPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999, marginBottom: 10, backgroundColor: 'rgba(20,16,28,0.06)' },
   levelPillText: { fontSize: 10, fontWeight: '700' },
-  xpBarBg: { width: '100%', height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)', overflow: 'hidden', marginBottom: 4 },
+  xpBarBg: { width: '100%', height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)', overflow: 'hidden' },
   xpBarFill: { height: 4, borderRadius: 9999 },
 
-  // START FOCUS card
   section: { marginTop: 14, paddingHorizontal: 18 },
 
-  // Calendar
   calSection: { marginTop: 18, paddingHorizontal: 18, marginBottom: 8 },
   calHeader: { marginBottom: 10 },
   calEyebrow: {
@@ -403,34 +294,4 @@ const styles = StyleSheet.create({
   startFocusBtn: { padding: 28, alignItems: 'center', gap: 6 },
   startFocusEyebrow: { fontSize: 11, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6 },
   startFocusLabel: { fontSize: 20, fontWeight: '700', color: Colors.ink, letterSpacing: 2 },
-
-  // ── Home quick chat bar ────────────────────────────────────────
-  homeChatBar: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  homeChatInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  homeChatInput: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.ink,
-    paddingVertical: 4,
-  },
-  homeChatSendBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  homeSendDisabled: { opacity: 0.35 },
-  homeChatSendIcon: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  homeChatClose: {
-    width: 28, height: 28,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  homeChatCloseText: { fontSize: 14, color: Colors.inkSoft },
 });
