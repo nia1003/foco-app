@@ -2,15 +2,19 @@
  * PetInfoScreen — 上拉式底部卡片
  * - 全螢幕顯示大寵物（無圓形框）
  * - 底部卡片：往上拉顯示 XP、個性、成長路線
+ * - 底部輸入欄：直接跟寵物對話，回應以漂浮泡泡呈現
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Keyboard,
   PanResponder,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -20,18 +24,18 @@ import { PetRenderer } from '@/components/pets/PetRenderer';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { PetChatModal } from '@/components/PetChatModal';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
 import { mockPets } from '@/data/mockData';
+import { chatWithPet } from '@/services/focoService';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
 // Sheet geometry
-const PEEK_H   = 200;              // visible when collapsed: handle + name + level + XP bar top edge
-const SHEET_H  = SCREEN_H * 0.72; // height when fully expanded
-const MAX_DRAG = SHEET_H - PEEK_H; // translateY range
+const PEEK_H   = 200;              // visible when collapsed: handle + name + level
+const SHEET_H  = SCREEN_H * 0.72;
+const MAX_DRAG = SHEET_H - PEEK_H;
 
 // Level metadata
 const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }> = {
@@ -46,20 +50,15 @@ export default function PetInfoScreen() {
   const { petId } = useLocalSearchParams<{ petId?: string }>();
   const { pets, activePet } = usePetStore();
   const insets = useSafeAreaInsets();
-  const [showChat, setShowChat] = useState(false);
 
-  // When the store is empty (backend not yet loaded), fall back to mockPets as the search pool
   const searchPool = pets.length > 0 ? pets : mockPets;
 
-  // petDef (visual definition): petId param is the PETS constant id ('sunion'/'lily')
-  // — use it directly first, so collection→pet-info always shows the right 3D model + name
   const petDef =
     (petId ? PETS.find((p) => p.id === petId) : null) ??
     PETS.find((p) => p.id === (activePet?.name ?? '').toLowerCase()) ??
     PETS.find((p) => p.id === 'sunion') ??
     PETS[0];
 
-  // FocoPet (XP / level data): find by UUID or by name matching the petDef
   const pet =
     (petId ? searchPool.find((p) => p.id === petId || p.name.toLowerCase() === petId) : null) ??
     activePet ??
@@ -68,6 +67,69 @@ export default function PetInfoScreen() {
   const level = Math.min(Math.max(pet.level, 1), 5) as 1 | 2 | 3 | 4 | 5;
   const info = LEVEL_INFO[level];
   const xpProgress = pet.xp_next_level > 0 ? pet.xp / pet.xp_next_level : 1;
+
+  // ── Inline chat state ────────────────────────
+  const [chatText, setChatText] = useState('');
+  const [petReply, setPetReply] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const replyOpacity = useRef(new Animated.Value(0)).current;
+  const lastChatAt = useRef(0);
+  // Chat bar floats above the peek section; slides up when keyboard opens
+  const chatBarBottom = useRef(new Animated.Value(PEEK_H + 8)).current;
+
+  useEffect(() => {
+    const showEv = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEv = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEv, (e) => {
+      Animated.timing(chatBarBottom, {
+        toValue: e.endCoordinates.height + 8,
+        duration: Platform.OS === 'ios' ? e.duration : 200,
+        useNativeDriver: false,
+      }).start();
+    });
+    const hide = Keyboard.addListener(hideEv, (e) => {
+      Animated.timing(chatBarBottom, {
+        toValue: PEEK_H + 8,
+        duration: Platform.OS === 'ios' ? ((e as any).duration ?? 250) : 200,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  const sendChat = async () => {
+    const trimmed = chatText.trim();
+    if (!trimmed || chatLoading) return;
+    if (Date.now() - lastChatAt.current < 10_000) return;
+    lastChatAt.current = Date.now();
+
+    setChatText('');
+    Keyboard.dismiss();
+    setChatLoading(true);
+    setPetReply('');
+
+    try {
+      const reply = await chatWithPet(petDef.id, trimmed);
+      setPetReply(reply);
+      replyOpacity.setValue(0);
+      Animated.sequence([
+        Animated.timing(replyOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(6000),
+        Animated.timing(replyOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]).start(() => setPetReply(''));
+    } catch (e: any) {
+      const errText = e?.message === 'rate_limited' ? '再等一下嘛～' : '嗯……說不出話來。';
+      setPetReply(errText);
+      replyOpacity.setValue(0);
+      Animated.sequence([
+        Animated.timing(replyOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(3000),
+        Animated.timing(replyOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]).start(() => setPetReply(''));
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   // ── Bottom sheet animation ───────────────────
   const sheetY = useRef(new Animated.Value(MAX_DRAG)).current;
@@ -114,6 +176,24 @@ export default function PetInfoScreen() {
       {/* Full-screen pet — no pointerEvents block so WebView can receive touch for 3D spin */}
       <View style={[styles.petBg, { top: 56 + insets.top }]}>
         <PetRenderer pet={petDef} size={380} />
+
+        {/* Typing indicator */}
+        {chatLoading && (
+          <View style={styles.speechBubble} pointerEvents="none">
+            <View style={styles.speechDotsRow}>
+              <Text style={styles.speechDot}>●</Text>
+              <Text style={[styles.speechDot, { opacity: 0.6 }]}>●</Text>
+              <Text style={[styles.speechDot, { opacity: 0.35 }]}>●</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Pet reply bubble */}
+        {!chatLoading && !!petReply && (
+          <Animated.View style={[styles.speechBubble, { opacity: replyOpacity }]} pointerEvents="none">
+            <Text style={styles.speechBubbleText}>{petReply}</Text>
+          </Animated.View>
+        )}
       </View>
 
       {/* ── Bottom Sheet ───────────────────────── */}
@@ -125,22 +205,11 @@ export default function PetInfoScreen() {
           <View style={styles.handle} />
         </View>
 
-        {/* Always-visible: name + level + chat button */}
+        {/* Always-visible: name + level */}
         <View style={styles.peekSection}>
-          <View style={styles.peekRow}>
-            <View>
-              <Text style={styles.petName}>{petDef.name}</Text>
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={[styles.chatBtn, { backgroundColor: petDef.accent + '22', borderColor: petDef.accent + '55' }]}
-              onPress={() => setShowChat(true)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.chatBtnText, { color: petDef.accent }]}>聊天 💬</Text>
-            </TouchableOpacity>
+          <Text style={styles.petName}>{petDef.name}</Text>
+          <View style={styles.levelBadge}>
+            <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
           </View>
         </View>
 
@@ -212,11 +281,36 @@ export default function PetInfoScreen() {
         </ScrollView>
       </Animated.View>
 
-      <PetChatModal
-        visible={showChat}
-        onClose={() => setShowChat(false)}
-        pet={petDef}
-      />
+      {/* ── Chat input bar — floats just above the peek section ── */}
+      <Animated.View style={[styles.chatBar, { bottom: chatBarBottom }]}>
+        <FrostCard radius={28} padded={false}>
+          <View style={styles.chatInputRow}>
+            <TextInput
+              style={styles.chatInput}
+              value={chatText}
+              onChangeText={setChatText}
+              placeholder={`跟 ${petDef.name} 說…`}
+              placeholderTextColor={Colors.inkFaint}
+              returnKeyType="send"
+              onSubmitEditing={sendChat}
+              editable={!chatLoading}
+              multiline={false}
+            />
+            <TouchableOpacity
+              style={[
+                styles.chatSendBtn,
+                { backgroundColor: petDef.accent },
+                (!chatText.trim() || chatLoading) && styles.chatSendBtnDisabled,
+              ]}
+              disabled={!chatText.trim() || chatLoading}
+              onPress={sendChat}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.chatSendIcon}>↑</Text>
+            </TouchableOpacity>
+          </View>
+        </FrostCard>
+      </Animated.View>
     </View>
   );
 }
@@ -233,7 +327,7 @@ const styles = StyleSheet.create({
   // Pet fills upper area (top is set dynamically via inline style)
   petBg: {
     position: 'absolute',
-    top: 56,   // overridden inline with 56 + insets.top
+    top: 56,
     left: 0,
     right: 0,
     bottom: PEEK_H,
@@ -241,7 +335,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Sheet ───────────────────────────────────
+  // ── Speech bubble ────────────────────────────
+  speechBubble: {
+    position: 'absolute',
+    top: 16,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    shadowColor: '#14101c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  speechBubbleText: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 16,
+    color: Colors.ink,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  speechDotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  speechDot: {
+    fontSize: 10,
+    color: Colors.inkSoft,
+  },
+
+  // ── Sheet ─────────────────────────────────────
   sheet: {
     position: 'absolute',
     bottom: 0,
@@ -274,21 +401,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingBottom: 14,
   },
-  peekRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  chatBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    borderWidth: 1,
-  },
-  chatBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   petName: {
     fontFamily: 'Fraunces_500Medium',
     fontSize: 32,
@@ -298,6 +410,7 @@ const styles = StyleSheet.create({
   },
   levelBadge: {
     marginTop: 8,
+    alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: 9999,
@@ -390,4 +503,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(242,206,220,0.50)',
   },
   currentBadgeText: { fontSize: 10, fontWeight: '700', color: '#b5607a' },
+
+  // ── Chat input bar ────────────────────────────
+  chatBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    zIndex: 25,
+    elevation: 16,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  chatInput: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.ink,
+    paddingVertical: 4,
+  },
+  chatSendBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  chatSendBtnDisabled: { opacity: 0.35 },
+  chatSendIcon: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });
