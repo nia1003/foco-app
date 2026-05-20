@@ -20,14 +20,23 @@
 
 ## 第二步：設定 EAS（只需做一次）
 
-```bash
-# 安裝 EAS CLI
-npm install -g eas-cli
+這個專案已把 `eas-cli` 放在 devDependencies，Windows/PowerShell 不需要全域安裝，避免 `eas` 找不到、`npx.ps1` 被 Execution Policy 擋住，或 npm 寫入 `C:\Program Files\nodejs` 權限不足。
+
+```powershell
+# 安裝專案依賴
+npm.cmd install
 
 # 登入（用 expo.dev 帳號）
-eas login
+npm.cmd run eas:login
 
-# 在專案根目錄初始化（會自動產生 eas.json）
+# 在專案根目錄初始化或重新確認 eas.json
+npm.cmd run eas:configure
+```
+
+macOS/Linux 或已設定好全域 EAS CLI 的環境也可以用原生指令：
+
+```bash
+eas login
 eas build:configure
 ```
 
@@ -84,7 +93,6 @@ supabase functions deploy session-complete --project-ref <YOUR_PROJECT_ID>
 
 # 本地測試 Edge Function
 supabase functions serve session-complete --env-file .env.local
-```
 
 ---
 

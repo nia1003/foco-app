@@ -16,17 +16,20 @@ import type { FocoPet } from '@/types';
 
 const ACTIVE_PET_KEY = '@foco/activePetId';
 const ONBOARDING_PET_NAME_KEY = '@foco/onboardingPetName';
+const STALE_MS = 5 * 60 * 1000;
 
 interface PetStore {
   pets: FocoPet[];
   activePetId: string | null;
+  petsLastFetchedAt: number | null;
 
   // ── computed (derived, not stored) ───────────
   activePet: FocoPet | null;
 
   // ── actions ──────────────────────────────────
-  /** 取代整個 pets 陣列（首次載入或刷新時使用） */
+  /** 取代整個 pets 陣列（首次載入或刷新時使用），同時更新 lastFetchedAt */
   setPets: (pets: FocoPet[]) => void;
+  isPetsStale: () => boolean;
   /** 選擇陪伴的寵物，並寫入 AsyncStorage */
   setActivePet: (petId: string) => Promise<void>;
   /** Onboarding 選寵物時呼叫，儲存名稱供首次載入自動匹配 */
@@ -57,10 +60,16 @@ export const usePetStore = create<PetStore>((set, get) => ({
   pets: [],
   activePetId: null,
   activePet: null,
+  petsLastFetchedAt: null,
+
+  isPetsStale: () => {
+    const { petsLastFetchedAt } = get();
+    return !petsLastFetchedAt || Date.now() - petsLastFetchedAt > STALE_MS;
+  },
 
   setPets: (pets) => {
     const activePetId = get().activePetId;
-    set({ pets, activePet: deriveActivePet(pets, activePetId) });
+    set({ pets, activePet: deriveActivePet(pets, activePetId), petsLastFetchedAt: Date.now() });
   },
 
   setActivePet: async (petId) => {
@@ -115,7 +124,7 @@ export const usePetStore = create<PetStore>((set, get) => ({
   },
 
   reset: () => {
-    set({ pets: [], activePetId: null, activePet: null });
+    set({ pets: [], activePetId: null, activePet: null, petsLastFetchedAt: null });
     AsyncStorage.multiRemove([ACTIVE_PET_KEY, ONBOARDING_PET_NAME_KEY]).catch(() => {});
   },
 }));

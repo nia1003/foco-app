@@ -1,6 +1,6 @@
 /**
  * PetRenderer — renders either a static Image or a custom component pet.
- * Use this everywhere a pet image is displayed so xingwang (and future
+ * Use this everywhere a pet image is displayed so sunion (and future
  * vector/3D pets) work automatically.
  */
 import React from 'react';

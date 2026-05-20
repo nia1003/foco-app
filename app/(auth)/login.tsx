@@ -4,12 +4,14 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,6 +21,7 @@ import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { authService } from '@/services/authService';
+import { useApiCall } from '@/hooks/useApiCall';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -26,22 +29,18 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const valid = email.includes('@') && password.length >= 6;
 
-  const handleLogin = async () => {
+  const { call: login, loading, blocked, cooldown } = useApiCall(async () => {
     if (!valid) return;
     try {
-      setLoading(true);
       await authService.login(email, password);
       // 成功後 authStore.onAuthStateChange 觸發，_layout.tsx 路由守衛自動跳 Home
     } catch (err: any) {
       Alert.alert('登入失敗', err.message ?? '請確認信箱與密碼');
-    } finally {
-      setLoading(false);
     }
-  };
+  });
 
   return (
     <View style={styles.root}>
@@ -50,6 +49,7 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View style={styles.content}>
           <FocoBar back />
 
@@ -92,13 +92,13 @@ export default function LoginScreen() {
               <View style={styles.underline} />
 
               <TouchableOpacity
-                style={[styles.continueBtn, (!valid || loading) && styles.disabled]}
-                disabled={!valid || loading}
-                onPress={() => { play('transition_up'); handleLogin(); }}
+                style={[styles.continueBtn, (!valid || blocked) && styles.disabled]}
+                disabled={!valid || blocked}
+                onPress={() => { play('transition_up'); login(); }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.continueBtnText}>
-                  {loading ? 'Signing in…' : 'SIGN IN →'}
+                  {loading ? 'Signing in…' : blocked ? `WAIT ${cooldown}s` : 'SIGN IN →'}
                 </Text>
               </TouchableOpacity>
 
@@ -115,6 +115,7 @@ export default function LoginScreen() {
             </FrostCard>
           </View>
         </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </View>
   );

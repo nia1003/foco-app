@@ -12,6 +12,30 @@ function xpNextLevel(level: number): number {
   return level < 5 ? XP_THRESHOLDS[level] : 900;
 }
 
+// ── pet-chat（呼叫 Supabase Edge Function → Claude Haiku）────
+export async function chatWithPet(petId: string, message: string): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const res = await fetch(
+    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/pet-chat`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ petId, message }),
+    },
+  );
+
+  if (res.status === 429) throw new Error('rate_limited');
+  if (!res.ok) throw new Error('ai_error');
+
+  const { reply } = await res.json();
+  return reply as string;
+}
+
 // ── session-complete（呼叫 Supabase Edge Function）
 export async function completeSession(payload: SessionPayload): Promise<SessionResult> {
   const {
@@ -151,6 +175,19 @@ export async function createTask(
 
   if (error) throw error;
   return data as Task;
+}
+
+// ── updateTaskProgress — 更新任務完成進度 ──────────
+export async function updateTaskProgress(taskId: string, completionPercent: number): Promise<void> {
+  const isDone = completionPercent >= 100;
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      completion_percent: completionPercent,
+      ...(isDone ? { status: 'done' } : {}),
+    })
+    .eq('id', taskId);
+  if (error) throw error;
 }
 
 // ── deleteTask（軟刪除 — status='deleted'）───────

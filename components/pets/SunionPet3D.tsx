@@ -1,7 +1,7 @@
 import React from 'react';
 import { PetWebView } from './PetWebView';
 
-interface XingWangPet3DProps {
+interface SunionPet3DProps {
   size?: number;
   color?: string;
   interactive?: boolean;
@@ -113,10 +113,10 @@ function buildHTML(color: string): string {
 </html>`;
 }
 
-export function XingWangPet3D({
+export function SunionPet3D({
   size = 120,
   color = '#FABD03',
   interactive = true,
-}: XingWangPet3DProps) {
+}: SunionPet3DProps) {
   return <PetWebView html={buildHTML(color)} size={size} interactive={interactive} />;
 }
