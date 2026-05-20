@@ -54,8 +54,17 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
       alignSelf: 'flex-start',
     },
     breakdownCardStretch: { alignItems: 'stretch', width: '100%' },
-    periodModes: { flexDirection: 'row', gap: 16, marginTop: 12, marginBottom: 4 },
-    periodModeLabel: { fontSize: 12, fontWeight: '600', color: colors.inkFaint },
+    periodModes: {
+      flexDirection: 'row',
+      gap: 16,
+      marginTop: 12,
+      marginBottom: 4,
+    },
+    periodModeLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.inkFaint,
+    },
     periodModeLabelActive: { color: colors.pinkText },
     chartNav: {
       flexDirection: 'row',
@@ -83,7 +92,11 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
     },
     chartTitleChevron: { fontSize: 20, color: colors.inkFaint },
     selectedDetail: { marginTop: 10 },
-    selectedDetailText: { fontSize: 12, color: colors.inkSoft, textAlign: 'center' },
+    selectedDetailText: {
+      fontSize: 12,
+      color: colors.inkSoft,
+      textAlign: 'center',
+    },
     breakdownCard: { padding: 22, alignItems: 'center' },
     dominantRow: {
       flexDirection: 'row',
@@ -96,7 +109,11 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
     dominantInfo: { flex: 1 },
     dominantLabel: { fontSize: 15, fontWeight: '600', color: colors.ink },
     dominantSub: { fontSize: 12, color: colors.inkSoft, marginTop: 2 },
-    dominantBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+    dominantBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 9999,
+    },
     dominantBadgeText: { fontSize: 12, fontWeight: '700' },
     radarWrapper: { alignItems: 'center', marginTop: 4 },
     recentCard: { padding: 22 },
@@ -124,7 +141,12 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
     },
     sessionSub: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
     sessionRight: { alignItems: 'flex-end', gap: 1 },
-    sessionXP: { fontSize: 14, fontWeight: '700', color: colors.pinkText, letterSpacing: -0.3 },
+    sessionXP: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.pinkText,
+      letterSpacing: -0.3,
+    },
     sessionXPLabel: { fontSize: 9, color: colors.inkFaint, letterSpacing: 0.8 },
     shareOpenBtn: {
       marginTop: 20,
@@ -147,8 +169,19 @@ export function createCategoryChartStyles({ colors, surfaces }: AppTheme) {
   return StyleSheet.create({
     wrap: { gap: 14, marginTop: 8 },
     row: { gap: 6 },
-    labelCol: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
-    label: { fontSize: 13, fontWeight: '600', color: colors.ink, flex: 1, flexShrink: 1 },
+    labelCol: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+      gap: 8,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.ink,
+      flex: 1,
+      flexShrink: 1,
+    },
     sub: { fontSize: 11, color: colors.inkSoft },
     barTrack: {
       height: 8,

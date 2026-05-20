@@ -1,9 +1,3 @@
-/**
- * StatsScreen — Focus analytics
- * - Line chart for Daily Focus Time
- * - Focus type: dominant DISC type + radar chart
- * - Recent sessions list
- */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
@@ -56,32 +50,32 @@ const DISC_COLOR: Record<string, string> = {
 };
 
 const DISC_ICON: Record<string, string> = {
-  dominance:        '▲',
-  influence:        '◆',
-  steadiness:       '◉',
-  conscientiousness:'◈',
+  dominance: '▲',
+  influence: '◆',
+  steadiness: '◉',
+  conscientiousness: '◈',
 };
 
 const DISC_LABEL: Record<string, string> = {
-  dominance:        'Dominance',
-  influence:        'Influence',
-  steadiness:       'Steadiness',
-  conscientiousness:'Conscientiousness',
+  dominance: 'Dominance',
+  influence: 'Influence',
+  steadiness: 'Steadiness',
+  conscientiousness: 'Conscientiousness',
 };
 
 const DISC_SUBLABEL: Record<string, string> = {
-  dominance:        '主導型',
-  influence:        '影響型',
-  steadiness:       '穩健型',
-  conscientiousness:'謹慎型',
+  dominance: '主導型',
+  influence: '影響型',
+  steadiness: '穩健型',
+  conscientiousness: '謹慎型',
 };
 
 // Axes in clockwise order starting from top
 const DISC_AXES: { key: string; angle: number }[] = [
-  { key: 'dominance',        angle: -Math.PI / 2 }, // top
-  { key: 'influence',        angle: 0 },             // right
-  { key: 'steadiness',       angle: Math.PI / 2 },   // bottom
-  { key: 'conscientiousness',angle: Math.PI },        // left
+  { key: 'dominance', angle: -Math.PI / 2 }, // top
+  { key: 'influence', angle: 0 }, // right
+  { key: 'steadiness', angle: Math.PI / 2 }, // bottom
+  { key: 'conscientiousness', angle: Math.PI }, // left
 ];
 
 // ── Data helpers ─────────────────────────────────────────────────
@@ -89,7 +83,20 @@ type PeriodMode = 'day' | 'week' | 'month';
 
 const WEEKLY_POINTS = 6;
 const MONTHLY_POINTS = 6;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
@@ -133,7 +140,10 @@ function getDailyRange(anchorEnd: Date): Date[] {
   });
 }
 
-function getWeeklyRanges(anchorEnd: Date, count: number): { start: Date; end: Date }[] {
+function getWeeklyRanges(
+  anchorEnd: Date,
+  count: number,
+): { start: Date; end: Date }[] {
   const end = startOfDay(anchorEnd);
   return Array.from({ length: count }, (_, i) => {
     const weekEnd = new Date(end);
@@ -150,7 +160,11 @@ function getMonthlyRanges(
 ): { year: number; month: number }[] {
   const anchor = new Date(anchorEnd.getFullYear(), anchorEnd.getMonth(), 1);
   return Array.from({ length: count }, (_, i) => {
-    const m = new Date(anchor.getFullYear(), anchor.getMonth() - (count - 1 - i), 1);
+    const m = new Date(
+      anchor.getFullYear(),
+      anchor.getMonth() - (count - 1 - i),
+      1,
+    );
     return { year: m.getFullYear(), month: m.getMonth() };
   });
 }
@@ -200,24 +214,35 @@ function formatChartPeriod(mode: PeriodMode, anchorEnd: Date): string {
     const days = getDailyRange(anchorEnd);
     const first = days[0];
     const last = days[6];
-    return `${MONTHS[first.getMonth()]} ${first.getDate()} – ${last.getDate()}, ${last.getFullYear()}`;
+    return `${
+      MONTHS[first.getMonth()]
+    } ${first.getDate()} – ${last.getDate()}, ${last.getFullYear()}`;
   }
   if (mode === 'week') {
     const ranges = getWeeklyRanges(anchorEnd, WEEKLY_POINTS);
     const first = ranges[0].start;
     const last = ranges[ranges.length - 1].end;
-    return `${MONTHS[first.getMonth()]} ${first.getDate()} – ${last.getDate()}, ${last.getFullYear()}`;
+    return `${
+      MONTHS[first.getMonth()]
+    } ${first.getDate()} – ${last.getDate()}, ${last.getFullYear()}`;
   }
   const ranges = getMonthlyRanges(anchorEnd, MONTHLY_POINTS);
   const first = ranges[0];
   const last = ranges[ranges.length - 1];
-  return `${MONTHS[first.month]} ${first.year} – ${MONTHS[last.month]} ${last.year}`;
+  return `${MONTHS[first.month]} ${first.year} – ${MONTHS[last.month]} ${
+    last.year
+  }`;
 }
 
-function shiftChartAnchor(anchor: Date, mode: PeriodMode, direction: -1 | 1): Date {
+function shiftChartAnchor(
+  anchor: Date,
+  mode: PeriodMode,
+  direction: -1 | 1,
+): Date {
   const d = new Date(anchor);
   if (mode === 'day') d.setDate(d.getDate() + direction * 7);
-  else if (mode === 'week') d.setDate(d.getDate() + direction * WEEKLY_POINTS * 7);
+  else if (mode === 'week')
+    d.setDate(d.getDate() + direction * WEEKLY_POINTS * 7);
   else d.setMonth(d.getMonth() + direction * MONTHLY_POINTS);
   return d;
 }
@@ -231,7 +256,10 @@ function isAnchorInFuture(anchor: Date, mode: PeriodMode): boolean {
 // Returns fraction (0–1) for each DISC type across all sessions
 function buildDiscData(sessions: SessionRecord[]): Record<string, number> {
   const counts: Record<string, number> = {
-    dominance: 0, influence: 0, steadiness: 0, conscientiousness: 0,
+    dominance: 0,
+    influence: 0,
+    steadiness: 0,
+    conscientiousness: 0,
   };
   sessions.forEach((s) => {
     if (s.focus_type_result && s.focus_type_result in counts) {
@@ -244,7 +272,13 @@ function buildDiscData(sessions: SessionRecord[]): Record<string, number> {
   );
 }
 
-type CategoryStat = { key: string; label: string; hours: number; pct: number; color: string };
+type CategoryStat = {
+  key: string;
+  label: string;
+  hours: number;
+  pct: number;
+  color: string;
+};
 type FocusGroupMode = 'category' | 'task';
 
 const TASK_NAME_COLORS = [
@@ -258,13 +292,17 @@ const TASK_NAME_COLORS = [
   Colors.inkFaint,
 ];
 
-function resolveSessionTaskLabel(s: SessionRecord, taskMap: Map<string, Task>): string {
+function resolveSessionTaskLabel(
+  s: SessionRecord,
+  taskMap: Map<string, Task>,
+): string {
   if (s.task_id) {
     const t = taskMap.get(s.task_id);
     if (t) return t.emoji ? `${t.emoji} ${t.title}` : t.title;
   }
   const tasksData = s.tasks;
-  if (Array.isArray(tasksData) && tasksData[0]?.title) return tasksData[0].title;
+  if (Array.isArray(tasksData) && tasksData[0]?.title)
+    return tasksData[0].title;
   if (tasksData && typeof tasksData === 'object' && 'title' in tasksData) {
     return (tasksData as { title: string }).title;
   }
@@ -275,7 +313,10 @@ function normalizeTaskGroupKey(title: string): string {
   return title.trim().toLowerCase();
 }
 
-function buildCategoryFocusStats(sessions: SessionRecord[], tasks: Task[]): CategoryStat[] {
+function buildCategoryFocusStats(
+  sessions: SessionRecord[],
+  tasks: Task[],
+): CategoryStat[] {
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
   let taskSec = 0;
   let dailySec = 0;
@@ -294,13 +335,34 @@ function buildCategoryFocusStats(sessions: SessionRecord[], tasks: Task[]): Cate
 
   const total = taskSec + dailySec + freeSec || 1;
   return [
-    { key: 'task', label: 'Task', hours: taskSec / 3600, pct: taskSec / total, color: Colors.pinkText },
-    { key: 'daily', label: 'Daily', hours: dailySec / 3600, pct: dailySec / total, color: '#5BAD6F' },
-    { key: 'free', label: 'Free focus', hours: freeSec / 3600, pct: freeSec / total, color: Colors.inkFaint },
+    {
+      key: 'task',
+      label: 'Task',
+      hours: taskSec / 3600,
+      pct: taskSec / total,
+      color: Colors.pinkText,
+    },
+    {
+      key: 'daily',
+      label: 'Daily',
+      hours: dailySec / 3600,
+      pct: dailySec / total,
+      color: '#5BAD6F',
+    },
+    {
+      key: 'free',
+      label: 'Free focus',
+      hours: freeSec / 3600,
+      pct: freeSec / total,
+      color: Colors.inkFaint,
+    },
   ];
 }
 
-function buildTaskNameFocusStats(sessions: SessionRecord[], tasks: Task[]): CategoryStat[] {
+function buildTaskNameFocusStats(
+  sessions: SessionRecord[],
+  tasks: Task[],
+): CategoryStat[] {
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
   const buckets = new Map<string, { label: string; sec: number }>();
 
@@ -329,12 +391,12 @@ function buildTaskNameFocusStats(sessions: SessionRecord[], tasks: Task[]): Cate
       : top;
 
   return entries.map(([key, { label, sec }], i) => ({
-      key,
-      label,
-      hours: sec / 3600,
-      pct: sec / total,
-      color: TASK_NAME_COLORS[i % TASK_NAME_COLORS.length],
-    }));
+    key,
+    label,
+    hours: sec / 3600,
+    pct: sec / total,
+    color: TASK_NAME_COLORS[i % TASK_NAME_COLORS.length],
+  }));
 }
 
 function CategoryBarChart({
@@ -366,7 +428,10 @@ function CategoryBarChart({
               style={[
                 catChartStyles.barFill,
                 {
-                  width: `${Math.max((s.hours / maxHours) * 100, s.hours > 0 ? 8 : 0)}%` as `${number}%`,
+                  width: `${Math.max(
+                    (s.hours / maxHours) * 100,
+                    s.hours > 0 ? 8 : 0,
+                  )}%` as `${number}%`,
                   backgroundColor: s.color,
                 },
               ]}
@@ -386,7 +451,7 @@ function getDominantType(data: Record<string, number>): string {
 
 function sessionTimeOfDay(isoStr: string): string {
   const h = new Date(isoStr).getHours();
-  if (h < 6)  return '深夜';
+  if (h < 6) return '深夜';
   if (h < 12) return '早上';
   if (h < 17) return '下午';
   if (h < 21) return '傍晚';
@@ -435,7 +500,10 @@ function LineChart({
     <View>
       <Svg width={W} height={svgH}>
         {/* Gradient-like area fill */}
-        <Polygon points={areaStr} fill={isDark ? 'rgba(201,143,168,0.22)' : 'rgba(242,206,220,0.30)'} />
+        <Polygon
+          points={areaStr}
+          fill={isDark ? 'rgba(201,143,168,0.22)' : 'rgba(242,206,220,0.30)'}
+        />
 
         <Polyline
           points={polylineStr}
@@ -449,11 +517,24 @@ function LineChart({
         {pts.map((p, i) =>
           i === selectedIndex ? (
             <React.Fragment key={i}>
-              <Circle cx={p.x} cy={p.y} r={12} fill={isDark ? 'rgba(201,143,168,0.15)' : 'rgba(232,120,90,0.12)'} />
+              <Circle
+                cx={p.x}
+                cy={p.y}
+                r={12}
+                fill={
+                  isDark ? 'rgba(201,143,168,0.15)' : 'rgba(232,120,90,0.12)'
+                }
+              />
               <Circle cx={p.x} cy={p.y} r={5.5} fill={colors.pinkHot} />
             </React.Fragment>
           ) : (
-            <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill={isDark ? 'rgba(201,143,168,0.45)' : 'rgba(232,120,90,0.45)'} />
+            <Circle
+              key={i}
+              cx={p.x}
+              cy={p.y}
+              r={3.5}
+              fill={isDark ? 'rgba(201,143,168,0.45)' : 'rgba(232,120,90,0.45)'}
+            />
           ),
         )}
       </Svg>
@@ -467,7 +548,12 @@ function LineChart({
             onPress={() => onSelect(i)}
             activeOpacity={0.7}
           >
-            <Text style={[lcStyles.dayLabel, i === selectedIndex && lcStyles.dayLabelActive]}>
+            <Text
+              style={[
+                lcStyles.dayLabel,
+                i === selectedIndex && lcStyles.dayLabelActive,
+              ]}
+            >
               {d.day}
             </Text>
           </TouchableOpacity>
@@ -510,14 +596,21 @@ function RadarChart({ data }: { data: Record<string, number> }) {
     <Svg width={SIZE} height={SIZE}>
       {/* Grid rings */}
       {gridPolygons.map((pts, i) => (
-        <Polygon key={i} points={pts} fill="none" stroke="rgba(20,16,28,0.08)" strokeWidth={1} />
+        <Polygon
+          key={i}
+          points={pts}
+          fill="none"
+          stroke="rgba(20,16,28,0.08)"
+          strokeWidth={1}
+        />
       ))}
 
       {/* Axis lines */}
       {DISC_AXES.map(({ key, angle }) => (
         <SvgLine
           key={key}
-          x1={cx} y1={cy}
+          x1={cx}
+          y1={cy}
           x2={cx + R * Math.cos(angle)}
           y2={cy + R * Math.sin(angle)}
           stroke="rgba(20,16,28,0.10)"
@@ -584,7 +677,8 @@ export default function StatsScreen() {
   const [chartAnchor, setChartAnchor] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(6);
   const [shareOpen, setShareOpen] = useState(false);
-  const [focusGroupMode, setFocusGroupMode] = useState<FocusGroupMode>('category');
+  const [focusGroupMode, setFocusGroupMode] =
+    useState<FocusGroupMode>('category');
 
   const nowDate = new Date();
   const [calYear, setCalYear] = useState(nowDate.getFullYear());
@@ -603,7 +697,10 @@ export default function StatsScreen() {
         status: 'done',
         created_at: new Date().toISOString(),
       };
-      setTasks([...mockTasks.tasks.filter((t) => t.status !== 'deleted'), demoDone]);
+      setTasks([
+        ...mockTasks.tasks.filter((t) => t.status !== 'deleted'),
+        demoDone,
+      ]);
       setLoading(false);
       return;
     }
@@ -651,24 +748,43 @@ export default function StatsScreen() {
   );
 
   const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
-  const selected   = chartStats[selectedDay];
+  const selected = chartStats[selectedDay];
 
   const handlePeriodMode = (mode: PeriodMode) => {
     setPeriodMode(mode);
     setChartAnchor(new Date());
-    const pointCount = mode === 'day' ? 7 : mode === 'week' ? WEEKLY_POINTS : MONTHLY_POINTS;
+    const pointCount =
+      mode === 'day' ? 7 : mode === 'week' ? WEEKLY_POINTS : MONTHLY_POINTS;
     setSelectedDay(pointCount - 1);
   };
 
   const handleChartBack = () => {
     setChartAnchor((prev) => shiftChartAnchor(prev, periodMode, -1));
-    setSelectedDay((prev) => Math.min(prev, (periodMode === 'day' ? 7 : periodMode === 'week' ? WEEKLY_POINTS : MONTHLY_POINTS) - 1));
+    setSelectedDay((prev) =>
+      Math.min(
+        prev,
+        (periodMode === 'day'
+          ? 7
+          : periodMode === 'week'
+          ? WEEKLY_POINTS
+          : MONTHLY_POINTS) - 1,
+      ),
+    );
   };
 
   const handleChartForward = () => {
     if (chartForwardDisabled) return;
     setChartAnchor((prev) => shiftChartAnchor(prev, periodMode, 1));
-    setSelectedDay((prev) => Math.min(prev, (periodMode === 'day' ? 7 : periodMode === 'week' ? WEEKLY_POINTS : MONTHLY_POINTS) - 1));
+    setSelectedDay((prev) =>
+      Math.min(
+        prev,
+        (periodMode === 'day'
+          ? 7
+          : periodMode === 'week'
+          ? WEEKLY_POINTS
+          : MONTHLY_POINTS) - 1,
+      ),
+    );
   };
 
   if (loading) {
@@ -791,7 +907,9 @@ export default function StatsScreen() {
               {selected && (
                 <View style={styles.selectedDetail}>
                   <Text style={styles.selectedDetailText}>
-                    {selected.sessions} session{selected.sessions !== 1 ? 's' : ''} · {selected.hours}h focused
+                    {selected.sessions} session
+                    {selected.sessions !== 1 ? 's' : ''} · {selected.hours}h
+                    focused
                   </Text>
                 </View>
               )}
@@ -803,7 +921,9 @@ export default function StatsScreen() {
         <View style={styles.section}>
           <FrostCard radius={24} padded={false}>
             <View style={[styles.breakdownCard, styles.breakdownCardStretch]}>
-              <Text style={[styles.chartTitle, styles.chartTitleLeft]}>Focus Breakdown</Text>
+              <Text style={[styles.chartTitle, styles.chartTitleLeft]}>
+                Focus Breakdown
+              </Text>
               <View style={styles.periodModes}>
                 {(
                   [
@@ -830,53 +950,77 @@ export default function StatsScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <CategoryBarChart stats={focusGroupStats} emptyText="No focus data yet" />
+              <CategoryBarChart
+                stats={focusGroupStats}
+                emptyText="No focus data yet"
+              />
             </View>
           </FrostCard>
         </View>
 
         {/* ── Focus type breakdown ────────────────────── */}
         <View style={styles.section}>
-          <TouchableOpacity activeOpacity={0.85} onPress={() => { play('tap'); router.push({ pathname: '/(app)/disc-detail', params: { dominant } }); }}>
-          <FrostCard radius={24} padded={false}>
-            <View style={styles.breakdownCard}>
-              <View style={styles.chartTitleRow}>
-                <Text style={styles.chartTitle}>Focus type breakdown</Text>
-                <Text style={styles.chartTitleChevron}>›</Text>
-              </View>
-
-              {/* Dominant type row */}
-              <View style={styles.dominantRow}>
-                <Text style={[styles.dominantEmoji, { color: DISC_COLOR[dominant] ?? '#888' }]}>
-                  {DISC_ICON[dominant]}
-                </Text>
-                <View style={styles.dominantInfo}>
-                  <Text style={styles.dominantLabel}>{DISC_LABEL[dominant]}</Text>
-                  <Text style={styles.dominantSub}>{DISC_SUBLABEL[dominant]}</Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              play('tap');
+              router.push({
+                pathname: '/(app)/disc-detail',
+                params: { dominant },
+              });
+            }}
+          >
+            <FrostCard radius={24} padded={false}>
+              <View style={styles.breakdownCard}>
+                <View style={styles.chartTitleRow}>
+                  <Text style={styles.chartTitle}>Focus type breakdown</Text>
+                  <Text style={styles.chartTitleChevron}>›</Text>
                 </View>
-                <View
-                  style={[
-                    styles.dominantBadge,
-                    { backgroundColor: (DISC_COLOR[dominant] ?? Colors.pinkHot) + '22' },
-                  ]}
-                >
+
+                {/* Dominant type row */}
+                <View style={styles.dominantRow}>
                   <Text
                     style={[
-                      styles.dominantBadgeText,
-                      { color: DISC_COLOR[dominant] ?? Colors.pinkHot },
+                      styles.dominantEmoji,
+                      { color: DISC_COLOR[dominant] ?? '#888' },
                     ]}
                   >
-                    {Math.round((discData[dominant] ?? 0) * 100)}%
+                    {DISC_ICON[dominant]}
                   </Text>
+                  <View style={styles.dominantInfo}>
+                    <Text style={styles.dominantLabel}>
+                      {DISC_LABEL[dominant]}
+                    </Text>
+                    <Text style={styles.dominantSub}>
+                      {DISC_SUBLABEL[dominant]}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.dominantBadge,
+                      {
+                        backgroundColor:
+                          (DISC_COLOR[dominant] ?? Colors.pinkHot) + '22',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dominantBadgeText,
+                        { color: DISC_COLOR[dominant] ?? Colors.pinkHot },
+                      ]}
+                    >
+                      {Math.round((discData[dominant] ?? 0) * 100)}%
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Radar chart */}
+                <View style={styles.radarWrapper}>
+                  <RadarChart data={discData} />
                 </View>
               </View>
-
-              {/* Radar chart */}
-              <View style={styles.radarWrapper}>
-                <RadarChart data={discData} />
-              </View>
-            </View>
-          </FrostCard>
+            </FrostCard>
           </TouchableOpacity>
         </View>
 
@@ -890,12 +1034,14 @@ export default function StatsScreen() {
                   const mins = Math.floor(s.actual_duration / 60);
                   const refTime = s.started_at ?? s.ended_at;
                   const date = new Date(s.ended_at);
-                  const dateStr = `${MONTHS[date.getMonth()]} ${date.getDate()}`;
+                  const dateStr = `${
+                    MONTHS[date.getMonth()]
+                  } ${date.getDate()}`;
                   const timeOfDay = sessionTimeOfDay(refTime);
                   const tasksData = s.tasks;
                   const taskName = Array.isArray(tasksData)
-                    ? (tasksData[0]?.title ?? null)
-                    : (tasksData?.title ?? null);
+                    ? tasksData[0]?.title ?? null
+                    : tasksData?.title ?? null;
                   return (
                     <View key={s.id} style={styles.sessionRow}>
                       <View style={styles.sessionDot} />
@@ -943,4 +1089,3 @@ export default function StatsScreen() {
     </View>
   );
 }
-

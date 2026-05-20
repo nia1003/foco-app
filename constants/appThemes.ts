@@ -27,7 +27,6 @@ export interface AppThemePreset {
   darkBackground: AppBackgroundStyle;
 }
 
-/** Default light background — must match current AppBackground exactly */
 export const DEFAULT_LIGHT_BACKGROUND: AppBackgroundStyle = {
   baseFill: '#f6f4f4',
   glowCenter: '#f0a8be',
@@ -219,7 +218,9 @@ export const APP_THEME_PRESETS: Record<AppStyleId, AppThemePreset> = {
 
 const LEGACY_STYLE_IDS = new Set(['classic', 'sakura', 'ocean', 'forest']);
 
-export function normalizeAppStyleId(stored: string | null | undefined): AppStyleId {
+export function normalizeAppStyleId(
+  stored: string | null | undefined,
+): AppStyleId {
   if (stored && stored in APP_THEME_PRESETS) return stored as AppStyleId;
   if (stored && LEGACY_STYLE_IDS.has(stored)) return 'default';
   return 'default';

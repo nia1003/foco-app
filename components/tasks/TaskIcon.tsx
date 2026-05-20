@@ -22,11 +22,7 @@ export function TaskIcon({ icon, size = 20 }: Props) {
   }
 
   const stroke =
-    appStyleId === 'monochrome'
-      ? isDark
-        ? '#ffffff'
-        : '#000000'
-      : colors.ink;
+    appStyleId === 'monochrome' ? (isDark ? '#ffffff' : '#000000') : colors.ink;
 
   const { Icon } = def;
   return (

@@ -1,14 +1,5 @@
-/**
- * DurationPickerModal — full-screen overlay to adjust focus duration.
- */
 import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CircularDurationPicker } from '@/components/ui/CircularDurationPicker';
 import { useSound } from '@/components/SoundProvider';
@@ -24,7 +15,12 @@ interface Props {
   onClose: () => void;
 }
 
-export function DurationPickerModal({ visible, value, onChange, onClose }: Props) {
+export function DurationPickerModal({
+  visible,
+  value,
+  onChange,
+  onClose,
+}: Props) {
   const { play } = useSound();
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(createStyles);
@@ -43,8 +39,18 @@ export function DurationPickerModal({ visible, value, onChange, onClose }: Props
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={handleClose}>
-      <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+    >
+      <View
+        style={[
+          styles.root,
+          { paddingTop: insets.top, paddingBottom: insets.bottom },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.closeBtn, { top: insets.top + 8 }]}
           onPress={handleClose}
@@ -60,14 +66,22 @@ export function DurationPickerModal({ visible, value, onChange, onClose }: Props
           {DURATION_PRESETS.map((m) => (
             <TouchableOpacity
               key={m}
-              style={[styles.presetChip, draft === m && styles.presetChipActive]}
+              style={[
+                styles.presetChip,
+                draft === m && styles.presetChipActive,
+              ]}
               onPress={() => {
                 play('tap');
                 setDraft(m);
               }}
               activeOpacity={0.8}
             >
-              <Text style={[styles.presetLabel, draft === m && styles.presetLabelActive]}>
+              <Text
+                style={[
+                  styles.presetLabel,
+                  draft === m && styles.presetLabelActive,
+                ]}
+              >
                 {m}m
               </Text>
             </TouchableOpacity>

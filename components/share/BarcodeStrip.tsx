@@ -32,7 +32,6 @@ interface Props {
   seed: string;
 }
 
-/** Receipt-style barcode — uniform bar height, seeded pattern from date. */
 export function BarcodeStrip({ value, seed }: Props) {
   const bars = useMemo(() => buildBars(seed), [seed]);
 

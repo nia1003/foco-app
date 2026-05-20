@@ -1,7 +1,3 @@
-/**
- * Centered pet carousel with left/right peek and infinite loop scroll.
- * Layout: … D ⇋ A ⇋ B ⇋ C ⇋ D …
- */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -21,7 +17,6 @@ import type { Pet } from '@/constants/pets';
 import type { FocoPet } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-/** Center card width — leaves side gutters so neighbors peek in */
 const PET_ITEM_W = Math.round(SCREEN_W * 0.62);
 const PET_GAP = 12;
 const PET_SNAP = PET_ITEM_W + PET_GAP;
@@ -142,7 +137,10 @@ export function CenteredPetCarousel({
         horizontal
         showsHorizontalScrollIndicator={false}
         removeClippedSubviews={false}
-        contentContainerStyle={[styles.row, { paddingHorizontal: PET_SIDE_PAD }]}
+        contentContainerStyle={[
+          styles.row,
+          { paddingHorizontal: PET_SIDE_PAD },
+        ]}
         decelerationRate="fast"
         snapToInterval={PET_SNAP}
         snapToAlignment="start"
@@ -155,12 +153,15 @@ export function CenteredPetCarousel({
               syncIndex(e.nativeEvent.contentOffset.x),
           },
         )}
-        onMomentumScrollEnd={(e) => handleScrollEnd(e.nativeEvent.contentOffset.x)}
+        onMomentumScrollEnd={(e) =>
+          handleScrollEnd(e.nativeEvent.contentOffset.x)
+        }
         onScrollEndDrag={(e) => handleScrollEnd(e.nativeEvent.contentOffset.x)}
       >
         {slides.map((slide, slideIdx) => {
           const p =
-            storePool.find((r) => r.name.toLowerCase() === slide.def.id) ?? storePool[0];
+            storePool.find((r) => r.name.toLowerCase() === slide.def.id) ??
+            storePool[0];
           const xpPct = p.xp_next_level > 0 ? p.xp / p.xp_next_level : 0;
           const focused = slide.realIndex === activePetIndex;
           const isLast = slideIdx === slides.length - 1;
@@ -199,13 +200,22 @@ export function CenteredPetCarousel({
                 activeOpacity={0.88}
               >
                 <View style={styles.preview}>
-                  <PetRenderer pet={slide.def} size={140} interactive={focused} />
+                  <PetRenderer
+                    pet={slide.def}
+                    size={140}
+                    interactive={focused}
+                  />
                 </View>
                 <Text style={styles.name}>{slide.def.name}</Text>
                 {focused && (
                   <>
                     <View style={styles.levelPill}>
-                      <Text style={[styles.levelPillText, { color: slide.def.accent }]}>
+                      <Text
+                        style={[
+                          styles.levelPillText,
+                          { color: slide.def.accent },
+                        ]}
+                      >
                         Lv.{p.level}
                       </Text>
                     </View>

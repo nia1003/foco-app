@@ -1,15 +1,5 @@
-/**
- * HomeScreen — daily dashboard hub
- * - Pet carousel + inline focus setup
- * - START FOCUS → direct timer
- */
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
@@ -32,8 +22,29 @@ import { getPets, getTasks } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
-const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
 export default function HomeScreen() {
@@ -68,7 +79,10 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!userId) return;
     getPets(userId)
-      .then((fetched) => { setPets(fetched); restoreActivePet(); })
+      .then((fetched) => {
+        setPets(fetched);
+        restoreActivePet();
+      })
       .catch(() => setPets(mockPets));
   }, [userId]);
 
@@ -78,8 +92,12 @@ export default function HomeScreen() {
       return;
     }
     getTasks(userId)
-      .then((res) => setPendingTasks(res.tasks.filter((t) => t.status === 'pending')))
-      .catch(() => setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')));
+      .then((res) =>
+        setPendingTasks(res.tasks.filter((t) => t.status === 'pending')),
+      )
+      .catch(() =>
+        setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')),
+      );
   }, [userId]);
 
   useEffect(() => {
@@ -95,16 +113,21 @@ export default function HomeScreen() {
   }, [activePet?.id]);
 
   const now = new Date();
-  const dateStr   = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
-  const hour      = now.getHours();
-  const timeGreet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const dateStr = `${DAYS[now.getDay()]}, ${
+    MONTHS[now.getMonth()]
+  } ${now.getDate()}`;
+  const hour = now.getHours();
+  const timeGreet =
+    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const displayName = userName ?? userEmail?.split('@')[0] ?? 'there';
   const settingsAvatar = displayName[0]?.toUpperCase() ?? '?';
 
   const initialCarouselIndex = useMemo(() => {
     if (!activePet?.name) return 0;
     const idx = UNLOCKED_DEFS.findIndex(
-      (p) => p.name.toLowerCase() === activePet.name.toLowerCase() || p.id === activePet.name.toLowerCase(),
+      (p) =>
+        p.name.toLowerCase() === activePet.name.toLowerCase() ||
+        p.id === activePet.name.toLowerCase(),
     );
     return idx >= 0 ? idx : 0;
   }, [activePet?.name]);
@@ -146,14 +169,20 @@ export default function HomeScreen() {
       >
         <View style={styles.greeting}>
           <Text style={styles.date}>{dateStr}</Text>
-          <Text style={styles.greet}>{timeGreet},{'\n'}{displayName}.</Text>
+          <Text style={styles.greet}>
+            {timeGreet},{'\n'}
+            {displayName}.
+          </Text>
         </View>
 
         <View style={styles.selectorSection}>
           <View style={styles.selectorHeader}>
             <Text style={styles.selectorEyebrow}>今天的夥伴</Text>
             <TouchableOpacity
-              onPress={() => { play('tap'); router.push('/(app)/pet-collection' as any); }}
+              onPress={() => {
+                play('tap');
+                router.push('/(app)/pet-collection' as any);
+              }}
               activeOpacity={0.7}
             >
               <Text style={styles.selectorAll}>全部 →</Text>
@@ -177,7 +206,10 @@ export default function HomeScreen() {
           <FrostCard radius={28} padded={false}>
             <TouchableOpacity
               style={styles.startFocusBtn}
-              onPress={() => { play('tap'); handleStartFocus(); }}
+              onPress={() => {
+                play('tap');
+                handleStartFocus();
+              }}
               activeOpacity={0.85}
               disabled={starting}
             >

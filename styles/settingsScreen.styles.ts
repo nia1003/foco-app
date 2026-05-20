@@ -27,7 +27,12 @@ export function createSettingsStyles({ colors, surfaces }: AppTheme) {
       marginBottom: 8,
       paddingLeft: 4,
     },
-    profileRow: { flexDirection: 'row', gap: 14, padding: 18, alignItems: 'flex-start' },
+    profileRow: {
+      flexDirection: 'row',
+      gap: 14,
+      padding: 18,
+      alignItems: 'flex-start',
+    },
     avatar: {
       width: 56,
       height: 56,
@@ -38,8 +43,18 @@ export function createSettingsStyles({ colors, surfaces }: AppTheme) {
     },
     avatarImg: { width: 56, height: 56, borderRadius: 28 },
     avatarText: { color: '#fff', fontSize: 22, fontWeight: '700' },
-    changePhoto: { fontSize: 10, color: colors.inkSoft, marginTop: 6, textAlign: 'center' },
-    fieldLabel: { fontSize: 11, fontWeight: '600', color: colors.inkFaint, marginBottom: 4 },
+    changePhoto: {
+      fontSize: 10,
+      color: colors.inkSoft,
+      marginTop: 6,
+      textAlign: 'center',
+    },
+    fieldLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.inkFaint,
+      marginBottom: 4,
+    },
     nameInput: {
       fontSize: 16,
       fontWeight: '500',

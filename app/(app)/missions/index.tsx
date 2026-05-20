@@ -1,7 +1,3 @@
-/**
- * MissionsScreen — Quest list + My Tasks
- * Task / Daily tabs · ▶ starts focus directly
- */
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -31,7 +27,6 @@ import { TaskIcon } from '@/components/tasks/TaskIcon';
 import { resolveTaskIcon } from '@/lib/taskIcon';
 import type { Task, TaskCategory } from '@/types';
 
-
 type TabType = 'task' | 'daily';
 
 type Quest = {
@@ -49,14 +44,68 @@ type QuestsState = Record<TabType, Quest[]>;
 
 const INITIAL_QUESTS: QuestsState = {
   task: [
-    { id: 'q1', title: 'Morning Focus Sprint', sub: 'Complete 3 sessions before noon', progress: 0.66, reward: '+30 XP', emoji: '🌅', duration_min: 25, category: 'task' },
-    { id: 'q2', title: 'Book Worm', sub: 'Read for 2 hours total', progress: 0.45, reward: '+25 XP', emoji: '📚', duration_min: 50, category: 'task' },
-    { id: 'q3', title: 'Inbox Zero', sub: 'Clear your email queue', progress: 0.20, reward: '+15 XP', emoji: '📬', duration_min: 15, category: 'task' },
-    { id: 'q6', title: 'First Week!', sub: 'Complete 7 days in a row', progress: 0.43, reward: '🏆 Trophy', emoji: '⭐', duration_min: 25, category: 'task' },
+    {
+      id: 'q1',
+      title: 'Morning Focus Sprint',
+      sub: 'Complete 3 sessions before noon',
+      progress: 0.66,
+      reward: '+30 XP',
+      emoji: '🌅',
+      duration_min: 25,
+      category: 'task',
+    },
+    {
+      id: 'q2',
+      title: 'Book Worm',
+      sub: 'Read for 2 hours total',
+      progress: 0.45,
+      reward: '+25 XP',
+      emoji: '📚',
+      duration_min: 50,
+      category: 'task',
+    },
+    {
+      id: 'q3',
+      title: 'Inbox Zero',
+      sub: 'Clear your email queue',
+      progress: 0.2,
+      reward: '+15 XP',
+      emoji: '📬',
+      duration_min: 15,
+      category: 'task',
+    },
+    {
+      id: 'q6',
+      title: 'First Week!',
+      sub: 'Complete 7 days in a row',
+      progress: 0.43,
+      reward: '🏆 Trophy',
+      emoji: '⭐',
+      duration_min: 25,
+      category: 'task',
+    },
   ],
   daily: [
-    { id: 'q4', title: 'Daily Checkin', sub: 'Log at least 1 session today', progress: 0.0, reward: '+5 XP', emoji: '✅', duration_min: 15, category: 'daily' },
-    { id: 'q5', title: 'Flow State', sub: 'Complete a 50-min session', progress: 0.0, reward: '+20 XP', emoji: '🌊', duration_min: 50, category: 'daily' },
+    {
+      id: 'q4',
+      title: 'Daily Checkin',
+      sub: 'Log at least 1 session today',
+      progress: 0.0,
+      reward: '+5 XP',
+      emoji: '✅',
+      duration_min: 15,
+      category: 'daily',
+    },
+    {
+      id: 'q5',
+      title: 'Flow State',
+      sub: 'Complete a 50-min session',
+      progress: 0.0,
+      reward: '+20 XP',
+      emoji: '🌊',
+      duration_min: 50,
+      category: 'daily',
+    },
   ],
 };
 
@@ -189,7 +238,9 @@ export default function MissionsScreen() {
               }}
               activeOpacity={0.75}
             >
-              <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>
+              <Text
+                style={[styles.tabLabel, tab === t && styles.tabLabelActive]}
+              >
                 {t === 'task' ? 'Task' : 'Daily'}
               </Text>
             </TouchableOpacity>
@@ -200,7 +251,9 @@ export default function MissionsScreen() {
           {currentQuests.length === 0 && (
             <FrostCard radius={20} padded={false}>
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No quests in this category.</Text>
+                <Text style={styles.emptyText}>
+                  No quests in this category.
+                </Text>
               </View>
             </FrostCard>
           )}
@@ -216,7 +269,12 @@ export default function MissionsScreen() {
                     <Text style={styles.myTaskTitle}>{q.title}</Text>
                     <Text style={styles.myTaskSub}>{q.sub}</Text>
                     <View style={styles.progressBg}>
-                      <View style={[styles.progressFill, { width: `${q.progress * 100}%` as `${number}%` }]} />
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${q.progress * 100}%` as `${number}%` },
+                        ]}
+                      />
                     </View>
                     <Text style={styles.questReward}>{q.duration_min} min</Text>
                   </View>
@@ -272,9 +330,13 @@ export default function MissionsScreen() {
                     </View>
                     <View style={styles.myTaskInfo}>
                       <Text style={styles.myTaskTitle}>{task.title}</Text>
-                      <Text style={styles.myTaskSub}>{task.duration_min} min</Text>
+                      <Text style={styles.myTaskSub}>
+                        {task.duration_min} min
+                      </Text>
                       {task.memo ? (
-                        <Text style={styles.myTaskMemo} numberOfLines={1}>{task.memo}</Text>
+                        <Text style={styles.myTaskMemo} numberOfLines={1}>
+                          {task.memo}
+                        </Text>
                       ) : null}
                     </View>
                     <View style={styles.taskActions}>
@@ -323,4 +385,3 @@ export default function MissionsScreen() {
     </View>
   );
 }
-

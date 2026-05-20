@@ -1,6 +1,3 @@
-/**
- * SettingsScreen — 帳號、偏好設定、登出
- */
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -20,8 +17,14 @@ import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { useThemedStyles } from '@/hooks/useThemedStyles';
-import { createSettingsStyles, type SettingsStyles } from '@/styles/settingsScreen.styles';
-import { APP_STYLE_OPTIONS, usePreferencesStore } from '@/stores/preferencesStore';
+import {
+  createSettingsStyles,
+  type SettingsStyles,
+} from '@/styles/settingsScreen.styles';
+import {
+  APP_STYLE_OPTIONS,
+  usePreferencesStore,
+} from '@/stores/preferencesStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { audioService } from '@/services/audioService';
@@ -141,7 +144,9 @@ export default function SettingsScreen() {
                   onPress={handleSaveName}
                   disabled={savingName}
                 >
-                  <Text style={styles.saveBtnText}>{savingName ? '儲存中…' : '儲存名稱'}</Text>
+                  <Text style={styles.saveBtnText}>
+                    {savingName ? '儲存中…' : '儲存名稱'}
+                  </Text>
                 </TouchableOpacity>
                 <Text style={styles.profileEmail}>{userEmail ?? '—'}</Text>
               </View>
@@ -164,8 +169,15 @@ export default function SettingsScreen() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <View style={[styles.swatch, { backgroundColor: opt.swatch }]} />
-                    <Text style={[styles.styleLabel, active && styles.styleLabelActive]}>
+                    <View
+                      style={[styles.swatch, { backgroundColor: opt.swatch }]}
+                    />
+                    <Text
+                      style={[
+                        styles.styleLabel,
+                        active && styles.styleLabelActive,
+                      ]}
+                    >
                       {opt.label}
                     </Text>
                   </TouchableOpacity>

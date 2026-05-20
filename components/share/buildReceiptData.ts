@@ -49,7 +49,6 @@ function formatBarcodeDateTime(d: Date): string {
   return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}.${pad2(d.getHours())}${pad2(d.getMinutes())}`;
 }
 
-/** Format seconds → 2H 15M, 45M, or 135M style strings. */
 export function formatDurationSec(totalSec: number): string {
   const totalMin = Math.floor(totalSec / 60);
   const h = Math.floor(totalSec / 3600);

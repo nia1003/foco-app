@@ -1,6 +1,3 @@
-/**
- * FrostCard — heavy-frost glass card (theme-aware).
- */
 import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -13,7 +10,12 @@ interface FrostCardProps {
   style?: ViewStyle;
 }
 
-export function FrostCard({ children, radius = 32, padded = true, style }: FrostCardProps) {
+export function FrostCard({
+  children,
+  radius = 32,
+  padded = true,
+  style,
+}: FrostCardProps) {
   const { surfaces } = useAppTheme();
 
   return (

@@ -1,6 +1,3 @@
-/**
- * Semantic surface tokens for light / dark mode (glass, pills, dividers).
- */
 export type BlurTint = 'light' | 'dark';
 
 export interface ThemeSurfaces {

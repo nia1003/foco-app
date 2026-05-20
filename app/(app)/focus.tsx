@@ -1,10 +1,3 @@
-/**
- * FocusScreen — Pomodoro timer (FOCO 完整版)
- * - 接收 durationMin + taskId 參數
- * - 使用擴充後的 useTimer（追蹤 pause/left_app 統計）
- * - 結束時 POST session-complete → 導向 Reward
- * - 寵物直接浮在畫面中央（無圓形 orb）
- */
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -32,7 +25,12 @@ import type { SessionPayload } from '@/types';
 
 export default function FocusScreen() {
   const router = useRouter();
-  const { durationMin = '25', taskId, petId: paramPetId, taskTitle } = useLocalSearchParams<{
+  const {
+    durationMin = '25',
+    taskId,
+    petId: paramPetId,
+    taskTitle,
+  } = useLocalSearchParams<{
     durationMin?: string;
     taskId?: string;
     petId?: string;
@@ -45,7 +43,8 @@ export default function FocusScreen() {
   const durationSeconds = Number(durationMin) * 60;
 
   // Resolve pet definition for 3D render — use the param pet, not necessarily activePet
-  const resolvedPetRecord = allPets.find((p) => p.id === resolvedPetId) ?? storePet;
+  const resolvedPetRecord =
+    allPets.find((p) => p.id === resolvedPetId) ?? storePet;
   const activePetDef =
     (resolvedPetRecord
       ? PETS.find((p) => p.id === resolvedPetRecord.name.toLowerCase()) ??
@@ -59,8 +58,8 @@ export default function FocusScreen() {
   // Use a ref so handleEnd always reads the latest value and stale closures can't freeze the screen
   const submittingRef = useRef(false);
 
-  const floatAnim  = useRef(new Animated.Value(0)).current;
-  const scaleAnim  = useRef(new Animated.Value(1)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const {
     phase,
@@ -97,19 +96,37 @@ export default function FocusScreen() {
     if (!paused && phase === 'timer') {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(floatAnim, { toValue: -10, duration: 2200, useNativeDriver: true }),
-          Animated.timing(floatAnim, { toValue:   0, duration: 2200, useNativeDriver: true }),
+          Animated.timing(floatAnim, {
+            toValue: -10,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatAnim, {
+            toValue: 0,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
         ]),
       ).start();
       Animated.loop(
         Animated.sequence([
-          Animated.timing(scaleAnim, { toValue: 1.04, duration: 2200, useNativeDriver: true }),
-          Animated.timing(scaleAnim, { toValue: 1,    duration: 2200, useNativeDriver: true }),
+          Animated.timing(scaleAnim, {
+            toValue: 1.04,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
         ]),
       ).start();
     } else {
-      floatAnim.stopAnimation(); floatAnim.setValue(0);
-      scaleAnim.stopAnimation(); scaleAnim.setValue(1);
+      floatAnim.stopAnimation();
+      floatAnim.setValue(0);
+      scaleAnim.stopAnimation();
+      scaleAnim.setValue(1);
     }
   }, [paused, phase]);
 
@@ -165,7 +182,9 @@ export default function FocusScreen() {
       console.error('[FOCO] session-complete failed:', err);
       router.replace({
         pathname: '/(app)/reward',
-        params: { result: JSON.stringify({ ...mockSessionResult, ...localStats }) },
+        params: {
+          result: JSON.stringify({ ...mockSessionResult, ...localStats }),
+        },
       });
     } finally {
       // Reset so the user can retry if navigation somehow fails
@@ -181,9 +200,7 @@ export default function FocusScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Flow State · {durationMin}m</Text>
-          {taskTitle ? (
-            <Text style={styles.taskName}>{taskTitle}</Text>
-          ) : null}
+          {taskTitle ? <Text style={styles.taskName}>{taskTitle}</Text> : null}
         </View>
 
         {/* Wavy ring + pet + countdown */}
@@ -196,10 +213,7 @@ export default function FocusScreen() {
           >
             <Animated.View
               style={{
-                transform: [
-                  { translateY: floatAnim },
-                  { scale: scaleAnim },
-                ],
+                transform: [{ translateY: floatAnim }, { scale: scaleAnim }],
               }}
             >
               <PetRenderer pet={activePetDef} size={160} />
@@ -211,7 +225,10 @@ export default function FocusScreen() {
         <View style={styles.controls}>
           <TouchableOpacity
             style={styles.controlBtn}
-            onPress={() => { play('tap'); setShowQuitModal(true); }}
+            onPress={() => {
+              play('tap');
+              setShowQuitModal(true);
+            }}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✕</Text>
@@ -240,7 +257,10 @@ export default function FocusScreen() {
 
           <TouchableOpacity
             style={styles.controlBtn}
-            onPress={() => { play('transition_up'); handleEnd(false); }}
+            onPress={() => {
+              play('transition_up');
+              handleEnd(false);
+            }}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✓</Text>
@@ -251,12 +271,23 @@ export default function FocusScreen() {
 
       {/* Quit modal */}
       <Modal visible={showQuitModal} transparent animationType="fade">
-        <View style={[styles.modalOverlay, { backgroundColor: surfaces.modalBackdrop }]}>
-          <View style={[styles.modalCard, { backgroundColor: surfaces.modalSheetBg, borderColor: surfaces.dividerStrong }]}>
+        <View
+          style={[
+            styles.modalOverlay,
+            { backgroundColor: surfaces.modalBackdrop },
+          ]}
+        >
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: surfaces.modalSheetBg,
+                borderColor: surfaces.dividerStrong,
+              },
+            ]}
+          >
             <Text style={styles.modalTitle}>提前結束？</Text>
-            <Text style={styles.modalSub}>
-              放棄會影響你的 DISC 分析結果。
-            </Text>
+            <Text style={styles.modalSub}>放棄會影響你的 DISC 分析結果。</Text>
             <TouchableOpacity
               style={styles.modalQuitBtn}
               onPress={() => {
@@ -271,7 +302,10 @@ export default function FocusScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.modalKeepBtn}
-              onPress={() => { play('tap'); setShowQuitModal(false); }}
+              onPress={() => {
+                play('tap');
+                setShowQuitModal(false);
+              }}
               activeOpacity={0.7}
             >
               <Text style={styles.modalKeepText}>繼續專注</Text>

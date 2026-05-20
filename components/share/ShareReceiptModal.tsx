@@ -133,14 +133,18 @@ export function ShareReceiptModal({
 
   const [shareTab, setShareTab] = useState<ShareTab>('receipt');
   const [sessionIndex, setSessionIndex] = useState(0);
-  const [selectedPetId, setSelectedPetId] = useState(UNLOCKED_PETS[0]?.id ?? 'xingwang');
+  const [selectedPetId, setSelectedPetId] = useState(
+    UNLOCKED_PETS[0]?.id ?? 'xingwang',
+  );
   const [petPickerOpen, setPetPickerOpen] = useState(false);
   const [signature, setSignature] = useState<SavedSignature | null>(null);
   const [signatureOpen, setSignatureOpen] = useState(false);
 
   const shareableSessions = useMemo(() => sessions.slice(0, 10), [sessions]);
   const currentSession = shareableSessions[sessionIndex];
-  const sessionInput = currentSession ? sessionRecordToShareInput(currentSession) : null;
+  const sessionInput = currentSession
+    ? sessionRecordToShareInput(currentSession)
+    : null;
 
   useEffect(() => {
     if (visible) {
@@ -155,7 +159,8 @@ export function ShareReceiptModal({
     [sessions, tasks, userName, userEmail, petLevel],
   );
 
-  const petDef = UNLOCKED_PETS.find((p) => p.id === selectedPetId) ?? UNLOCKED_PETS[0];
+  const petDef =
+    UNLOCKED_PETS.find((p) => p.id === selectedPetId) ?? UNLOCKED_PETS[0];
 
   const handleShareImage = async () => {
     try {
@@ -168,7 +173,10 @@ export function ShareReceiptModal({
       if (canShare) {
         await Sharing.shareAsync(uri, {
           mimeType: 'image/png',
-          dialogTitle: shareTab === 'receipt' ? "Share today's receipt" : 'Share focus card',
+          dialogTitle:
+            shareTab === 'receipt'
+              ? "Share today's receipt"
+              : 'Share focus card',
         });
       } else {
         Alert.alert('無法分享', '此裝置不支援分享功能');
@@ -180,27 +188,56 @@ export function ShareReceiptModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: screenBg }]}>
-        <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+      <View
+        style={[
+          styles.screen,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+            backgroundColor: screenBg,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.closeBtn}
+          onPress={onClose}
+          activeOpacity={0.7}
+        >
           <Text style={styles.closeText}>✕ Close</Text>
         </TouchableOpacity>
 
         <View style={styles.tabRow}>
           <TouchableOpacity
-            style={[styles.tabBtn, shareTab === 'receipt' && chromeStyles.tabBtnActive]}
+            style={[
+              styles.tabBtn,
+              shareTab === 'receipt' && chromeStyles.tabBtnActive,
+            ]}
             onPress={() => setShareTab('receipt')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabBtnText, shareTab === 'receipt' && chromeStyles.tabBtnTextActive]}>
+            <Text
+              style={[
+                styles.tabBtnText,
+                shareTab === 'receipt' && chromeStyles.tabBtnTextActive,
+              ]}
+            >
               Receipt
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, shareTab === 'focus' && chromeStyles.tabBtnActive]}
+            style={[
+              styles.tabBtn,
+              shareTab === 'focus' && chromeStyles.tabBtnActive,
+            ]}
             onPress={() => setShareTab('focus')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabBtnText, shareTab === 'focus' && chromeStyles.tabBtnTextActive]}>
+            <Text
+              style={[
+                styles.tabBtnText,
+                shareTab === 'focus' && chromeStyles.tabBtnTextActive,
+              ]}
+            >
               Focus Card
             </Text>
           </TouchableOpacity>
@@ -212,99 +249,116 @@ export function ShareReceiptModal({
           showsVerticalScrollIndicator={false}
         >
           {/* Capture frame — padding keeps edges visible in shared image */}
-          <View ref={captureRefView} collapsable={false} style={styles.captureFrame}>
+          <View
+            ref={captureRefView}
+            collapsable={false}
+            style={styles.captureFrame}
+          >
             {shareTab === 'receipt' ? (
-            <View style={styles.receipt}>
-              <Text style={styles.brand}>FOCO</Text>
-              <Text style={styles.brandSub}>TODAY'S RECEIPT</Text>
+              <View style={styles.receipt}>
+                <Text style={styles.brand}>FOCO</Text>
+                <Text style={styles.brandSub}>TODAY'S RECEIPT</Text>
 
-              <ReceiptRule />
+                <ReceiptRule />
 
-              <View style={styles.profileRow}>
+                <View style={styles.profileRow}>
+                  <TouchableOpacity
+                    style={styles.avatarBox}
+                    onPress={() => setPetPickerOpen(true)}
+                    activeOpacity={0.85}
+                  >
+                    {petDef.CustomComponent ? (
+                      <PetRenderer pet={petDef} size={72} />
+                    ) : (
+                      <Image
+                        source={petDef.image}
+                        style={styles.avatarImg}
+                        resizeMode="contain"
+                      />
+                    )}
+                    <Text style={styles.avatarTapHint}>tap</Text>
+                  </TouchableOpacity>
+                  <View style={styles.profileMeta}>
+                    <ReceiptRow left="name" right={receipt.name} />
+                    <ReceiptRow left="mood" right={receipt.mood} />
+                    <ReceiptRow left="role" right={receipt.role} />
+                    <ReceiptRow left="day" right={receipt.dayName} />
+                  </View>
+                </View>
+
+                <ReceiptRule />
+
+                <ReceiptRow left="DATE" right={receipt.dateStr} />
+                <ReceiptRow left="TIME" right={receipt.timeStr} />
+                <ReceiptRow left="NO." right={receipt.receiptNo} />
+
+                <ReceiptRule />
+
+                <Text style={styles.sectionLabel}>TODAY LOG</Text>
+                {receipt.logItems.length === 0 ? (
+                  <Text style={styles.emptyLog}>No completed tasks today</Text>
+                ) : (
+                  receipt.logItems.map((item, i) => (
+                    <LogRow
+                      key={`${item.title}-${item.right}-${i}`}
+                      title={item.title}
+                      right={item.right}
+                    />
+                  ))
+                )}
+
+                <ReceiptRule />
+
+                <ReceiptRow
+                  left="ITEMS COMPLETED"
+                  right={String(receipt.itemsCompleted).padStart(2, '0')}
+                />
+                <ReceiptRow
+                  left="INTERRUPTIONS"
+                  right={String(receipt.interruptions).padStart(2, '0')}
+                />
+
+                <View style={styles.ruleSolid} />
+
+                <ReceiptRow
+                  left="TOTAL ACTIVE TIME"
+                  right={receipt.totalActiveTime}
+                  bold
+                />
+
+                <ReceiptRule />
+
+                <ReceiptRow left="AUTH" right={receipt.authCode} />
+                <View style={styles.row}>
+                  <Text style={styles.rowLeft}>STATUS</Text>
+                  <Text style={[styles.rowRight, styles.bold]}>APPROVED</Text>
+                </View>
+
                 <TouchableOpacity
-                  style={styles.avatarBox}
-                  onPress={() => setPetPickerOpen(true)}
+                  style={styles.signatureBlock}
+                  onPress={() => setSignatureOpen(true)}
                   activeOpacity={0.85}
                 >
-                  {petDef.CustomComponent ? (
-                    <PetRenderer pet={petDef} size={72} />
-                  ) : (
-                    <Image source={petDef.image} style={styles.avatarImg} resizeMode="contain" />
-                  )}
-                  <Text style={styles.avatarTapHint}>tap</Text>
+                  <Text style={styles.signatureHint}>SIGNATURE</Text>
+                  <View style={styles.signatureArea}>
+                    <SignaturePreview signature={signature} />
+                  </View>
                 </TouchableOpacity>
-                <View style={styles.profileMeta}>
-                  <ReceiptRow left="name" right={receipt.name} />
-                  <ReceiptRow left="mood" right={receipt.mood} />
-                  <ReceiptRow left="role" right={receipt.role} />
-                  <ReceiptRow left="day" right={receipt.dayName} />
-                </View>
+
+                <View style={styles.ruleSolid} />
+
+                <BarcodeStrip
+                  value={receipt.barcodeValue}
+                  seed={receipt.barcodeSeed}
+                />
+
+                <ReceiptRule />
+
+                <Text style={styles.thanks}>thank you for your day.</Text>
+                <Text style={styles.retain}>
+                  RETAIN THIS COPY FOR YOUR RECORDS
+                </Text>
               </View>
-
-              <ReceiptRule />
-
-              <ReceiptRow left="DATE" right={receipt.dateStr} />
-              <ReceiptRow left="TIME" right={receipt.timeStr} />
-              <ReceiptRow left="NO." right={receipt.receiptNo} />
-
-              <ReceiptRule />
-
-              <Text style={styles.sectionLabel}>TODAY LOG</Text>
-              {receipt.logItems.length === 0 ? (
-                <Text style={styles.emptyLog}>No completed tasks today</Text>
-              ) : (
-                receipt.logItems.map((item, i) => (
-                  <LogRow
-                    key={`${item.title}-${item.right}-${i}`}
-                    title={item.title}
-                    right={item.right}
-                  />
-                ))
-              )}
-
-              <ReceiptRule />
-
-              <ReceiptRow
-                left="ITEMS COMPLETED"
-                right={String(receipt.itemsCompleted).padStart(2, '0')}
-              />
-              <ReceiptRow
-                left="INTERRUPTIONS"
-                right={String(receipt.interruptions).padStart(2, '0')}
-              />
-
-              <View style={styles.ruleSolid} />
-
-              <ReceiptRow left="TOTAL ACTIVE TIME" right={receipt.totalActiveTime} bold />
-
-              <ReceiptRule />
-
-              <ReceiptRow left="AUTH" right={receipt.authCode} />
-              <View style={styles.row}>
-                <Text style={styles.rowLeft}>STATUS</Text>
-                <Text style={[styles.rowRight, styles.bold]}>APPROVED</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.signatureBlock}
-                onPress={() => setSignatureOpen(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.signatureHint}>SIGNATURE</Text>
-                <View style={styles.signatureArea}>
-                  <SignaturePreview signature={signature} />
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.ruleSolid} />
-
-              <BarcodeStrip value={receipt.barcodeValue} seed={receipt.barcodeSeed} />
-
-              <ReceiptRule />
-
-              <Text style={styles.thanks}>thank you for your day.</Text>
-              <Text style={styles.retain}>RETAIN THIS COPY FOR YOUR RECORDS</Text>
-            </View>
             ) : sessionInput ? (
               <View style={styles.focusCapture}>
                 {shareableSessions.length > 1 && (
@@ -315,7 +369,14 @@ export function ShareReceiptModal({
                       disabled={sessionIndex === 0}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.sessionNavArrow, sessionIndex === 0 && styles.sessionNavDisabled]}>‹</Text>
+                      <Text
+                        style={[
+                          styles.sessionNavArrow,
+                          sessionIndex === 0 && styles.sessionNavDisabled,
+                        ]}
+                      >
+                        ‹
+                      </Text>
                     </TouchableOpacity>
                     <Text style={styles.sessionNavLabel}>
                       Session {sessionIndex + 1} / {shareableSessions.length}
@@ -323,7 +384,9 @@ export function ShareReceiptModal({
                     <TouchableOpacity
                       style={styles.sessionNavBtn}
                       onPress={() =>
-                        setSessionIndex((i) => Math.min(shareableSessions.length - 1, i + 1))
+                        setSessionIndex((i) =>
+                          Math.min(shareableSessions.length - 1, i + 1),
+                        )
                       }
                       disabled={sessionIndex >= shareableSessions.length - 1}
                       activeOpacity={0.7}
@@ -331,7 +394,8 @@ export function ShareReceiptModal({
                       <Text
                         style={[
                           styles.sessionNavArrow,
-                          sessionIndex >= shareableSessions.length - 1 && styles.sessionNavDisabled,
+                          sessionIndex >= shareableSessions.length - 1 &&
+                            styles.sessionNavDisabled,
                         ]}
                       >
                         ›
@@ -376,15 +440,25 @@ export function ShareReceiptModal({
             activeOpacity={1}
             onPress={() => setPetPickerOpen(false)}
           >
-            <View style={styles.petSheet} onStartShouldSetResponder={() => true}>
+            <View
+              style={styles.petSheet}
+              onStartShouldSetResponder={() => true}
+            >
               <Text style={styles.petSheetTitle}>CHOOSE PET</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.petRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.petRow}
+              >
                 {UNLOCKED_PETS.map((pet) => {
                   const selected = pet.id === selectedPetId;
                   return (
                     <TouchableOpacity
                       key={pet.id}
-                      style={[styles.petOption, selected && styles.petOptionSelected]}
+                      style={[
+                        styles.petOption,
+                        selected && styles.petOptionSelected,
+                      ]}
                       onPress={() => {
                         setSelectedPetId(pet.id);
                         setPetPickerOpen(false);
@@ -394,9 +468,18 @@ export function ShareReceiptModal({
                       {pet.CustomComponent ? (
                         <PetRenderer pet={pet} size={56} />
                       ) : (
-                        <Image source={pet.image} style={styles.petOptionImg} resizeMode="contain" />
+                        <Image
+                          source={pet.image}
+                          style={styles.petOptionImg}
+                          resizeMode="contain"
+                        />
                       )}
-                      <Text style={[styles.petOptionName, selected && styles.petOptionNameSelected]}>
+                      <Text
+                        style={[
+                          styles.petOptionName,
+                          selected && styles.petOptionNameSelected,
+                        ]}
+                      >
                         {pet.name}
                       </Text>
                     </TouchableOpacity>

@@ -20,7 +20,12 @@ interface Props {
 
 const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
 
-export function SignaturePadModal({ visible, initial, onCancel, onSave }: Props) {
+export function SignaturePadModal({
+  visible,
+  initial,
+  onCancel,
+  onSave,
+}: Props) {
   const [paths, setPaths] = useState<string[]>([]);
   const [canvasSize, setCanvasSize] = useState({ w: 320, h: 160 });
   const pathsRef = useRef<string[]>([]);
@@ -55,13 +60,17 @@ export function SignaturePadModal({ visible, initial, onCancel, onSave }: Props)
       onPanResponderGrant: (evt) => {
         const { locationX, locationY } = evt.nativeEvent;
         drawingRef.current = true;
-        currentPathRef.current = `M${locationX.toFixed(1)},${locationY.toFixed(1)}`;
+        currentPathRef.current = `M${locationX.toFixed(1)},${locationY.toFixed(
+          1,
+        )}`;
         syncPaths([...pathsRef.current, currentPathRef.current]);
       },
       onPanResponderMove: (evt) => {
         if (!drawingRef.current) return;
         const { locationX, locationY } = evt.nativeEvent;
-        currentPathRef.current += ` L${locationX.toFixed(1)},${locationY.toFixed(1)}`;
+        currentPathRef.current += ` L${locationX.toFixed(
+          1,
+        )},${locationY.toFixed(1)}`;
         const base = pathsRef.current.slice(0, -1);
         syncPaths([...base, currentPathRef.current]);
       },
@@ -91,7 +100,12 @@ export function SignaturePadModal({ visible, initial, onCancel, onSave }: Props)
   };
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={handleCancel}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={handleCancel}
+    >
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <Text style={styles.signHere}>SIGN HERE</Text>
@@ -128,14 +142,32 @@ export function SignaturePadModal({ visible, initial, onCancel, onSave }: Props)
           <Text style={styles.signatureLabel}>--- SIGNATURE ---</Text>
 
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.btnGhost} onPress={handleCancel} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.btnGhost}
+              onPress={handleCancel}
+              activeOpacity={0.8}
+            >
               <Text style={styles.btnGhostText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btnGhost} onPress={resetCanvas} activeOpacity={0.8}>
-              <Text style={[styles.btnGhostText, paths.length === 0 && styles.btnMuted]}>Clear</Text>
+            <TouchableOpacity
+              style={styles.btnGhost}
+              onPress={resetCanvas}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.btnGhostText,
+                  paths.length === 0 && styles.btnMuted,
+                ]}
+              >
+                Clear
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.btnPrimary, paths.length === 0 && styles.btnPrimaryDisabled]}
+              style={[
+                styles.btnPrimary,
+                paths.length === 0 && styles.btnPrimaryDisabled,
+              ]}
               onPress={handleSave}
               activeOpacity={0.85}
               disabled={paths.length === 0}

@@ -1,7 +1,3 @@
-/**
- * WavyTimer — wavy circular progress ring (react-native-svg)
- * Progress 0→1 grows the stroke from 12 o'clock clockwise until the ring closes.
- */
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -100,12 +96,18 @@ export function WavyTimer({
         />
       </Svg>
 
-      <View style={[styles.center, { width: size * 0.68, height: size * 0.68 }]}>
+      <View
+        style={[styles.center, { width: size * 0.68, height: size * 0.68 }]}
+      >
         <View style={styles.innerStack}>
           {children}
-          <Text style={[styles.timeText, { color: colors.ink }]}>{timeLabel}</Text>
+          <Text style={[styles.timeText, { color: colors.ink }]}>
+            {timeLabel}
+          </Text>
           {caption ? (
-            <Text style={[styles.caption, { color: colors.inkFaint }]}>{caption}</Text>
+            <Text style={[styles.caption, { color: colors.inkFaint }]}>
+              {caption}
+            </Text>
           ) : null}
         </View>
       </View>

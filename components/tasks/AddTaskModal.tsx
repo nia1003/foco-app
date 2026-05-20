@@ -1,6 +1,3 @@
-/**
- * AddTaskModal — create a task with icon picker (English UI).
- */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -103,7 +100,10 @@ export function AddTaskModal({
       onCreated(created);
       handleClose();
     } catch {
-      Alert.alert('Could not create task', 'Please check your connection and try again.');
+      Alert.alert(
+        'Could not create task',
+        'Please check your connection and try again.',
+      );
     } finally {
       setSaving(false);
     }
@@ -112,7 +112,12 @@ export function AddTaskModal({
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={handleClose}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+    >
       <Pressable style={styles.backdrop} onPress={handleClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           {iconPickerOpen ? (

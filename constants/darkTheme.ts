@@ -1,4 +1,3 @@
-/** Dark palette — used when preferencesStore.darkMode is true */
 export const DarkColors = {
   beige: '#1a1622',
   pinkHot: '#c98fa8',

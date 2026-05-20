@@ -17,7 +17,11 @@ export function createHomeStyles({ colors, surfaces }: AppTheme) {
       letterSpacing: -0.4,
       lineHeight: 38,
     },
-    selectorSection: { marginTop: 20, overflow: 'visible', alignItems: 'center' },
+    selectorSection: {
+      marginTop: 20,
+      overflow: 'visible',
+      alignItems: 'center',
+    },
     selectorHeader: {
       flexDirection: 'row',
       alignItems: 'baseline',

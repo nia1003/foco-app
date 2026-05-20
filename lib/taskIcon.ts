@@ -19,7 +19,6 @@ export function resolveTaskIcon(
   return DEFAULT_TASK_ICON;
 }
 
-/** Focus timer header — emoji prefix only; SVG uses title alone */
 export function focusTitleWithIcon(title: string, icon: TaskIconValue): string {
   const trimmed = title.trim();
   if (icon.type === 'emoji') return `${icon.value} ${trimmed}`;

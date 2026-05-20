@@ -25,7 +25,12 @@ export function createMissionsStyles({ colors, surfaces }: AppTheme) {
       borderRadius: 9999,
       backgroundColor: surfaces.ctaBg,
     },
-    addBtnText: { fontSize: 12, fontWeight: '700', color: surfaces.ctaText, letterSpacing: 0.5 },
+    addBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: surfaces.ctaText,
+      letterSpacing: 0.5,
+    },
     tabs: { flexDirection: 'row', gap: 8, marginTop: 20, marginBottom: 4 },
     tabPill: {
       paddingHorizontal: 16,
@@ -35,7 +40,10 @@ export function createMissionsStyles({ colors, surfaces }: AppTheme) {
       borderWidth: 0.5,
       borderColor: surfaces.panelBorder,
     },
-    tabPillActive: { backgroundColor: surfaces.ctaBg, borderColor: surfaces.ctaBg },
+    tabPillActive: {
+      backgroundColor: surfaces.ctaBg,
+      borderColor: surfaces.ctaBg,
+    },
     tabLabel: { fontSize: 13, fontWeight: '500', color: colors.inkSoft },
     tabLabelActive: { color: surfaces.ctaText, fontWeight: '600' },
     list: { gap: 10, marginTop: 8 },
@@ -51,7 +59,12 @@ export function createMissionsStyles({ colors, surfaces }: AppTheme) {
     emptyState: { padding: 20, alignItems: 'center' },
     emptyText: { fontSize: 13, color: colors.inkFaint },
     myTaskWrap: { marginBottom: 0 },
-    myTaskCard: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+    myTaskCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      gap: 12,
+    },
     taskEmojiWrap: {
       width: 42,
       height: 42,
@@ -65,16 +78,35 @@ export function createMissionsStyles({ colors, surfaces }: AppTheme) {
     myTaskInfo: { flex: 1 },
     myTaskTitle: { fontSize: 15, fontWeight: '600', color: colors.ink },
     myTaskSub: { fontSize: 12, color: colors.inkSoft, marginTop: 1 },
-    myTaskMemo: { fontSize: 11, color: colors.inkFaint, marginTop: 2, fontStyle: 'italic' },
+    myTaskMemo: {
+      fontSize: 11,
+      color: colors.inkFaint,
+      marginTop: 2,
+      fontStyle: 'italic',
+    },
     progressBg: {
       marginTop: 7,
       height: 4,
       borderRadius: 9999,
       backgroundColor: surfaces.chartTrack,
     },
-    progressFill: { height: 4, borderRadius: 9999, backgroundColor: colors.pinkHot },
-    questReward: { fontSize: 10, fontWeight: '600', color: colors.pinkText, marginTop: 4 },
-    taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+    progressFill: {
+      height: 4,
+      borderRadius: 9999,
+      backgroundColor: colors.pinkHot,
+    },
+    questReward: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.pinkText,
+      marginTop: 4,
+    },
+    taskActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexShrink: 0,
+    },
     myTaskStartBtn: {
       width: 36,
       height: 36,
@@ -83,7 +115,12 @@ export function createMissionsStyles({ colors, surfaces }: AppTheme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    myTaskStartIcon: { fontSize: 14, fontWeight: '700', color: colors.pinkText, marginLeft: 2 },
+    myTaskStartIcon: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.pinkText,
+      marginLeft: 2,
+    },
     deleteBtn: {
       width: 32,
       height: 32,

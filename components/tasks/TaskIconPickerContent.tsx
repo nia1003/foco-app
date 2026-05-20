@@ -1,6 +1,3 @@
-/**
- * TaskIconPickerContent — emoji / SVG grid (no Modal wrapper).
- */
 import React, { useState } from 'react';
 import {
   ScrollView,
@@ -100,7 +97,11 @@ export function TaskIconPickerContent({ value, onChange, onDone }: Props) {
             })}
       </ScrollView>
 
-      <TouchableOpacity style={styles.doneBtn} onPress={onDone} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={styles.doneBtn}
+        onPress={onDone}
+        activeOpacity={0.85}
+      >
         <Text style={styles.doneBtnText}>Done</Text>
       </TouchableOpacity>
     </View>

@@ -1,6 +1,3 @@
-/**
- * TaskIconSelector — modal wrapper around TaskIconPickerContent.
- */
 import React from 'react';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 import { useThemedStyles } from '@/hooks/useThemedStyles';
@@ -19,10 +16,19 @@ export function TaskIconSelector({ visible, value, onChange, onClose }: Props) {
   const styles = useThemedStyles(createStyles);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <TaskIconPickerContent value={value} onChange={onChange} onDone={onClose} />
+          <TaskIconPickerContent
+            value={value}
+            onChange={onChange}
+            onDone={onClose}
+          />
         </Pressable>
       </Pressable>
     </Modal>

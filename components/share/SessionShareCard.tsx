@@ -1,15 +1,13 @@
-/**
- * Focus session share card (interface A) — same visual as analysis screen card.
- */
 import React from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Dimensions,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, {
-  Circle,
-  Line as SvgLine,
-  Polygon,
-  Rect,
-} from 'react-native-svg';
+import Svg, { Circle, Line as SvgLine, Polygon, Rect } from 'react-native-svg';
 import type { SessionEvent } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -44,12 +42,28 @@ const QUALITY_LEVELS = [
 ] as const;
 
 function getLevel(score: number) {
-  return QUALITY_LEVELS.find((l) => score >= l.min) ?? QUALITY_LEVELS[QUALITY_LEVELS.length - 1];
+  return (
+    QUALITY_LEVELS.find((l) => score >= l.min) ??
+    QUALITY_LEVELS[QUALITY_LEVELS.length - 1]
+  );
 }
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   const h = d.getHours().toString().padStart(2, '0');
   const m = d.getMinutes().toString().padStart(2, '0');
   return `${months[d.getMonth()]} ${d.getDate()} · ${h}:${m}`;
@@ -69,8 +83,13 @@ interface Segment {
   widthPct: number;
 }
 
-function buildSegments(events: SessionEvent[], startedAt: string, totalSec: number): Segment[] {
-  if (!events?.length || totalSec <= 0) return [{ type: 'focus', widthPct: 100 }];
+function buildSegments(
+  events: SessionEvent[],
+  startedAt: string,
+  totalSec: number,
+): Segment[] {
+  if (!events?.length || totalSec <= 0)
+    return [{ type: 'focus', widthPct: 100 }];
   const startMs = new Date(startedAt).getTime();
   const totalMs = totalSec * 1000;
   const endMs = startMs + totalMs;
@@ -100,20 +119,55 @@ function segColor(type: SegmentType, accent: string): string {
   return 'rgba(220,50,50,0.40)';
 }
 
-function ClockIcon({ size = 15, color = '#333' }: { size?: number; color?: string }) {
+function ClockIcon({
+  size = 15,
+  color = '#333',
+}: {
+  size?: number;
+  color?: string;
+}) {
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 1.5;
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={1.3} />
-      <SvgLine x1={cx} y1={cy} x2={cx} y2={cy - r * 0.55} stroke={color} strokeWidth={1.3} strokeLinecap="round" />
-      <SvgLine x1={cx} y1={cy} x2={cx + r * 0.45} y2={cy} stroke={color} strokeWidth={1.3} strokeLinecap="round" />
+      <Circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.3}
+      />
+      <SvgLine
+        x1={cx}
+        y1={cy}
+        x2={cx}
+        y2={cy - r * 0.55}
+        stroke={color}
+        strokeWidth={1.3}
+        strokeLinecap="round"
+      />
+      <SvgLine
+        x1={cx}
+        y1={cy}
+        x2={cx + r * 0.45}
+        y2={cy}
+        stroke={color}
+        strokeWidth={1.3}
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }
 
-function BarsIcon({ size = 15, color = '#333' }: { size?: number; color?: string }) {
+function BarsIcon({
+  size = 15,
+  color = '#333',
+}: {
+  size?: number;
+  color?: string;
+}) {
   const bw = size * 0.18;
   const gap = size * 0.1;
   const hs = [size * 0.38, size * 0.58, size * 0.76];
@@ -138,7 +192,13 @@ function BarsIcon({ size = 15, color = '#333' }: { size?: number; color?: string
   );
 }
 
-function DiamondIcon({ size = 15, color = '#333' }: { size?: number; color?: string }) {
+function DiamondIcon({
+  size = 15,
+  color = '#333',
+}: {
+  size?: number;
+  color?: string;
+}) {
   const cx = size / 2;
   const cy = size / 2;
   const hw = size * 0.38;
@@ -146,7 +206,9 @@ function DiamondIcon({ size = 15, color = '#333' }: { size?: number; color?: str
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <Polygon
-        points={`${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`}
+        points={`${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${
+          cx - hw
+        },${cy}`}
         fill="none"
         stroke={color}
         strokeWidth={1.3}
@@ -218,21 +280,29 @@ export function SessionShareCard({
         style={[styles.hero, { height: heroH }]}
       >
         <View style={[styles.heroCenter, { bottom: OVERLAY_H }]}>
-          <Text style={[styles.heroScore, { color: level.accent }]}>{qualityScore}</Text>
+          <Text style={[styles.heroScore, { color: level.accent }]}>
+            {qualityScore}
+          </Text>
           <Text style={styles.heroScoreSub}>/100</Text>
         </View>
 
         <View style={styles.heroTop}>
           <Text style={styles.heroBrand}>FOCO</Text>
           <View style={[styles.timeChip, { borderColor: level.accent + '40' }]}>
-            <Text style={[styles.timeChipText, { color: level.accent }]}>{dateTime}</Text>
+            <Text style={[styles.timeChipText, { color: level.accent }]}>
+              {dateTime}
+            </Text>
           </View>
         </View>
 
         <View style={[styles.overlayStrip, { height: OVERLAY_H }]}>
           <Text style={styles.overlayTitle}>Focus Complete</Text>
           {showOverlayShare && onOverlayShare ? (
-            <TouchableOpacity style={styles.overlayPill} onPress={onOverlayShare} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.overlayPill}
+              onPress={onOverlayShare}
+              activeOpacity={0.8}
+            >
               <Text style={styles.overlayPillText}>Share ↗</Text>
             </TouchableOpacity>
           ) : (
@@ -247,7 +317,10 @@ export function SessionShareCard({
             <View
               style={[
                 styles.qualityFill,
-                { width: `${qualityScore}%` as any, backgroundColor: level.accent },
+                {
+                  width: `${qualityScore}%` as any,
+                  backgroundColor: level.accent,
+                },
               ]}
             />
           </View>
@@ -277,7 +350,8 @@ export function SessionShareCard({
                     {
                       width: `${seg.widthPct}%` as any,
                       backgroundColor: segColor(seg.type, level.accent),
-                      borderRadius: i === 0 || i === segments.length - 1 ? 3 : 0,
+                      borderRadius:
+                        i === 0 || i === segments.length - 1 ? 3 : 0,
                     },
                   ]}
                 />
@@ -289,11 +363,26 @@ export function SessionShareCard({
         <View style={styles.hairline} />
 
         <View style={styles.statsRow}>
-          <StatCol icon="clock" value={formatDuration(duration)} label="Duration" accent={level.accent} />
+          <StatCol
+            icon="clock"
+            value={formatDuration(duration)}
+            label="Duration"
+            accent={level.accent}
+          />
           <View style={styles.colDivider} />
-          <StatCol icon="bars" value={`${pauses}`} label="Pauses" accent={level.accent} />
+          <StatCol
+            icon="bars"
+            value={`${pauses}`}
+            label="Pauses"
+            accent={level.accent}
+          />
           <View style={styles.colDivider} />
-          <StatCol icon="diamond" value={`${leftApp}`} label="Left App" accent={level.accent} />
+          <StatCol
+            icon="diamond"
+            value={`${leftApp}`}
+            label="Left App"
+            accent={level.accent}
+          />
         </View>
 
         <Text style={styles.cardFooter}>foco.app</Text>
@@ -304,8 +393,18 @@ export function SessionShareCard({
 
 const colStyles = StyleSheet.create({
   col: { flex: 1, alignItems: 'center', gap: 4 },
-  value: { fontSize: 15, fontWeight: '700', color: 'rgba(0,0,0,0.80)', letterSpacing: -0.3 },
-  label: { fontSize: 9, color: 'rgba(0,0,0,0.35)', letterSpacing: 0.8, textTransform: 'uppercase' },
+  value: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(0,0,0,0.80)',
+    letterSpacing: -0.3,
+  },
+  label: {
+    fontSize: 9,
+    color: 'rgba(0,0,0,0.35)',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
 });
 
 const styles = StyleSheet.create({
@@ -320,7 +419,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   hero: { paddingHorizontal: 20, paddingTop: 18 },
-  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   heroBrand: {
     fontFamily: 'Fraunces_500Medium',
     fontSize: 15,
@@ -368,7 +471,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  overlayTitle: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  overlayTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
   overlayPill: {
     backgroundColor: 'rgba(255,255,255,0.88)',
     paddingHorizontal: 11,
@@ -376,7 +484,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   overlayPillPlaceholder: { width: 56 },
-  overlayPillText: { fontSize: 11, fontWeight: '700', color: '#111', letterSpacing: 0.2 },
+  overlayPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#111',
+    letterSpacing: 0.2,
+  },
   dataSection: {
     backgroundColor: '#fff',
     paddingHorizontal: 22,
@@ -410,9 +523,19 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 10,
   },
-  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
   taskCheck: { fontSize: 13, fontWeight: '700' },
-  taskTitle: { fontSize: 13, fontWeight: '600', color: 'rgba(0,0,0,0.65)', flex: 1 },
+  taskTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(0,0,0,0.65)',
+    flex: 1,
+  },
   timelineBlock: { marginBottom: 10 },
   timelineBar: {
     height: 5,
@@ -424,7 +547,11 @@ const styles = StyleSheet.create({
   },
   timelineSeg: { height: 5 },
   statsRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 },
-  colDivider: { width: StyleSheet.hairlineWidth, height: 34, backgroundColor: 'rgba(0,0,0,0.08)' },
+  colDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 34,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+  },
   cardFooter: {
     marginTop: 14,
     fontSize: 10,

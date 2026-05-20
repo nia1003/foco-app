@@ -22,10 +22,7 @@ import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
 
 import type { Task } from '@/types';
 
-
-
 export function useFocusLaunch() {
-
   const router = useRouter();
 
   const { play } = useSound();
@@ -36,64 +33,44 @@ export function useFocusLaunch() {
 
   const setFocusDurationMin = usePreferencesStore((s) => s.setFocusDurationMin);
 
-
-
   const launchFocus = useCallback(
-
     async (
-
       setup: FocusQuickSetupValue,
 
       tasks: Task[],
 
       options?: { fallbackTitle?: string },
-
     ) => {
-
       if (setup.taskMode === 'new' && !setup.newTitle.trim()) {
-
-        Alert.alert('Title required', 'Enter a task name, or choose Free focus / an existing task.');
+        Alert.alert(
+          'Title required',
+          'Enter a task name, or choose Free focus / an existing task.',
+        );
 
         return;
-
       }
 
       if (!setup.selectedPetId) {
-
         Alert.alert('Companion required', 'Select a pet to focus with.');
 
         return;
-
       }
-
-
 
       play('transition_up');
 
       await setFocusDurationMin(setup.durationMin);
 
-
-
       if (setup.selectedPetId) {
-
         await setActivePet(setup.selectedPetId);
-
       }
 
-
-
       const newIcon = { type: setup.newIconType, value: setup.newIcon };
-
-
 
       let taskId: string | null = setup.selectedTaskId;
 
       let taskTitle =
-
         options?.fallbackTitle ??
-
         resolveTaskTitle(
-
           setup.taskMode,
 
           tasks,
@@ -103,41 +80,32 @@ export function useFocusLaunch() {
           newIcon,
 
           setup.newTitle,
-
         );
 
-
-
       if (setup.taskMode === 'new' && setup.newTitle.trim()) {
-
         try {
+          const created = await createTask(
+            userId ?? '',
+            setup.newTitle.trim(),
+            setup.durationMin,
+            {
+              icon_type: setup.newIconType,
 
-          const created = await createTask(userId ?? '', setup.newTitle.trim(), setup.durationMin, {
-
-            icon_type: setup.newIconType,
-
-            icon_value: setup.newIcon,
-
-          });
+              icon_value: setup.newIcon,
+            },
+          );
 
           taskId = created.id;
 
           taskTitle = focusTitleWithIcon(setup.newTitle.trim(), newIcon);
-
         } catch {
-
           Alert.alert('Could not create task', 'Please try again in a moment.');
 
           return;
-
         }
-
       }
 
-
-
       navigateToFocus(router, {
-
         durationMin: setup.durationMin,
 
         petId: setup.selectedPetId,
@@ -145,18 +113,11 @@ export function useFocusLaunch() {
         taskId,
 
         taskTitle,
-
       });
-
     },
 
     [play, router, setActivePet, setFocusDurationMin, userId],
-
   );
 
-
-
   return { launchFocus };
-
 }
-
