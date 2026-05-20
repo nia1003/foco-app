@@ -142,6 +142,8 @@ export interface Task {
   /** @deprecated use icon_type + icon_value */
   emoji?: string;
   memo?: string;
+  /** Cumulative completion 0–100 (persisted across sessions) */
+  completion_percent?: number;
 }
 
 // sessions table（歷史清單用）
@@ -176,6 +178,12 @@ export interface SessionPayload {
   early_stop: boolean;
   started_at: string;          // ISO string
   events: SessionEvent[];      // 個別事件時間軸
+  /** Reflection screen — distraction tag ids */
+  distraction_reasons?: string[];
+  /** Reflection screen — self-rated completion 0–100 */
+  completion_percent?: number;
+  /** Reflection screen — mood 1 (worst) – 5 (best) */
+  mood_score?: number;
 }
 
 // Edge Function 回傳（+ focus.tsx 補充的本地計時統計）

@@ -130,7 +130,7 @@ function calcStreak(endedAtList: string[]): number {
 export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
   const { data, error } = await supabase
     .from('tasks')
-    .select('id, user_id, title, duration_min, status, category, created_at, icon_type, icon_value')
+    .select('id, user_id, title, duration_min, status, category, created_at, icon_type, icon_value, completion_percent')
     .eq('user_id', userId)
     .neq('status', 'deleted')        // 軟刪除：status='deleted' 的不顯示
     .order('created_at', { ascending: false });
