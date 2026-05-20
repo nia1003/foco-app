@@ -2,7 +2,7 @@
  * CircularDurationPicker — drag the ring handle to pick minutes.
  * Tap the center number to type a value directly.
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Colors } from '@/constants/theme';
@@ -40,52 +40,123 @@ function arcPath(duration: number): string {
   return `M ${start.x} ${start.y} A ${RADIUS} ${RADIUS} 0 ${large} 1 ${end.x} ${end.y}`;
 }
 
-function touchToDuration(dx: number, dy: number): number {
+function touchAngle(dx: number, dy: number): number {
   let norm = Math.atan2(dy, dx) + Math.PI / 2;
   if (norm < 0) norm += 2 * Math.PI;
   if (norm >= 2 * Math.PI) norm -= 2 * Math.PI;
-  const dur = MIN_VAL + (norm / (2 * Math.PI)) * (MAX_VAL - MIN_VAL);
+  return norm;
+}
+
+function durationFromAngle(angle: number): number {
+  const dur = MIN_VAL + (angle / (2 * Math.PI)) * (MAX_VAL - MIN_VAL);
   return Math.round(Math.max(MIN_VAL, Math.min(MAX_VAL, dur)));
+}
+
+/** Integrate drag deltas so crossing 12 o'clock does not wrap 120 → 5. */
+function durationFromDrag(
+  angle: number,
+  prevAngle: number | null,
+  currentValue: number,
+): number {
+  if (prevAngle === null) return durationFromAngle(angle);
+
+  let delta = angle - prevAngle;
+  if (delta > Math.PI) delta -= 2 * Math.PI;
+  if (delta < -Math.PI) delta += 2 * Math.PI;
+
+  const range = MAX_VAL - MIN_VAL;
+  const next = currentValue + (delta / (2 * Math.PI)) * range;
+  return Math.round(Math.max(MIN_VAL, Math.min(MAX_VAL, next)));
 }
 
 interface Props {
   value: number;
   onChange: (v: number) => void;
+  /** Notifies parent to disable ScrollView while dragging the ring */
+  onInteractionActiveChange?: (active: boolean) => void;
+  /** Open number pad when mounted (e.g. inside duration modal) */
+  autoFocusInput?: boolean;
 }
 
-export function CircularDurationPicker({ value, onChange }: Props) {
-  const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState('');
+export function CircularDurationPicker({
+  value,
+  onChange,
+  onInteractionActiveChange,
+  autoFocusInput = false,
+}: Props) {
+  const [editing, setEditing] = useState(autoFocusInput);
+  const [editText, setEditText] = useState(autoFocusInput ? String(value) : '');
+  const valueRef = useRef(value);
+  const lastAngleRef = useRef<number | null>(null);
+
+  valueRef.current = value;
+
+  useEffect(() => {
+    if (autoFocusInput) {
+      setEditing(true);
+      setEditText(String(value));
+    }
+  }, [autoFocusInput]);
+
+  useEffect(() => {
+    if (editing) setEditText(String(value));
+  }, [value, editing]);
 
   const handleAngle = durToSvgAngle(value);
   const handle = polar(handleAngle);
 
+  const applyTouch = (dx: number, dy: number, isGrant: boolean) => {
+    const angle = touchAngle(dx, dy);
+    const next = durationFromDrag(angle, isGrant ? null : lastAngleRef.current, valueRef.current);
+    lastAngleRef.current = angle;
+    onChange(next);
+  };
+
+  const endInteraction = () => {
+    lastAngleRef.current = null;
+    onInteractionActiveChange?.(false);
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: (evt) => {
+        onInteractionActiveChange?.(true);
         const dx = evt.nativeEvent.locationX - CX;
         const dy = evt.nativeEvent.locationY - CY;
-        if (Math.sqrt(dx * dx + dy * dy) > 20) onChange(touchToDuration(dx, dy));
+        if (Math.sqrt(dx * dx + dy * dy) > 20) applyTouch(dx, dy, true);
       },
       onPanResponderMove: (evt) => {
         const dx = evt.nativeEvent.locationX - CX;
         const dy = evt.nativeEvent.locationY - CY;
-        onChange(touchToDuration(dx, dy));
+        applyTouch(dx, dy, false);
       },
-    })
+      onPanResponderRelease: endInteraction,
+      onPanResponderTerminate: endInteraction,
+    }),
   ).current;
 
-  function commitEdit(text: string) {
+  function clampDuration(v: number) {
+    return Math.max(MIN_VAL, Math.min(MAX_VAL, v));
+  }
+
+  function applyEditText(text: string) {
+    if (text === '') return;
     const v = parseInt(text, 10);
-    if (!isNaN(v)) onChange(Math.max(MIN_VAL, Math.min(MAX_VAL, v)));
+    if (!isNaN(v)) onChange(clampDuration(v));
+  }
+
+  function commitEdit(text: string) {
+    applyEditText(text);
     setEditing(false);
   }
 
   return (
-    <View style={styles.wrap}>
-      <Svg width={SIZE} height={SIZE} {...panResponder.panHandlers}>
+    <View style={styles.wrap} {...panResponder.panHandlers}>
+      <Svg width={SIZE} height={SIZE} pointerEvents="none">
         <Circle
           cx={CX} cy={CY} r={RADIUS}
           fill="none"
@@ -111,7 +182,10 @@ export function CircularDurationPicker({ value, onChange }: Props) {
           <TextInput
             style={styles.editInput}
             value={editText}
-            onChangeText={setEditText}
+            onChangeText={(text) => {
+              setEditText(text);
+              applyEditText(text);
+            }}
             keyboardType="number-pad"
             autoFocus
             selectTextOnFocus

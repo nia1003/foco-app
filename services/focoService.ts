@@ -93,7 +93,7 @@ export async function getSessions(userId: string): Promise<{
 }> {
   const { data, error } = await supabase
     .from('sessions')
-    .select('id, actual_duration, completed, focus_type_result, xp_earned, ended_at, pause_count, left_app_count, quality_score, started_at, tasks(title)')
+    .select('id, task_id, actual_duration, completed, focus_type_result, xp_earned, ended_at, pause_count, left_app_count, quality_score, started_at, tasks(title)')
     .eq('user_id', userId)
     .order('ended_at', { ascending: false });
 
@@ -130,13 +130,18 @@ function calcStreak(endedAtList: string[]): number {
 export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
   const { data, error } = await supabase
     .from('tasks')
-    .select('id, user_id, title, duration_min, status, created_at')
+    .select('id, user_id, title, duration_min, status, category, created_at, icon_type, icon_value, completion_percent')
     .eq('user_id', userId)
     .neq('status', 'deleted')        // 軟刪除：status='deleted' 的不顯示
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return { tasks: data as Task[] };
+  return {
+    tasks: (data as Task[]).map((t) => ({
+      ...t,
+      category: t.category ?? 'task',
+    })),
+  };
 }
 
 // ── createTask ────────────────────────────────
@@ -144,10 +149,27 @@ export async function createTask(
   userId: string,
   title: string,
   durationMin: number,
+  options?: {
+    category?: 'task' | 'daily';
+    icon_type?: 'emoji' | 'svg';
+    icon_value?: string;
+  },
 ): Promise<Task> {
+  const category = options?.category ?? 'task';
+  const row: Record<string, unknown> = {
+    user_id: userId,
+    title,
+    duration_min: durationMin,
+    category,
+  };
+  if (options?.icon_type && options?.icon_value) {
+    row.icon_type = options.icon_type;
+    row.icon_value = options.icon_value;
+  }
+
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ user_id: userId, title, duration_min: durationMin })
+    .insert(row)
     .select()
     .single();
 
@@ -220,6 +242,7 @@ export async function getCalendarData(userId: string, year: number, month: numbe
   return Array.from(byDate.entries()).map(([date, sessions]) => ({
     date,
     session_count: sessions.length,
+    total_focus_sec: sessions.reduce((acc, s) => acc + s.duration_min * 60, 0),
     sessions,
   }));
 }
@@ -244,7 +267,7 @@ export async function getWeekSessions(userId: string, weekStart: string): Promis
   const result: DayData[] = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    return { date: d.toISOString().slice(0, 10), session_count: 0, sessions: [] };
+    return { date: d.toISOString().slice(0, 10), session_count: 0, total_focus_sec: 0, sessions: [] };
   });
 
   for (const row of data as any[]) {
@@ -267,6 +290,7 @@ export async function getWeekSessions(userId: string, weekStart: string): Promis
     if (entry) {
       entry.sessions.push(summary);
       entry.session_count++;
+      entry.total_focus_sec += summary.duration_min * 60;
     }
   }
 

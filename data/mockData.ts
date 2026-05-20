@@ -105,7 +105,18 @@ export const mockSessions: {
   },
 };
 
-export const mockCalendarData: DayData[] = [
+function withDayFocusSec(
+  day: Omit<DayData, 'total_focus_sec'> & { total_focus_sec?: number },
+): DayData {
+  return {
+    ...day,
+    total_focus_sec:
+      day.total_focus_sec ??
+      day.sessions.reduce((acc, s) => acc + s.duration_min * 60, 0),
+  };
+}
+
+const rawMockCalendarData: Omit<DayData, 'total_focus_sec'>[] = [
   {
     date: '2026-05-02',
     session_count: 1,
@@ -156,6 +167,8 @@ export const mockCalendarData: DayData[] = [
   },
 ];
 
+export const mockCalendarData: DayData[] = rawMockCalendarData.map(withDayFocusSec);
+
 export function getMockCalendarData(year: number, month: number): DayData[] {
   const prefix = `${year}-${String(month).padStart(2, '0')}-`;
   return mockCalendarData.filter((d) => d.date.startsWith(prefix));
@@ -169,6 +182,9 @@ export const mockTasks: { tasks: Task[] } = {
       title: 'focus for data structure exam',
       duration_min: 50,
       status: 'pending',
+      icon_type: 'emoji',
+      icon_value: '📚',
+      emoji: '📚',
       created_at: '2025-05-15T00:00:00Z',
     },
   ],

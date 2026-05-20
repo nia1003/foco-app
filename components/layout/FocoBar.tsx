@@ -3,27 +3,33 @@
  * Uses useSafeAreaInsets so the back button clears the Dynamic Island / notch.
  */
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '@/constants/theme';
 import { useSound } from '@/components/SoundProvider';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 interface FocoBarProps {
   back?: boolean;
+  /** Initial letter — opens Settings (same as Home) */
   avatar?: string | null;
-  dark?: boolean;
+  avatarUri?: string | null;
 }
 
-export function FocoBar({ back = false, avatar = null, dark = false }: FocoBarProps) {
+export function FocoBar({
+  back = false,
+  avatar = null,
+  avatarUri = null,
+}: FocoBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { play } = useSound();
+  const { colors, surfaces } = useAppTheme();
 
-  const fg         = dark ? '#fff' : Colors.ink;
-  const mutedColor = dark ? 'rgba(255,255,255,0.6)' : Colors.inkSoft;
-  const btnBg      = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)';
-  const btnBorder  = dark ? 'rgba(255,255,255,0.15)' : 'rgba(20,16,28,0.08)';
+  const fg = colors.ink;
+  const mutedColor = colors.inkSoft;
+  const btnBg = surfaces.barBtnBg;
+  const btnBorder = surfaces.barBtnBorder;
 
   // Total bar height = 56px content + safe area top
   const barHeight = 56 + insets.top;
@@ -51,13 +57,17 @@ export function FocoBar({ back = false, avatar = null, dark = false }: FocoBarPr
 
       <Text style={[styles.wordmark, { color: fg }]}>FOCO</Text>
 
-      {avatar && (
+      {avatar != null && avatar !== '' && (
         <TouchableOpacity
-          style={[styles.avatarBadge, { top: btnTop }]}
+          style={[styles.avatarBadge, { top: btnTop, backgroundColor: surfaces.avatarBadge }]}
           onPress={() => { play('tap'); router.push('/(app)/settings'); }}
           activeOpacity={0.75}
         >
-          <Text style={styles.avatarText}>{avatar}</Text>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{avatar}</Text>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -116,5 +126,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#fff',
+  },
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
 });

@@ -9,6 +9,8 @@ node_modules/
 
 # Expo
 .expo/
+.expo-bundle-test/
+.expo-test-bundle/
 dist/
 web-build/
 expo-env.d.ts
