@@ -29,7 +29,15 @@ export const Colors = {
   "borderMid": "#D1D5DB",
   "success": "#16A34A",
   "warning": "#EAB308",
-  "error": "#DC2626"
+  "error": "#DC2626",
+  "flowchartBlue": "#D4E1F5",
+  "flowchartGreen": "#D5E8D4",
+  "flowchartPaleYellow": "#FFF2CC",
+  "flowchartPeach": "#F8CECC",
+  "flowchartAlert": "#FFFFCC",
+  "flowchartStroke": "#FF8000",
+  "flowchartTextRed": "#FF1E00",
+  "flowchartTextOrange": "#FF3401"
 } as const;
 
 export const Spacing = {
