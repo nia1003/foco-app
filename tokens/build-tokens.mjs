@@ -56,7 +56,7 @@ export const Radius = ${JSON.stringify(borderRadius, null, 2)} as const;
 
 export const FontSize = ${JSON.stringify(fontSize, null, 2)} as const;
 
-export const FontWeight = ${JSON.stringify(fontWeight, null, 2)};
+export const FontWeight = ${JSON.stringify(fontWeight, null, 2)} as const;
 
 export const Shadow = {
   sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },

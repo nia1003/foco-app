@@ -4,11 +4,30 @@
 
 export const Colors = {
   "primary": "#27272a",
+  "beige": "#EFE8E0",
+  "pinkHot": "#F2CEDC",
+  "pinkText": "#b5607a",
+  "pinkSoft": "#E7A0CC",
   "primaryBlue": "#1d4ed8",
+  "blueDeep": "#203F9A",
+  "blueSoft": "#94C2DA",
+  "blueMid": "#4E7CB2",
   "primaryGreen": "#166534",
   "primaryDark": "#111827",
   "primaryMid": "#6B7280",
   "focoGreen": "#2D3A2D",
+  "ink": "#1a1622",
+  "inkSoft": "rgba(26,22,34,0.62)",
+  "inkFaint": "rgba(26,22,34,0.38)",
+  "blobPink": "#f6cfdc",
+  "blobLavender": "#e8d5ec",
+  "blobBlue": "#d6e3f0",
+  "blobPeach": "#f9d8c7",
+  "softBg": "#faf5ef",
+  "glassChrome": "rgba(255,255,255,0.78)",
+  "glassClear": "rgba(255,255,255,0.55)",
+  "frostCard": "rgba(255,255,255,0.62)",
+  "signInBtn": "rgba(255,255,255,0.85)",
   "white": "#FFFFFF",
   "black": "#000000",
   "gray900": "#111827",
@@ -29,7 +48,15 @@ export const Colors = {
   "borderMid": "#D1D5DB",
   "success": "#16A34A",
   "warning": "#EAB308",
-  "error": "#DC2626"
+  "error": "#DC2626",
+  "flowchartBlue": "#D4E1F5",
+  "flowchartGreen": "#D5E8D4",
+  "flowchartPaleYellow": "#FFF2CC",
+  "flowchartPeach": "#F8CECC",
+  "flowchartAlert": "#FFFFCC",
+  "flowchartStroke": "#FF8000",
+  "flowchartTextRed": "#FF1E00",
+  "flowchartTextOrange": "#FF3401"
 } as const;
 
 export const Spacing = {
@@ -38,6 +65,7 @@ export const Spacing = {
   "md": 8,
   "lg": 12,
   "xl": 16,
+  "xxl": 28,
   "2xl": 24,
   "3xl": 32,
   "4xl": 48
@@ -58,9 +86,11 @@ export const FontSize = {
   "xs": 12,
   "sm": 14,
   "base": 16,
+  "md": 16,
   "lg": 18,
   "xl": 20,
   "2xl": 24,
+  "xxl": 28,
   "3xl": 30,
   "4xl": 36
 } as const;
@@ -72,7 +102,7 @@ export const FontWeight = {
   "medium": "500",
   "semibold": "600",
   "bold": "700"
-};
+} as const;
 
 export const Shadow = {
   sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },

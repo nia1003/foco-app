@@ -15,10 +15,45 @@
       "$type": "color",
       "description": "Primary dark (noir accent)"
     },
+    "beige": {
+      "value": "#EFE8E0",
+      "$type": "color",
+      "description": "Legacy beige background"
+    },
+    "pinkHot": {
+      "value": "#F2CEDC",
+      "$type": "color",
+      "description": "Legacy pink accent"
+    },
+    "pinkText": {
+      "value": "#b5607a",
+      "$type": "color",
+      "description": "Legacy pink text"
+    },
+    "pinkSoft": {
+      "value": "#E7A0CC",
+      "$type": "color",
+      "description": "Legacy soft pink"
+    },
     "primaryBlue": {
       "value": "#1d4ed8",
       "$type": "color",
       "description": "Blue accent variant"
+    },
+    "blueDeep": {
+      "value": "#203F9A",
+      "$type": "color",
+      "description": "Legacy deep blue"
+    },
+    "blueSoft": {
+      "value": "#94C2DA",
+      "$type": "color",
+      "description": "Legacy soft blue"
+    },
+    "blueMid": {
+      "value": "#4E7CB2",
+      "$type": "color",
+      "description": "Legacy mid blue"
     },
     "primaryGreen": {
       "value": "#166534",
@@ -39,6 +74,66 @@
       "value": "#2D3A2D",
       "$type": "color",
       "description": "Brand green"
+    },
+    "ink": {
+      "value": "#1a1622",
+      "$type": "color",
+      "description": "Legacy ink text"
+    },
+    "inkSoft": {
+      "value": "rgba(26,22,34,0.62)",
+      "$type": "color",
+      "description": "Legacy ink soft"
+    },
+    "inkFaint": {
+      "value": "rgba(26,22,34,0.38)",
+      "$type": "color",
+      "description": "Legacy ink faint"
+    },
+    "blobPink": {
+      "value": "#f6cfdc",
+      "$type": "color",
+      "description": "Wallpaper blob pink"
+    },
+    "blobLavender": {
+      "value": "#e8d5ec",
+      "$type": "color",
+      "description": "Wallpaper blob lavender"
+    },
+    "blobBlue": {
+      "value": "#d6e3f0",
+      "$type": "color",
+      "description": "Wallpaper blob blue"
+    },
+    "blobPeach": {
+      "value": "#f9d8c7",
+      "$type": "color",
+      "description": "Wallpaper blob peach"
+    },
+    "softBg": {
+      "value": "#faf5ef",
+      "$type": "color",
+      "description": "Legacy soft background"
+    },
+    "glassChrome": {
+      "value": "rgba(255,255,255,0.78)",
+      "$type": "color",
+      "description": "Legacy glass chrome"
+    },
+    "glassClear": {
+      "value": "rgba(255,255,255,0.55)",
+      "$type": "color",
+      "description": "Legacy glass clear"
+    },
+    "frostCard": {
+      "value": "rgba(255,255,255,0.62)",
+      "$type": "color",
+      "description": "Legacy frost card"
+    },
+    "signInBtn": {
+      "value": "rgba(255,255,255,0.85)",
+      "$type": "color",
+      "description": "Legacy sign in button"
     },
     "white": {
       "value": "#FFFFFF",
@@ -144,6 +239,46 @@
       "value": "#DC2626",
       "$type": "color",
       "description": "Error color (red-600)"
+    },
+    "flowchartBlue": {
+      "value": "#D4E1F5",
+      "$type": "color",
+      "description": "Flowchart fill blue"
+    },
+    "flowchartGreen": {
+      "value": "#D5E8D4",
+      "$type": "color",
+      "description": "Flowchart fill green"
+    },
+    "flowchartPaleYellow": {
+      "value": "#FFF2CC",
+      "$type": "color",
+      "description": "Flowchart pale yellow (decision)"
+    },
+    "flowchartPeach": {
+      "value": "#F8CECC",
+      "$type": "color",
+      "description": "Flowchart peach/pink (inputs)"
+    },
+    "flowchartAlert": {
+      "value": "#FFFFCC",
+      "$type": "color",
+      "description": "Flowchart alert fill"
+    },
+    "flowchartStroke": {
+      "value": "#FF8000",
+      "$type": "color",
+      "description": "Flowchart stroke / accent"
+    },
+    "flowchartTextRed": {
+      "value": "#FF1E00",
+      "$type": "color",
+      "description": "Inline text red (rgb(255,30,0))"
+    },
+    "flowchartTextOrange": {
+      "value": "#FF3401",
+      "$type": "color",
+      "description": "Inline text orange (rgb(255,52,1))"
     }
   },
   "spacing": {
@@ -171,6 +306,11 @@
       "value": "16px",
       "$type": "dimension",
       "description": "Extra large spacing (gap-4)"
+    },
+    "xxl": {
+      "value": "28px",
+      "$type": "dimension",
+      "description": "Alias between 2xl and 3xl"
     },
     "2xl": {
       "value": "24px",
@@ -246,6 +386,11 @@
       "$type": "dimension",
       "description": "Base font size"
     },
+    "md": {
+      "value": "16px",
+      "$type": "dimension",
+      "description": "Alias for base"
+    },
     "lg": {
       "value": "18px",
       "$type": "dimension",
@@ -260,6 +405,11 @@
       "value": "24px",
       "$type": "dimension",
       "description": "2x large font (text-2xl)"
+    },
+    "xxl": {
+      "value": "28px",
+      "$type": "dimension",
+      "description": "Between 2xl and 3xl"
     },
     "3xl": {
       "value": "30px",
