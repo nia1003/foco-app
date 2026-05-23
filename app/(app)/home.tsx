@@ -1,7 +1,10 @@
 /**
- * HomeScreen — two-section layout
- *   Top (light): FOCO bar + "Welcome back / Start Focus." + pink CTA + pet carousel
- *   Bottom (dark): greeting + timer gauge + deadlines + daily tasks
+ * HomeScreen — vertical two-page layout
+ *   Page 1 (top, light, NO tab bar):  FocoBar + hero + CTA + pet carousel + chat
+ *   Page 2 (bottom, dark, has tab bar): greeting/timer/tasks | tasks list | stats
+ *
+ * The EmbeddedTabBar lives inside the dark section view, so it physically
+ * scrolls with the dark block — it is never a globally-floating element.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -13,6 +16,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -24,25 +28,54 @@ import { TimerGauge } from '@/components/home/TimerGauge';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { useUIStore } from '@/stores/uiStore';
 import { getPets, getTasks } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const PET_CARD_W  = Math.round(SCREEN_W * 0.72);
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const PET_CARD_W    = Math.round(SCREEN_W * 0.72);
 const PET_SECTION_H = 440;
 const DARK_OVERLAP  = 55;
+const EMBEDDED_TAB_RESERVED = 96; // space at bottom of page-2 content for tab bar
 
-// Design tokens from Figma export
-const LIGHT_BG   = '#fbfbfb';
-const DARK_BG    = '#252525';
-const PINK       = '#ffc8ef';
-const INK        = '#1a1622';
+const LIGHT_BG = '#fbfbfb';
+const DARK_BG  = '#252525';
+const PINK     = '#ffc8ef';
+const INK      = '#1a1622';
 
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
-// ── TaskCard ─────────────────────────────────────────────────────────────────
+type Page2Tab = 'home' | 'tasks' | 'stats';
+
+// Random greetings per pet
+const PET_GREETINGS: Record<string, string[]> = {
+  sunion: [
+    "Ready to focus? Let's go! 🌟",
+    "You've got this! I believe in you 💪",
+    "One focused session at a time ✨",
+    "Today is a great day to start 🌻",
+  ],
+  lily: [
+    "Bloom where you're planted 🌸",
+    "Growth takes patience — you're doing great!",
+    "Let's make today count 🌺",
+    "Every step forward matters 🌿",
+  ],
+  fluff: [
+    "Poof! Let's make magic happen ✨",
+    "Soft focus, big results 🌙",
+    "I'm here with you every step 💙",
+    "Float into your flow state 🫧",
+  ],
+  stay: [
+    "Reaching for the stars ⭐",
+    "You shine brightest when you focus 🌟",
+    "Let's conquer today! 💫",
+    "Starry focus coming right up ✦",
+  ],
+};
+
+// ── TaskCard ──────────────────────────────────────────────────────────────────
 function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
   return (
     <View style={taskStyles.card}>
@@ -96,6 +129,100 @@ const taskStyles = StyleSheet.create({
   },
 });
 
+// ── EmbeddedTabBar ────────────────────────────────────────────────────────────
+// Physically lives inside the dark section — scrolls WITH it, never floats globally.
+interface EmbeddedTabBarProps {
+  active: Page2Tab;
+  onPress: (tab: Page2Tab) => void;
+}
+function EmbeddedTabBar({ active, onPress }: EmbeddedTabBarProps) {
+  const tabs: Array<{ id: Page2Tab; label: string; icon: string }> = [
+    { id: 'home',  label: 'Home',  icon: '⌂' },
+    { id: 'tasks', label: 'Tasks', icon: '☑' },
+    { id: 'stats', label: 'Stats', icon: '◫' },
+  ];
+  return (
+    <View style={etbStyles.wrapper} pointerEvents="box-none">
+      <View style={etbStyles.pill}>
+        {tabs.map((tab) => {
+          const isActive = tab.id === active;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={etbStyles.tab}
+              onPress={() => onPress(tab.id)}
+              activeOpacity={0.7}
+            >
+              {isActive && <View style={etbStyles.activeHighlight} />}
+              <Text style={[etbStyles.icon, isActive && etbStyles.iconActive]}>
+                {tab.icon}
+              </Text>
+              <Text style={[etbStyles.label, isActive && etbStyles.labelActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const etbStyles = StyleSheet.create({
+  wrapper: {
+    position: 'absolute',
+    bottom: 22,
+    left: 14,
+    right: 14,
+    zIndex: 30,
+  },
+  pill: {
+    flexDirection: 'row',
+    borderRadius: 9999,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(37,37,37,0.88)',
+    padding: 8,
+    shadowColor: 'rgba(0,0,0,0.8)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 6,
+    position: 'relative',
+  },
+  activeHighlight: {
+    position: 'absolute',
+    top: 2, bottom: 2, left: 8, right: 8,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  icon: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.40)',
+  },
+  iconActive: {
+    color: '#ffffff',
+  },
+  label: {
+    fontSize: 10.5,
+    letterSpacing: 0.1,
+    color: 'rgba(255,255,255,0.40)',
+    fontWeight: '500',
+  },
+  labelActive: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+});
+
 // ── HomeScreen ────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router   = useRouter();
@@ -108,19 +235,25 @@ export default function HomeScreen() {
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
+  const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
 
-  // Drives per-pet scale/opacity; updated on native thread for 60fps
+  // Pet chat state
+  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string }>({
+    visible: false, msg: '', text: '',
+  });
+  const chatInputRef = useRef<TextInput>(null);
+
+  // Drives per-pet scale/opacity on native thread (60fps)
   const scrollX = useRef(new Animated.Value(0)).current;
 
   // Staleness guard for task list
   const tasksLastFetchedAt = useRef<number | null>(null);
   const TASKS_STALE_MS = 5 * 60 * 1000;
 
-  // ── Page 1 / Page 2 scroll logic ──────────────────────────
-  const mainScrollRef = useRef<ScrollView>(null);
-  const hasInitialScrolled = useRef(false);
-  const darkSectionYRef = useRef<number>(0);
-  const { setHomeTabBarVisible } = useUIStore();
+  // ── Page 1 / Page 2 scroll ─────────────────────────────────────
+  const mainScrollRef        = useRef<ScrollView>(null);
+  const hasInitialScrolled   = useRef(false);
+  const darkSectionYRef      = useRef<number>(0);
 
   const onDarkSectionLayout = useCallback((e: LayoutChangeEvent) => {
     const y = e.nativeEvent.layout.y;
@@ -128,17 +261,18 @@ export default function HomeScreen() {
     if (!hasInitialScrolled.current) {
       hasInitialScrolled.current = true;
       mainScrollRef.current?.scrollTo({ y, animated: false });
-      setHomeTabBarVisible(true);
     }
-  }, [setHomeTabBarVisible]);
+  }, []);
 
   const onMainScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    // Dismiss pet chat when user scrolls into Page 2 area
     const y = e.nativeEvent.contentOffset.y;
-    const threshold = darkSectionYRef.current - 80;
-    setHomeTabBarVisible(y >= threshold);
-  }, [setHomeTabBarVisible]);
+    if (y > darkSectionYRef.current - 40) {
+      setChat((prev) => prev.visible ? { ...prev, visible: false } : prev);
+    }
+  }, []);
 
-  // ── Data fetching ──────────────────────────────────────────────
+  // ── Data fetching ───────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
     const STALE_MS = 5 * 60 * 1000;
@@ -175,18 +309,17 @@ export default function HomeScreen() {
     if (idx >= 0) setActiveCarouselIndex(idx);
   }, [activePet?.name]);
 
-  // ── Derived ────────────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────
   const displayName     = userName ?? userEmail?.split('@')[0] ?? 'there';
   const activePetDef    = UNLOCKED_DEFS[activeCarouselIndex] ?? UNLOCKED_DEFS[0];
   const activePetRecord = storePool.find(
     (p) => p.name.toLowerCase() === activePetDef?.id,
   ) ?? storePool[0];
 
-  // taskType is a local-only field; backend tasks land in dailyTasks via !t.taskType
   const deadlineTasks = pendingTasks.filter((t) => t.taskType === 'deadline');
   const dailyTasks    = pendingTasks.filter((t) => t.taskType === 'daily' || !t.taskType);
 
-  // ── Handlers ───────────────────────────────────────────────────
+  // ── Handlers ────────────────────────────────────────────────────
   const goFocus = (task?: Task) => {
     play('transition_up');
     router.push({
@@ -204,13 +337,31 @@ export default function HomeScreen() {
     const offset = e.nativeEvent.contentOffset.x;
     const idx    = Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, Math.round(offset / PET_CARD_W)));
     setActiveCarouselIndex(idx);
-
     const def    = UNLOCKED_DEFS[idx];
     const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
     if (record?.id) usePetStore.getState().setActivePet(record.id);
   };
 
-  // ── Render ─────────────────────────────────────────────────────
+  // Tap pet → toggle chat bubble with random greeting
+  const handlePetPress = useCallback((petId: string) => {
+    play('tap');
+    setChat((prev) => {
+      if (prev.visible) return { ...prev, visible: false };
+      const pool = PET_GREETINGS[petId] ?? PET_GREETINGS.sunion;
+      return {
+        visible: true,
+        msg: pool[Math.floor(Math.random() * pool.length)],
+        text: '',
+      };
+    });
+  }, [play]);
+
+  // Send button → focus TextInput to open keyboard
+  const handleSendPress = useCallback(() => {
+    chatInputRef.current?.focus();
+  }, []);
+
+  // ── Render ──────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
       <ScrollView
@@ -222,7 +373,7 @@ export default function HomeScreen() {
         scrollEventThrottle={50}
         onScroll={onMainScroll}
       >
-        {/* ── LIGHT SECTION ──────────────────────────────────── */}
+        {/* ── PAGE 1: LIGHT SECTION (NO TAB BAR) ─────────────── */}
         <View style={styles.lightSection}>
           <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
           <View style={styles.heroArea}>
@@ -237,25 +388,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── PET CAROUSEL ───────────────────────────────────── */}
+        {/* ── PAGE 1: PET CAROUSEL ────────────────────────────── */}
         <View style={styles.petSection}>
           {/*
            * Threshold / deadzone interpolation
-           * ─────────────────────────────────────────────────────────
-           * T = 20% of one card width = the "deadzone" on each side of
-           * the centred pet.
-           *
-           * For pet i, whose centre sits at x = i * PET_CARD_W:
-           *
-           *   scrollX:   … ─(c-W)──(c-T)────c────(c+T)──(c+W)─ …
-           *   scale:         0.65    1.0    1.0    1.0    0.65
-           *   opacity:       0.40    1.0    1.0    1.0    0.40
-           *
-           * Effect: the active pet holds full size for the first 20% of
-           * any swipe (deadzone), then smoothly shrinks over the remaining
-           * 80%.  The arriving pet grows only in the final 20% approach.
-           * Combined with decelerationRate=0.985, scrolling feels heavy
-           * and intentional rather than hair-trigger.
+           * T = 20% of card width = deadzone on each side of the centred pet.
+           * scale / opacity clamp: [0.65 → 1.0 → 1.0 → 1.0 → 0.65]
+           * decelerationRate=0.985 gives a heavy, intentional swipe feel.
            */}
           <Animated.ScrollView
             horizontal
@@ -277,16 +416,16 @@ export default function HomeScreen() {
           >
             {UNLOCKED_DEFS.map((def, i) => {
               const c = i * PET_CARD_W;
-              const T = PET_CARD_W * 0.20; // deadzone half-width
+              const T = PET_CARD_W * 0.20;
 
               const scale = scrollX.interpolate({
                 inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
-                outputRange: [0.65,            1.0,  1.0, 1.0,  0.65],
+                outputRange: [0.65, 1.0, 1.0, 1.0, 0.65],
                 extrapolate: 'clamp',
               });
               const opacity = scrollX.interpolate({
                 inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
-                outputRange: [0.40,            1.0,  1.0, 1.0,  0.40],
+                outputRange: [0.40, 1.0, 1.0, 1.0, 0.40],
                 extrapolate: 'clamp',
               });
 
@@ -300,64 +439,184 @@ export default function HomeScreen() {
                 >
                   <TouchableOpacity
                     style={styles.petCardInner}
-                    onPress={() => {
+                    onPress={() => handlePetPress(def.id)}
+                    onLongPress={() => {
                       play('transition_up');
                       router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
                     }}
+                    delayLongPress={500}
                     activeOpacity={0.9}
                   >
-                    {/* interactive=false prevents WebView pan from hijacking carousel scroll */}
+                    {/* interactive=false prevents WebView from hijacking carousel scroll */}
                     <PetRenderer pet={def} size={460} interactive={false} />
                   </TouchableOpacity>
                 </Animated.View>
               );
             })}
           </Animated.ScrollView>
+
+          {/* ── Pet chat overlay — pure text, no bg/border ──── */}
+          {chat.visible && (
+            <View style={styles.chatOverlay} pointerEvents="box-none">
+              <View style={styles.chatRow} pointerEvents="auto">
+                <TextInput
+                  ref={chatInputRef}
+                  style={styles.chatPureText}
+                  value={chat.text}
+                  onChangeText={(t) => setChat((p) => ({ ...p, text: t }))}
+                  placeholder={chat.msg}
+                  placeholderTextColor="rgba(26,22,34,0.70)"
+                  returnKeyType="send"
+                  multiline={false}
+                  onSubmitEditing={() => {
+                    // Hook your API / message handler here (e.g., from stash)
+                    setChat((p) => ({ ...p, text: '', msg: p.msg }));
+                  }}
+                />
+                <TouchableOpacity
+                  style={styles.sendBtn}
+                  onPress={handleSendPress}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.sendArrow}>↑</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
 
-        {/* ── DARK SECTION ───────────────────────────────────── */}
+        {/* ── PAGE 2: DARK SECTION (HAS EMBEDDED TAB BAR) ────── */}
+        {/*
+         * height: SCREEN_H ensures the dark block fills the viewport exactly
+         * when scrolled into view. The EmbeddedTabBar (absolute bottom) will
+         * therefore sit at the screen bottom — it slides IN with the block and
+         * slides OUT with it. It is never a globally-floating element.
+         */}
         <View style={styles.darkSection} onLayout={onDarkSectionLayout}>
-          <Text style={styles.greetName}>Hi {displayName},</Text>
-          <Text style={styles.greetSub}>welcome to the headspace.</Text>
+          {/* ── Sub-tab content area ──────────────────────── */}
+          <View style={styles.page2Content}>
+            {activePage2Tab === 'home' && (
+              <>
+                <Text style={styles.greetName}>Hi {displayName},</Text>
+                <Text style={styles.greetSub}>welcome to the headspace.</Text>
 
-          <Text style={styles.sectionLabel}>timer</Text>
-          <View style={styles.gaugeCard}>
-            <TimerGauge value={durationMin} onChange={setDurationMin} />
+                <Text style={styles.sectionLabel}>timer</Text>
+                <View style={styles.gaugeCard}>
+                  <TimerGauge value={durationMin} onChange={setDurationMin} />
+                </View>
+
+                {deadlineTasks.length > 0 && (
+                  <>
+                    <Text style={styles.sectionLabel}>deadlines</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                    >
+                      {deadlineTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+
+                {dailyTasks.length > 0 && (
+                  <>
+                    <Text style={styles.sectionLabel}>Daily</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                    >
+                      {dailyTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+
+                {deadlineTasks.length === 0 && dailyTasks.length === 0 && (
+                  <Text style={styles.emptyTasks}>No pending tasks — you're all clear 🎉</Text>
+                )}
+              </>
+            )}
+
+            {activePage2Tab === 'tasks' && (
+              <>
+                <Text style={styles.greetName}>Tasks</Text>
+                <Text style={styles.greetSub}>all pending missions.</Text>
+
+                {pendingTasks.length === 0 ? (
+                  <Text style={styles.emptyTasks}>No pending tasks — add one to get started!</Text>
+                ) : (
+                  <>
+                    {deadlineTasks.length > 0 && (
+                      <>
+                        <Text style={styles.sectionLabel}>deadlines</Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.taskRow}
+                          nestedScrollEnabled
+                        >
+                          {deadlineTasks.map((task) => (
+                            <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                          ))}
+                        </ScrollView>
+                      </>
+                    )}
+                    {dailyTasks.length > 0 && (
+                      <>
+                        <Text style={styles.sectionLabel}>daily</Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.taskRow}
+                          nestedScrollEnabled
+                        >
+                          {dailyTasks.map((task) => (
+                            <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                          ))}
+                        </ScrollView>
+                      </>
+                    )}
+                    <TouchableOpacity
+                      style={styles.viewAllBtn}
+                      onPress={() => router.push('/(app)/missions' as any)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={styles.viewAllText}>View full task manager →</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </>
+            )}
+
+            {activePage2Tab === 'stats' && (
+              <>
+                <Text style={styles.greetName}>Stats</Text>
+                <Text style={styles.greetSub}>your focus journey.</Text>
+                <View style={styles.gaugeCard}>
+                  <Text style={styles.statsPlaceholder}>
+                    {'Sessions this week: —\nFocus time today: —'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.viewAllBtn}
+                  onPress={() => router.push('/(app)/stats' as any)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.viewAllText}>View full statistics →</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
-          {deadlineTasks.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>deadlines</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.taskRow}
-                nestedScrollEnabled
-              >
-                {deadlineTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                ))}
-              </ScrollView>
-            </>
-          )}
-
-          {dailyTasks.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>Daily</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.taskRow}
-                nestedScrollEnabled
-              >
-                {dailyTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                ))}
-              </ScrollView>
-            </>
-          )}
-
-          <View style={styles.bottomPad} />
+          {/* ── Embedded Tab Bar — lives INSIDE dark section ─ */}
+          <EmbeddedTabBar active={activePage2Tab} onPress={setActivePage2Tab} />
         </View>
       </ScrollView>
     </View>
@@ -429,16 +688,62 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
 
-  // ── Dark section ────────────────────────────────────────────────
+  // ── Pet chat overlay (pure text, no background/border) ──────────
+  chatOverlay: {
+    position: 'absolute',
+    bottom: DARK_OVERLAP + 24,
+    left: 24,
+    right: 24,
+    zIndex: 30,
+  },
+  chatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  chatPureText: {
+    flex: 1,
+    color: INK,
+    fontSize: 15,
+    fontFamily: 'Fraunces_500Medium',
+    fontWeight: '500',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: 0,
+  },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: PINK,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendArrow: {
+    color: INK,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // ── Dark section (Page 2) ────────────────────────────────────────
+  // height: SCREEN_H means when scrolled into view the block fills the
+  // entire viewport — the EmbeddedTabBar (absolute bottom: 22) lands at
+  // the screen bottom and slides in/out with this block.
   darkSection: {
     backgroundColor: DARK_BG,
     borderTopLeftRadius:  40,
     borderTopRightRadius: 40,
     marginTop: -DARK_OVERLAP,
+    height: SCREEN_H,
+    position: 'relative',
+    zIndex: 10,
+  },
+
+  // Inner content area — reserves space at the bottom for the embedded tab bar
+  page2Content: {
     paddingTop: DARK_OVERLAP + 28,
     paddingHorizontal: 29,
-    zIndex: 10,
-    minHeight: 520,
+    paddingBottom: EMBEDDED_TAB_RESERVED,
   },
 
   greetName: {
@@ -479,5 +784,29 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
 
-  bottomPad: { height: 60 },
+  emptyTasks: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 14,
+    marginTop: 24,
+    textAlign: 'center',
+  },
+
+  viewAllBtn: {
+    marginTop: 24,
+    alignSelf: 'flex-start',
+  },
+  viewAllText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
+
+  statsPlaceholder: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 14,
+    lineHeight: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    textAlign: 'center',
+  },
 });

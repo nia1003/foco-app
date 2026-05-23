@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 
+// UI state for cross-component coordination.
+// homeTabBarVisible removed — the home screen now uses an EmbeddedTabBar
+// inside the dark section that naturally slides with the content block.
 interface UIState {
-  homeTabBarVisible: boolean;
-  setHomeTabBarVisible: (v: boolean) => void;
+  // Reserved for future UI state
+  _placeholder: boolean;
 }
 
-export const useUIStore = create<UIState>((set) => ({
-  homeTabBarVisible: true,
-  setHomeTabBarVisible: (homeTabBarVisible) => set({ homeTabBarVisible }),
+export const useUIStore = create<UIState>(() => ({
+  _placeholder: true,
 }));

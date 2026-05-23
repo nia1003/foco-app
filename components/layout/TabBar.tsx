@@ -8,8 +8,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
-import { useUIStore } from '@/stores/uiStore';
-
 type TabId = 'home' | 'missions' | 'stats';
 
 interface Tab {
@@ -90,12 +88,13 @@ export function TabBar() {
   const router = useRouter();
   const pathname = usePathname();
   const { colors, surfaces, isDark } = useAppTheme();
-  const homeTabBarVisible = useUIStore((s) => s.homeTabBarVisible);
 
   if (HIDDEN_ROUTES.some((r) => pathname.includes(r))) return null;
 
+  // Home route uses its own EmbeddedTabBar (lives inside the dark section).
+  // Showing the global Tab Bar here would float over Page 1.
   const isHome = pathname === '/home' || pathname.endsWith('/home');
-  if (isHome && !homeTabBarVisible) return null;
+  if (isHome) return null;
 
   const fg = colors.ink;
   const muted = colors.inkSoft;
