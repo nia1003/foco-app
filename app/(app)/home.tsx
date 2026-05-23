@@ -27,13 +27,15 @@ import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const PET_CARD_W = Math.round(SCREEN_W * 0.72);
-const PET_SECTION_H = 260;
-const DARK_OVERLAP = 60;
+const PET_CARD_W  = Math.round(SCREEN_W * 0.72);
+const PET_SECTION_H = 280;
+const DARK_OVERLAP  = 55;
 
-const PINK      = '#F2CEDC';
-const PINK_TEXT = '#b5607a';
-const INK       = '#1a1622';
+// Design tokens from Figma export
+const LIGHT_BG   = '#fbfbfb';
+const DARK_BG    = '#252525';
+const PINK       = '#ffc8ef';
+const INK        = '#1a1622';
 
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
@@ -56,33 +58,38 @@ function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
 
 const taskStyles = StyleSheet.create({
   card: {
-    width: 140,
-    height: 110,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 20,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.12)',
-    padding: 16,
+    width: 137,
+    height: 135,
+    backgroundColor: 'rgba(255,255,255,0.90)',
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.90)',
+    paddingHorizontal: 22,
+    paddingVertical: 18,
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    overflow: 'hidden',
   },
   title: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.85)',
-    lineHeight: 18,
+    fontSize: 12,
+    fontWeight: '600',
+    color: INK,
+    lineHeight: 16,
+    alignSelf: 'flex-start',
   },
   btn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 34,
     backgroundColor: PINK,
     alignItems: 'center',
     justifyContent: 'center',
   },
   arrow: {
-    fontSize: 14,
-    color: PINK_TEXT,
+    fontSize: 20,
+    color: INK,
     fontWeight: '700',
+    letterSpacing: 2,
   },
 });
 
@@ -99,7 +106,7 @@ export default function HomeScreen() {
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
 
-  // Staleness guard for task list — avoids re-fetching on every tab-back
+  // Staleness guard for task list
   const tasksLastFetchedAt = useRef<number | null>(null);
   const TASKS_STALE_MS = 5 * 60 * 1000;
 
@@ -107,7 +114,6 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!userId) return;
     const STALE_MS = 5 * 60 * 1000;
-    // pets.length guard ensures a freshly-reset store (post-logout) always refetches
     const isStale  = !petsLastFetchedAt || Date.now() - petsLastFetchedAt > STALE_MS;
     if (pets.length && !isStale) { restoreActivePet(); return; }
     getPets(userId)
@@ -144,7 +150,6 @@ export default function HomeScreen() {
   // ── Derived ────────────────────────────────────────────────────
   const displayName     = userName ?? userEmail?.split('@')[0] ?? 'there';
   const activePetDef    = UNLOCKED_DEFS[activeCarouselIndex] ?? UNLOCKED_DEFS[0];
-  // FocoPet.name matches the PETS constant id (e.g. "Sunion" → id "sunion")
   const activePetRecord = storePool.find(
     (p) => p.name.toLowerCase() === activePetDef?.id,
   ) ?? storePool[0];
@@ -161,8 +166,6 @@ export default function HomeScreen() {
       params: {
         durationMin: String(durationMin),
         petId: activePetRecord?.id ?? '',
-        // Always pass taskId so focus.tsx gets a consistent signal;
-        // empty string is treated as null task_id in the session payload
         taskId: task?.id ?? '',
         ...(task ? { taskTitle: task.title } : {}),
       },
@@ -174,7 +177,6 @@ export default function HomeScreen() {
     const idx    = Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, Math.round(offset / PET_CARD_W)));
     setActiveCarouselIndex(idx);
 
-    // Persist selection so it survives navigation away-and-back
     const def    = UNLOCKED_DEFS[idx];
     const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
     if (record?.id) usePetStore.getState().setActivePet(record.id);
@@ -193,10 +195,8 @@ export default function HomeScreen() {
         <View style={styles.lightSection}>
           <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
           <View style={styles.heroArea}>
-            <Text style={styles.heroLine}>Welcome back</Text>
-            <Text style={styles.heroLine}>Start Focus.</Text>
+            <Text style={styles.heroLine}>{'Welcome\nback\nStart Focus.'}</Text>
           </View>
-          {/* Pink circle CTA — free focus, no task */}
           <TouchableOpacity
             style={styles.pinkCircleBtn}
             onPress={() => { play('tap'); goFocus(); }}
@@ -206,7 +206,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── PET CAROUSEL (transparent bg, sits above dark section) ── */}
+        {/* ── PET CAROUSEL ───────────────────────────────────── */}
         <View style={styles.petSection}>
           <ScrollView
             horizontal
@@ -287,48 +287,51 @@ export default function HomeScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root:          { flex: 1, backgroundColor: '#faf5ef' },
+  root:          { flex: 1, backgroundColor: LIGHT_BG },
   scroll:        { flex: 1 },
   scrollContent: { paddingBottom: 0 },
 
+  // ── Light section ───────────────────────────────────────────────
   lightSection: {
-    backgroundColor: '#faf5ef',
+    backgroundColor: LIGHT_BG,
     zIndex: 20,
   },
   heroArea: {
-    paddingHorizontal: 22,
-    paddingTop: 6,
-    paddingBottom: 16,
+    paddingHorizontal: 38,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
   heroLine: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 38,
-    fontWeight: '500',
+    fontSize: 54,
+    fontWeight: '600',
     color: INK,
-    letterSpacing: -0.6,
-    lineHeight: 46,
+    letterSpacing: 1,
+    lineHeight: 58,
   },
   pinkCircleBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 69,
+    height: 69,
+    borderRadius: 34,
     backgroundColor: PINK,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    shadowColor: PINK_TEXT,
+    shadowColor: '#c07090',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
   },
   pinkCircleArrow: {
-    fontSize: 20,
-    color: PINK_TEXT,
+    fontSize: 32,
+    color: INK,
     fontWeight: '700',
+    letterSpacing: 2,
   },
 
+  // ── Pet carousel ────────────────────────────────────────────────
   petSection: {
     height: PET_SECTION_H,
     backgroundColor: 'transparent',
@@ -341,43 +344,46 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
 
+  // ── Dark section ────────────────────────────────────────────────
   darkSection: {
-    backgroundColor: INK,
-    borderTopLeftRadius:  32,
-    borderTopRightRadius: 32,
+    backgroundColor: DARK_BG,
+    borderTopLeftRadius:  40,
+    borderTopRightRadius: 40,
     marginTop: -DARK_OVERLAP,
     paddingTop: DARK_OVERLAP + 28,
-    paddingHorizontal: 22,
+    paddingHorizontal: 29,
     zIndex: 10,
-    minHeight: 480,
+    minHeight: 520,
   },
 
   greetName: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 28,
-    fontWeight: '500',
+    fontSize: 40,
+    fontWeight: '600',
     color: '#fff',
-    letterSpacing: -0.3,
-    marginBottom: 4,
+    letterSpacing: -0.4,
+    lineHeight: 44,
+    marginBottom: 6,
   },
   greetSub: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.45)',
-    letterSpacing: 0.1,
-    marginBottom: 24,
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.65)',
+    letterSpacing: -0.2,
+    marginBottom: 28,
   },
 
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.38)',
-    letterSpacing: 1.2,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.71)',
+    letterSpacing: 0.2,
     marginTop: 24,
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   gaugeCard: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 20,
     paddingVertical: 14,
     alignItems: 'center',
@@ -388,5 +394,5 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
 
-  bottomPad: { height: 48 },
+  bottomPad: { height: 60 },
 });
