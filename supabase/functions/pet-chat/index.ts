@@ -1,8 +1,11 @@
 // ================================================================
 // FOCO — Edge Function: pet-chat
-// Calls Claude Haiku with a per-pet system prompt.
-// Rate-limit: 1 request per 10 seconds per user (checked via last_chat_at in pets table).
+// Calls Google Gemini 1.5 Flash (free tier) with a per-pet system prompt.
+// Rate-limit: 1 request per 10 seconds per user (pet_chat_rate_limit table).
 // Runtime: Deno (Supabase Edge Functions)
+//
+// Setup: add GEMINI_API_KEY secret in Supabase Dashboard → Settings → Secrets
+//   Get a free key at: https://aistudio.google.com/
 // ================================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -30,6 +33,9 @@ const PET_PROMPTS: Record<string, string> = {
 說話規則：只說 1 句，字數不超過 20 字，極簡。
 禁止：廢話、感嘆號、超過 20 字。`,
 }
+
+const GEMINI_API_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -79,40 +85,47 @@ serve(async (req: Request) => {
       })
     }
 
-    // Upsert rate-limit timestamp
     await supabase.from('pet_chat_rate_limit').upsert({
       user_id: user.id,
       last_at: new Date(now).toISOString(),
     })
 
-    // ── Call Claude Haiku ──────────────────────────────────────
-    const systemPrompt = PET_PROMPTS[petId] ?? PET_PROMPTS['sunion']
-
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': Deno.env.get('ANTHROPIC_API_KEY') ?? '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 80,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: message }],
-      }),
-    })
-
-    if (!claudeRes.ok) {
-      const err = await claudeRes.text()
-      console.error('Claude API error:', err)
+    // ── Call Google Gemini 1.5 Flash ───────────────────────────
+    const geminiKey = Deno.env.get('GEMINI_API_KEY') ?? ''
+    if (!geminiKey) {
+      console.error('GEMINI_API_KEY not set')
       return new Response(JSON.stringify({ error: 'ai_error' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const claudeData = await claudeRes.json()
-    const reply: string = claudeData.content?.[0]?.text ?? '...'
+    const systemPrompt = PET_PROMPTS[petId] ?? PET_PROMPTS['sunion']
+
+    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${geminiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: message }] }],
+        generationConfig: {
+          maxOutputTokens: 80,
+          temperature: 0.9,
+          topP: 0.95,
+        },
+      }),
+    })
+
+    if (!geminiRes.ok) {
+      const err = await geminiRes.text()
+      console.error('Gemini API error:', geminiRes.status, err)
+      return new Response(JSON.stringify({ error: 'ai_error' }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const geminiData = await geminiRes.json()
+    const reply: string =
+      geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '...'
 
     return new Response(JSON.stringify({ reply }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

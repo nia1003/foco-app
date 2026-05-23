@@ -1,33 +1,40 @@
 /**
- * HomeScreen — vertical two-page layout (Reanimated + RNGH)
- *   Page 1 (exactly SCREEN_H, light, NO tab bar):  FocoBar + hero + pet carousel + chat
- *   Page 2 (exactly SCREEN_H, dark, has tab bar):  Dashboard | Tasks | Stats
+ * HomeScreen — two-page full-screen layout
+ *   Page 1 (light): FOCO bar + hero text + pink CTA + pet carousel
+ *   Page 2 (dark):  inline tab bar (Home / Missions / Stats) with global swipe-back gesture
  *
- * The two pages stack vertically. A PanGestureHandler drives a spring-based
- * translateY that moves the page stack, giving heavy rubber-band damping.
- * Page 2 never bleeds into Page 1 at rest.
+ * Architecture:
+ *   GestureDetector (vertical pan — page flip)
+ *     Reanimated.View (translateY: 0 = page1, -SCREEN_H = page2)
+ *       Page 1  (height: SCREEN_H)
+ *       Page 2  (height: SCREEN_H, dark, rounded top corners)
+ *         Reanimated.ScrollView  (tab content, scroll-position tracked for gesture priority)
+ *         EmbeddedTabBar         (fixed bottom inside dark card)
+ *
+ *  Carousel lock: after user scrolls to a pet, carousel locks (scrollEnabled=false).
+ *  Tap "change ↔" to unlock and browse again.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated,
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Reanimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
   runOnJS,
   useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -36,138 +43,111 @@ import { TimerGauge } from '@/components/home/TimerGauge';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { chatWithPet, getPets, getTasks } from '@/services/focoService';
+import { getPets, getTasks } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
+// ── Constants ─────────────────────────────────────────────────────────────────
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-const PET_CARD_W    = Math.round(SCREEN_W * 0.72);
-const PET_SECTION_H = 440;
-const HERO_SECTION_H = SCREEN_H - PET_SECTION_H; // fills rest of page 1
-const EMBEDDED_TAB_RESERVED = 96;
+const PET_CARD_W       = Math.round(SCREEN_W * 0.72);
+const PET_SECTION_H    = Math.min(340, SCREEN_H * 0.38);  // fills ~38% of screen
+const SNAP_THRESHOLD   = SCREEN_H * 0.28;
+const VELOCITY_THRESHOLD = 600;
+const RESISTANCE       = 0.12;
 
-const LIGHT_BG = '#fbfbfb';
-const DARK_BG  = '#252525';
-const PINK     = '#ffc8ef';
-const INK      = '#1a1622';
+const PINK      = '#F2CEDC';
+const PINK_TEXT = '#b5607a';
+const INK       = '#1a1622';
 
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
-type Page2Tab = 'home' | 'tasks' | 'stats';
-
-// ── Per-pet random greetings ──────────────────────────────────────────────────
-const PET_GREETINGS: Record<string, string[]> = {
-  sunion: [
-    "Ready to focus? Let's go! 🌟",
-    "You've got this! I believe in you 💪",
-    "One focused session at a time ✨",
-    "Today is a great day to start 🌻",
-  ],
-  lily: [
-    "Bloom where you're planted 🌸",
-    "Growth takes patience — you're doing great!",
-    "Let's make today count 🌺",
-    "Every step forward matters 🌿",
-  ],
-  fluff: [
-    "Poof! Let's make magic happen ✨",
-    "Soft focus, big results 🌙",
-    "I'm here with you every step 💙",
-    "Float into your flow state 🫧",
-  ],
-  stay: [
-    "Reaching for the stars ⭐",
-    "You shine brightest when you focus 🌟",
-    "Let's conquer today! 💫",
-    "Starry focus coming right up ✦",
-  ],
-};
-
-// ── TaskCard ──────────────────────────────────────────────────────────────────
+// ── TaskCard ─────────────────────────────────────────────────────────────────
 function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
   return (
-    <View style={taskStyles.card}>
-      <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
-      <TouchableOpacity
-        style={taskStyles.btn}
-        onPress={onPress}
-        activeOpacity={0.8}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Text style={taskStyles.arrow}>→</Text>
+    <View style={taskSt.card}>
+      <Text style={taskSt.title} numberOfLines={2}>{task.title}</Text>
+      <TouchableOpacity style={taskSt.btn} onPress={onPress} activeOpacity={0.8}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={taskSt.arrow}>→</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const taskStyles = StyleSheet.create({
+const taskSt = StyleSheet.create({
   card: {
-    width: 137,
-    height: 135,
-    backgroundColor: 'rgba(255,255,255,0.90)',
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.90)',
-    paddingHorizontal: 22,
-    paddingVertical: 18,
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    overflow: 'hidden',
+    width: 140, height: 110,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20, borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 16, justifyContent: 'space-between',
   },
-  title: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: INK,
-    lineHeight: 16,
-    alignSelf: 'flex-start',
+  title: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.85)', lineHeight: 18 },
+  btn: { width: 32, height: 32, borderRadius: 16, backgroundColor: PINK, alignItems: 'center', justifyContent: 'center' },
+  arrow: { fontSize: 14, color: PINK_TEXT, fontWeight: '700' },
+});
+
+// ── MissionsRow ───────────────────────────────────────────────────────────────
+function MissionsRow({ task, onPress }: { task: Task; onPress: () => void }) {
+  return (
+    <View style={missSt.row}>
+      <View style={missSt.dot} />
+      <Text style={missSt.title} numberOfLines={1}>{task.title}</Text>
+      <TouchableOpacity style={missSt.btn} onPress={onPress} activeOpacity={0.8}>
+        <Text style={missSt.btnText}>▶</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const missSt = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: PINK },
+  title: { flex: 1, fontSize: 14, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
   btn: {
-    width: 44,
-    height: 44,
-    borderRadius: 34,
-    backgroundColor: PINK,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 30, height: 30, borderRadius: 15, backgroundColor: PINK,
+    alignItems: 'center', justifyContent: 'center',
   },
-  arrow: {
-    fontSize: 20,
-    color: INK,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
+  btnText: { fontSize: 10, color: PINK_TEXT, fontWeight: '700' },
 });
 
 // ── EmbeddedTabBar ────────────────────────────────────────────────────────────
-// Physically lives inside the dark card — moves WITH it, never floats globally.
-interface EmbeddedTabBarProps {
-  active: Page2Tab;
-  onPress: (tab: Page2Tab) => void;
-}
-function EmbeddedTabBar({ active, onPress }: EmbeddedTabBarProps) {
-  const tabs: Array<{ id: Page2Tab; label: string; icon: string }> = [
-    { id: 'home',  label: 'Home',  icon: '⌂' },
-    { id: 'tasks', label: 'Tasks', icon: '☑' },
-    { id: 'stats', label: 'Stats', icon: '◫' },
+type P2Tab = 'home' | 'missions' | 'stats';
+
+function EmbeddedTabBar({
+  active,
+  onPress,
+  bottomInset,
+}: {
+  active: P2Tab;
+  onPress: (t: P2Tab) => void;
+  bottomInset: number;
+}) {
+  const tabs: Array<{ id: P2Tab; label: string; icon: string }> = [
+    { id: 'home',     label: 'Home',     icon: '⌂' },
+    { id: 'missions', label: 'Tasks',    icon: '☑' },
+    { id: 'stats',    label: 'Stats',    icon: '◫' },
   ];
   return (
-    <View style={etbStyles.wrapper} pointerEvents="box-none">
-      <View style={etbStyles.pill}>
+    <View style={[etbSt.wrapper, { paddingBottom: bottomInset || 10 }]}>
+      <View style={etbSt.pill}>
         {tabs.map((tab) => {
           const isActive = tab.id === active;
           return (
             <TouchableOpacity
               key={tab.id}
-              style={etbStyles.tab}
+              style={etbSt.tab}
               onPress={() => onPress(tab.id)}
               activeOpacity={0.7}
             >
-              {isActive && <View style={etbStyles.activeHighlight} />}
-              <Text style={[etbStyles.icon, isActive && etbStyles.iconActive]}>
-                {tab.icon}
-              </Text>
-              <Text style={[etbStyles.label, isActive && etbStyles.labelActive]}>
-                {tab.label}
-              </Text>
+              {isActive && <View style={etbSt.activeHighlight} />}
+              <Text style={[etbSt.icon, isActive && etbSt.iconActive]}>{tab.icon}</Text>
+              <Text style={[etbSt.label, isActive && etbSt.labelActive]}>{tab.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -176,164 +156,59 @@ function EmbeddedTabBar({ active, onPress }: EmbeddedTabBarProps) {
   );
 }
 
-const etbStyles = StyleSheet.create({
+const etbSt = StyleSheet.create({
   wrapper: {
-    position: 'absolute',
-    bottom: 22,
-    left: 14,
-    right: 14,
-    zIndex: 30,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    backgroundColor: INK,
   },
   pill: {
     flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 9999,
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(37,37,37,0.88)',
-    padding: 8,
-    shadowColor: 'rgba(0,0,0,0.8)',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 20,
-    elevation: 8,
+    borderColor: 'rgba(255,255,255,0.10)',
+    padding: 6,
   },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-    paddingVertical: 6,
-    position: 'relative',
-  },
+  tab:  { flex: 1, alignItems: 'center', paddingVertical: 6, gap: 2, position: 'relative' },
   activeHighlight: {
-    position: 'absolute',
-    top: 2, bottom: 2, left: 8, right: 8,
+    position: 'absolute', top: 2, bottom: 2, left: 6, right: 6,
     borderRadius: 9999,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.18)',
   },
-  icon: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.40)',
-  },
-  iconActive: {
-    color: '#ffffff',
-  },
-  label: {
-    fontSize: 10.5,
-    letterSpacing: 0.1,
-    color: 'rgba(255,255,255,0.40)',
-    fontWeight: '500',
-  },
-  labelActive: {
-    color: '#ffffff',
-    fontWeight: '600',
-  },
+  icon:        { fontSize: 14, color: 'rgba(255,255,255,0.35)' },
+  iconActive:  { color: '#fff' },
+  label:       { fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
+  labelActive: { color: '#fff', fontWeight: '600' },
 });
 
 // ── HomeScreen ────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const router   = useRouter();
-  const { play } = useSound();
+  const router    = useRouter();
+  const { play }  = useSound();
+  const insets    = useSafeAreaInsets();
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
 
   const storePool = pets.length > 0 ? pets : mockPets;
 
+  // ── UI state ─────────────────────────────────────────────────
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
-  const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
+  const [carouselLocked, setCarouselLocked]           = useState(false);
+  const [p2Tab, setP2Tab]                             = useState<P2Tab>('home');
 
-  // Pet chat state
-  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string; loading: boolean }>({
-    visible: false, msg: '', text: '', loading: false,
-  });
-  const chatInputRef = useRef<TextInput>(null);
+  // ── Reanimated shared values ─────────────────────────────────
+  const offset     = useSharedValue(0);          // 0 = Page 1, -SCREEN_H = Page 2
+  const curPage    = useSharedValue<0 | 1>(0);
+  const page2AtTop = useSharedValue(1);          // 1 = Page2 scroll at top
 
-  // Drives per-pet scale/opacity on native thread (60fps) for the carousel
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const carouselRef = useRef<ScrollView>(null);
 
-  // ── Reanimated page-transition state ───────────────────────────
-  // offset = 0      → Page 1 fully visible
-  // offset = -SCREEN_H → Page 2 fully visible
-  const offset   = useSharedValue(0);
-  const curPage  = useSharedValue<0 | 1>(0); // worklet-readable page index
-  const [page, setPage] = useState<0 | 1>(0);  // React-side mirror for effects
-
-  // Tracks Page 2 inner scroll position; used to block pan-to-page1 when scrolled
-  const page2AtTop = useSharedValue(1); // 1 = at top, 0 = scrolled down
-
-  const page2ScrollHandler = useAnimatedScrollHandler((event) => {
-    page2AtTop.value = event.contentOffset.y < 8 ? 1 : 0;
-  });
-
-  // ── Pan gesture: vertical-only, rubber-band resistance, spring snap ──
-  const SNAP_THRESHOLD = SCREEN_H * 0.28;
-  const VELOCITY_THRESHOLD = 600;
-  const RESISTANCE = 0.12; // rubber-band ratio outside snap bounds
-
-  const panGesture = Gesture.Pan()
-    .activeOffsetY([-14, 14])   // activate after 14px vertical
-    .failOffsetX([-22, 22])     // fail if >22px horizontal (lets carousel take over)
-    .onUpdate((e) => {
-      const isPage2 = curPage.value === 1;
-      const base = isPage2 ? -SCREEN_H : 0;
-      const candidate = base + e.translationY;
-
-      // On page 2 scrolled down: ignore upward drag (inner scroll handles it)
-      if (isPage2 && e.translationY < 0 && page2AtTop.value < 0.5) return;
-
-      // Rubber-band resistance beyond snap bounds
-      if (candidate > 0) {
-        offset.value = candidate * RESISTANCE;
-      } else if (candidate < -SCREEN_H) {
-        offset.value = -SCREEN_H + (candidate + SCREEN_H) * RESISTANCE;
-      } else {
-        offset.value = candidate;
-      }
-    })
-    .onEnd((e) => {
-      const isPage2 = curPage.value === 1;
-      const drag = e.translationY;
-      const vel  = e.velocityY;
-
-      let next: 0 | 1;
-      if (!isPage2) {
-        // On page 1: drag up enough or fast → go to page 2
-        next = (drag < -SNAP_THRESHOLD || vel < -VELOCITY_THRESHOLD) ? 1 : 0;
-      } else {
-        // On page 2 at top: drag down enough or fast → back to page 1
-        next = (drag > SNAP_THRESHOLD || vel > VELOCITY_THRESHOLD) ? 0 : 1;
-      }
-
-      const target = next === 0 ? 0 : -SCREEN_H;
-      offset.value = withSpring(target, {
-        damping: 28,
-        stiffness: 85,
-        mass: 1.4,
-        overshootClamping: false,
-      });
-      curPage.value = next;
-      runOnJS(setPage)(next);
-    });
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: offset.value }],
-  }));
-
-  // ── Dismiss chat when transitioning to Page 2 ──────────────────
-  useEffect(() => {
-    if (page === 1) {
-      setChat((prev) => prev.visible ? { ...prev, visible: false } : prev);
-    }
-  }, [page]);
-
-  // ── Staleness guard ─────────────────────────────────────────────
-  const tasksLastFetchedAt = useRef<number | null>(null);
-  const TASKS_STALE_MS = 5 * 60 * 1000;
-
-  // ── Data fetching ───────────────────────────────────────────────
+  // ── Data fetching ─────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
     const STALE_MS = 5 * 60 * 1000;
@@ -347,35 +222,28 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!userId) {
       setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
-      tasksLastFetchedAt.current = null;
       return;
     }
-    const isStale = !tasksLastFetchedAt.current ||
-      Date.now() - tasksLastFetchedAt.current > TASKS_STALE_MS;
-    if (!isStale) return;
     getTasks(userId)
-      .then((res) => {
-        setPendingTasks(res.tasks.filter((t) => t.status === 'pending'));
-        tasksLastFetchedAt.current = Date.now();
-      })
+      .then((res) => setPendingTasks(res.tasks.filter((t) => t.status === 'pending')))
       .catch(() => setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')));
   }, [userId]);
-
-  // Reset chat when user swipes to a different pet
-  useEffect(() => {
-    setChat({ visible: false, msg: '', text: '', loading: false });
-  }, [activeCarouselIndex]);
 
   // Sync carousel to stored active pet on mount
   useEffect(() => {
     if (!activePet?.name) return;
     const idx = UNLOCKED_DEFS.findIndex(
-      (p) => p.name.toLowerCase() === activePet.name.toLowerCase(),
+      (p) => p.name.toLowerCase() === activePet.name.toLowerCase() || p.id === activePet.name.toLowerCase(),
     );
-    if (idx >= 0) setActiveCarouselIndex(idx);
+    if (idx >= 0) {
+      setActiveCarouselIndex(idx);
+      setTimeout(() => {
+        carouselRef.current?.scrollTo({ x: idx * PET_CARD_W, animated: false });
+      }, 80);
+    }
   }, [activePet?.name]);
 
-  // ── Derived ─────────────────────────────────────────────────────
+  // ── Derived ──────────────────────────────────────────────────
   const displayName     = userName ?? userEmail?.split('@')[0] ?? 'there';
   const activePetDef    = UNLOCKED_DEFS[activeCarouselIndex] ?? UNLOCKED_DEFS[0];
   const activePetRecord = storePool.find(
@@ -385,234 +253,181 @@ export default function HomeScreen() {
   const deadlineTasks = pendingTasks.filter((t) => t.taskType === 'deadline');
   const dailyTasks    = pendingTasks.filter((t) => t.taskType === 'daily' || !t.taskType);
 
-  // ── Handlers ────────────────────────────────────────────────────
-  const goFocus = (task?: Task) => {
+  // ── Handlers ─────────────────────────────────────────────────
+  const goFocus = useCallback((task?: Task) => {
     play('transition_up');
     router.push({
       pathname: '/(app)/focus',
       params: {
         durationMin: String(durationMin),
         petId: activePetRecord?.id ?? '',
-        taskId: task?.id ?? '',
-        ...(task ? { taskTitle: task.title } : {}),
+        ...(task ? { taskId: task.id, taskTitle: task.title } : {}),
       },
     });
-  };
+  }, [durationMin, activePetRecord, play, router]);
 
-  const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const xOffset = e.nativeEvent.contentOffset.x;
-    const idx     = Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, Math.round(xOffset / PET_CARD_W)));
+  const handleCarouselScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x   = e.nativeEvent.contentOffset.x;
+    const idx = Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, Math.round(x / PET_CARD_W)));
     setActiveCarouselIndex(idx);
     const def    = UNLOCKED_DEFS[idx];
     const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
     if (record?.id) usePetStore.getState().setActivePet(record.id);
-  };
+    setCarouselLocked(true);
+  }, [storePool]);
 
-  // Tap pet → show random greeting (no keyboard)
-  const handlePetPress = useCallback((petId: string) => {
-    play('tap');
-    const pool = PET_GREETINGS[petId] ?? PET_GREETINGS.sunion;
-    setChat((prev) => ({
-      ...prev,
-      visible: true,
-      msg: pool[Math.floor(Math.random() * pool.length)],
-      text: '',
-      loading: false,
-    }));
-  }, [play]);
+  // ── Page 2 scroll tracking ────────────────────────────────────
+  const page2ScrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      page2AtTop.value = e.contentOffset.y < 8 ? 1 : 0;
+    },
+  });
 
-  // "···" button → show greeting + open keyboard immediately
-  const handleChatBtnPress = useCallback(() => {
-    play('tap');
-    const pool = PET_GREETINGS[activePetDef.id] ?? PET_GREETINGS.sunion;
-    setChat({
-      visible: true,
-      msg: pool[Math.floor(Math.random() * pool.length)],
-      text: '',
-      loading: false,
+  // ── Vertical page-flip gesture ────────────────────────────────
+  const panGesture = Gesture.Pan()
+    .activeOffsetY([-14, 14])
+    .failOffsetX([-22, 22])
+    .onUpdate((e) => {
+      const isPage2    = curPage.value === 1;
+      const base       = isPage2 ? -SCREEN_H : 0;
+      const candidate  = base + e.translationY;
+      // Block up-swipe while Page 2 is scrolled down (let inner scroll handle it)
+      if (isPage2 && e.translationY < 0 && page2AtTop.value < 0.5) return;
+      if (candidate > 0) {
+        offset.value = candidate * RESISTANCE;
+      } else if (candidate < -SCREEN_H) {
+        offset.value = -SCREEN_H + (candidate + SCREEN_H) * RESISTANCE;
+      } else {
+        offset.value = candidate;
+      }
+    })
+    .onEnd((e) => {
+      const isPage2 = curPage.value === 1;
+      let next: 0 | 1;
+      if (!isPage2) {
+        next = (e.translationY < -SNAP_THRESHOLD || e.velocityY < -VELOCITY_THRESHOLD) ? 1 : 0;
+      } else {
+        next = (e.translationY > SNAP_THRESHOLD || e.velocityY > VELOCITY_THRESHOLD) ? 0 : 1;
+      }
+      offset.value = withSpring(next === 0 ? 0 : -SCREEN_H, {
+        damping: 28, stiffness: 85, mass: 1.4, overshootClamping: false,
+      });
+      curPage.value = next;
     });
-    setTimeout(() => chatInputRef.current?.focus(), 50);
-  }, [play, activePetDef]);
 
-  // Keyboard send → call Chat API with the current pet's system prompt
-  const handleChatSubmit = useCallback(async () => {
-    const text = chat.text.trim();
-    if (!text || chat.loading) return;
-    setChat((p) => ({ ...p, text: '', loading: true }));
-    try {
-      const reply = await chatWithPet(activePetDef.id, text);
-      setChat((p) => ({ ...p, msg: reply, loading: false }));
-    } catch {
-      setChat((p) => ({ ...p, loading: false }));
-    }
-  }, [chat.text, chat.loading, activePetDef]);
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: offset.value }],
+  }));
 
-  // ── Render ──────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
       <GestureDetector gesture={panGesture}>
-        <Reanimated.View style={[styles.pageStack, animStyle]}>
+        <Reanimated.View style={[styles.pagesContainer, animStyle]}>
 
-          {/* ═══════════════ PAGE 1: light cover ═══════════════════ */}
-          <View style={styles.page1}>
+          {/* ════════════════ PAGE 1 — COVER ════════════════ */}
+          <View style={[styles.page1, { height: SCREEN_H }]}>
+            {/* FocoBar already handles insets.top internally */}
+            <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
 
-            {/* Hero section: FocoBar + headline + CTA button */}
-            <View style={styles.heroSection}>
-              <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
-              <View style={styles.heroArea}>
-                <Text style={styles.heroLine}>{'Welcome\nback\nStart Focus.'}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.pinkCircleBtn}
-                onPress={() => { play('tap'); goFocus(); }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.pinkCircleArrow}>→</Text>
-              </TouchableOpacity>
+            {/* Hero text — font 33pt (reduced from 38pt to avoid crowding pet) */}
+            <View style={styles.heroArea}>
+              <Text style={styles.heroLine}>Welcome back</Text>
+              <Text style={styles.heroLine}>Start Focus.</Text>
             </View>
+
+            {/* Pink circle CTA */}
+            <TouchableOpacity
+              style={styles.pinkCircleBtn}
+              onPress={() => { play('tap'); goFocus(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.pinkCircleArrow}>→</Text>
+            </TouchableOpacity>
 
             {/* Pet carousel */}
-            <View style={styles.petSection}>
-              <Animated.ScrollView
+            <View style={[styles.petSection, { height: PET_SECTION_H }]}>
+              <ScrollView
+                ref={carouselRef}
                 horizontal
+                scrollEnabled={!carouselLocked}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[
-                  styles.petRow,
-                  { paddingHorizontal: (SCREEN_W - PET_CARD_W) / 2 },
-                ]}
-                decelerationRate={0.985}
+                contentContainerStyle={{ paddingHorizontal: (SCREEN_W - PET_CARD_W) / 2 }}
+                decelerationRate="fast"
                 snapToInterval={PET_CARD_W}
                 snapToAlignment="center"
-                disableIntervalMomentum
-                scrollEventThrottle={8}
-                onScroll={Animated.event(
-                  [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                  { useNativeDriver: true },
-                )}
                 onMomentumScrollEnd={handleCarouselScroll}
               >
-                {UNLOCKED_DEFS.map((def, i) => {
-                  const c = i * PET_CARD_W;
-                  const T = PET_CARD_W * 0.20;
-                  const scale = scrollX.interpolate({
-                    inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
-                    outputRange: [0.65, 1.0, 1.0, 1.0, 0.65],
-                    extrapolate: 'clamp',
-                  });
-                  const opacity = scrollX.interpolate({
-                    inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
-                    outputRange: [0.40, 1.0, 1.0, 1.0, 0.40],
-                    extrapolate: 'clamp',
-                  });
-                  return (
-                    <Animated.View
-                      key={def.id}
-                      style={[styles.petCard, { width: PET_CARD_W, transform: [{ scale }], opacity }]}
-                    >
-                      <TouchableOpacity
-                        style={styles.petCardInner}
-                        onPress={() => handlePetPress(def.id)}
-                        onLongPress={() => {
-                          play('transition_up');
-                          router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
-                        }}
-                        delayLongPress={500}
-                        activeOpacity={0.9}
-                      >
-                        <PetRenderer pet={def} size={460} interactive={false} />
-                      </TouchableOpacity>
-                    </Animated.View>
-                  );
-                })}
-              </Animated.ScrollView>
-
-              {/* ── Chat overlay — pure text, no bg/border ─── */}
-              {chat.visible && (
-                <View style={styles.chatOverlay} pointerEvents="box-none">
-                  <Text style={styles.chatReplyText}>
-                    {chat.loading ? '···' : chat.msg}
-                  </Text>
-                  <TextInput
-                    ref={chatInputRef}
-                    style={styles.chatInputText}
-                    value={chat.text}
-                    onChangeText={(t) => setChat((p) => ({ ...p, text: t }))}
-                    placeholder="say something…"
-                    placeholderTextColor="rgba(26,22,34,0.35)"
-                    returnKeyType="send"
-                    multiline={false}
-                    onSubmitEditing={handleChatSubmit}
-                    pointerEvents="auto"
-                  />
-                </View>
-              )}
-
-              {/* ── Always-visible pink "···" chat button ──── */}
-              <TouchableOpacity
-                style={styles.chatDotBtn}
-                onPress={handleChatBtnPress}
-                activeOpacity={0.75}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.chatDotIcon}>···</Text>
-              </TouchableOpacity>
+                {UNLOCKED_DEFS.map((def, idx) => (
+                  <TouchableOpacity
+                    key={def.id}
+                    style={{ width: PET_CARD_W, height: PET_SECTION_H, alignItems: 'center', justifyContent: 'flex-end' }}
+                    onPress={() => {
+                      play('transition_up');
+                      router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
+                    }}
+                    activeOpacity={0.9}
+                  >
+                    <PetRenderer pet={def} size={Math.round(PET_SECTION_H * 0.88)} interactive />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
-          </View>{/* /PAGE 1 */}
+            {/* Carousel lock / change-pet control */}
+            <View style={styles.carouselControls}>
+              {carouselLocked ? (
+                <TouchableOpacity
+                  style={styles.changePetBtn}
+                  onPress={() => setCarouselLocked(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.changePetText}>↔ change pet</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.swipeCarouselHint}>← swipe to browse →</Text>
+              )}
+            </View>
 
-          {/* ═══════════════ PAGE 2: dark dashboard ════════════════ */}
-          <View style={styles.page2}>
+            {/* Swipe-up hint at bottom of Page 1 */}
+            <View style={[styles.swipeUpHint, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              <Text style={styles.swipeUpArrow}>↑</Text>
+              <Text style={styles.swipeUpText}>swipe up</Text>
+            </View>
+          </View>
+          {/* ════════════════ END PAGE 1 ════════════════ */}
+
+          {/* ════════════════ PAGE 2 — DARK DASHBOARD ════════════════ */}
+          <View style={[styles.page2, { height: SCREEN_H }]}>
+            {/* Pull-down indicator */}
+            <View style={styles.page2Handle}>
+              <View style={styles.handlePill} />
+            </View>
+
+            {/* Tab content — fills flex space above tab bar */}
             <Reanimated.ScrollView
-              style={styles.page2Scroll}
+              style={{ flex: 1 }}
               contentContainerStyle={styles.page2Content}
               showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              scrollEventThrottle={16}
               onScroll={page2ScrollHandler}
+              scrollEventThrottle={16}
+              keyboardShouldPersistTaps="handled"
             >
-              {/* ── Home tab: Dashboard ─────────────────────── */}
-              {activePage2Tab === 'home' && (
+              {p2Tab === 'home' && (
                 <>
                   <Text style={styles.greetName}>Hi {displayName},</Text>
                   <Text style={styles.greetSub}>welcome to the headspace.</Text>
 
-                  {/* Stats preview row */}
-                  <View style={styles.statsRow}>
-                    <View style={styles.statsTile}>
-                      <Text style={styles.statsTileVal}>—</Text>
-                      <Text style={styles.statsTileLbl}>sessions{'\n'}this week</Text>
-                    </View>
-                    <View style={styles.statsTile}>
-                      <Text style={styles.statsTileVal}>—</Text>
-                      <Text style={styles.statsTileLbl}>focus time{'\n'}today</Text>
-                    </View>
-                    <View style={styles.statsTile}>
-                      <Text style={styles.statsTileVal}>—</Text>
-                      <Text style={styles.statsTileLbl}>streak{'\n'}days</Text>
-                    </View>
+                  {/* Timer first */}
+                  <Text style={styles.sectionLabel}>TIMER</Text>
+                  <View style={styles.gaugeCard}>
+                    <TimerGauge value={durationMin} onChange={setDurationMin} />
                   </View>
 
-                  {/* Daily tasks preview */}
-                  {dailyTasks.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>daily tasks</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.taskRow}
-                        nestedScrollEnabled
-                      >
-                        {dailyTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                        ))}
-                      </ScrollView>
-                    </>
-                  )}
-
-                  {/* Deadline tasks preview */}
+                  {/* Deadline tasks */}
                   {deadlineTasks.length > 0 && (
                     <>
-                      <Text style={styles.sectionLabel}>deadlines</Text>
+                      <Text style={styles.sectionLabel}>DEADLINES</Text>
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -626,79 +441,84 @@ export default function HomeScreen() {
                     </>
                   )}
 
-                  {dailyTasks.length === 0 && deadlineTasks.length === 0 && (
-                    <Text style={styles.emptyTasks}>No pending tasks — you're all clear 🎉</Text>
-                  )}
-
-                  {/* Timer */}
-                  <Text style={styles.sectionLabel}>timer</Text>
-                  <View style={styles.gaugeCard}>
-                    <TimerGauge value={durationMin} onChange={setDurationMin} />
-                  </View>
-                </>
-              )}
-
-              {/* ── Tasks tab ───────────────────────────────── */}
-              {activePage2Tab === 'tasks' && (
-                <>
-                  <Text style={styles.greetName}>Tasks</Text>
-                  <Text style={styles.greetSub}>all pending missions.</Text>
-                  {pendingTasks.length === 0 ? (
-                    <Text style={styles.emptyTasks}>No pending tasks — add one to get started!</Text>
-                  ) : (
+                  {/* Daily tasks */}
+                  {dailyTasks.length > 0 && (
                     <>
-                      {deadlineTasks.length > 0 && (
-                        <>
-                          <Text style={styles.sectionLabel}>deadlines</Text>
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.taskRow}
-                            nestedScrollEnabled
-                          >
-                            {deadlineTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                            ))}
-                          </ScrollView>
-                        </>
-                      )}
-                      {dailyTasks.length > 0 && (
-                        <>
-                          <Text style={styles.sectionLabel}>daily</Text>
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.taskRow}
-                            nestedScrollEnabled
-                          >
-                            {dailyTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                            ))}
-                          </ScrollView>
-                        </>
-                      )}
-                      <TouchableOpacity
-                        style={styles.viewAllBtn}
-                        onPress={() => router.push('/(app)/missions' as any)}
-                        activeOpacity={0.75}
+                      <Text style={styles.sectionLabel}>DAILY</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.taskRow}
+                        nestedScrollEnabled
                       >
-                        <Text style={styles.viewAllText}>View full task manager →</Text>
-                      </TouchableOpacity>
+                        {dailyTasks.map((task) => (
+                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                        ))}
+                      </ScrollView>
                     </>
                   )}
+
+                  {pendingTasks.length === 0 && (
+                    <Text style={styles.emptyTasks}>No pending tasks — all clear 🎉</Text>
+                  )}
                 </>
               )}
 
-              {/* ── Stats tab ───────────────────────────────── */}
-              {activePage2Tab === 'stats' && (
+              {p2Tab === 'missions' && (
+                <>
+                  <Text style={styles.greetName}>Tasks</Text>
+                  <Text style={styles.greetSub}>what are you working on?</Text>
+
+                  {deadlineTasks.length > 0 && (
+                    <>
+                      <Text style={styles.sectionLabel}>DEADLINES</Text>
+                      <View style={styles.listCard}>
+                        {deadlineTasks.map((task) => (
+                          <MissionsRow key={task.id} task={task} onPress={() => goFocus(task)} />
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {dailyTasks.length > 0 && (
+                    <>
+                      <Text style={styles.sectionLabel}>DAILY</Text>
+                      <View style={styles.listCard}>
+                        {dailyTasks.map((task) => (
+                          <MissionsRow key={task.id} task={task} onPress={() => goFocus(task)} />
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {pendingTasks.length === 0 && (
+                    <Text style={styles.emptyTasks}>No tasks yet 🎉</Text>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.viewAllBtn}
+                    onPress={() => router.push('/(app)/missions' as any)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.viewAllText}>Manage all tasks →</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {p2Tab === 'stats' && (
                 <>
                   <Text style={styles.greetName}>Stats</Text>
                   <Text style={styles.greetSub}>your focus journey.</Text>
-                  <View style={styles.gaugeCard}>
-                    <Text style={styles.statsPlaceholder}>
-                      {'Sessions this week: —\nFocus time today: —'}
-                    </Text>
+
+                  <View style={styles.statsPreviewCard}>
+                    <Text style={styles.statsPreviewLabel}>sessions this week</Text>
+                    <Text style={styles.statsPreviewValue}>—</Text>
                   </View>
+                  <View style={styles.statsPreviewCard}>
+                    <Text style={styles.statsPreviewLabel}>focus time today</Text>
+                    <Text style={styles.statsPreviewValue}>—</Text>
+                  </View>
+
                   <TouchableOpacity
                     style={styles.viewAllBtn}
                     onPress={() => router.push('/(app)/stats' as any)}
@@ -710,9 +530,14 @@ export default function HomeScreen() {
               )}
             </Reanimated.ScrollView>
 
-            {/* Tab bar lives INSIDE the dark card — slides with it */}
-            <EmbeddedTabBar active={activePage2Tab} onPress={setActivePage2Tab} />
-          </View>{/* /PAGE 2 */}
+            {/* Tab bar lives inside dark card — always visible, slides with it */}
+            <EmbeddedTabBar
+              active={p2Tab}
+              onPress={setP2Tab}
+              bottomInset={insets.bottom}
+            />
+          </View>
+          {/* ════════════════ END PAGE 2 ════════════════ */}
 
         </Reanimated.View>
       </GestureDetector>
@@ -722,243 +547,165 @@ export default function HomeScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: LIGHT_BG,
+  root:           { flex: 1, backgroundColor: '#faf5ef' },
+
+  pagesContainer: {
+    // Two pages stacked vertically; each is SCREEN_H tall
+    // GestureDetector wraps the whole thing
+  },
+
+  // ── Page 1 ──────────────────────────────────────────────────────
+  page1: {
+    backgroundColor: '#faf5ef',
     overflow: 'hidden',
   },
 
-  // The animated stack that translateY moves
-  pageStack: {
-    width: SCREEN_W,
-  },
-
-  // ── PAGE 1 ──────────────────────────────────────────────────────
-  page1: {
-    height: SCREEN_H,
-    backgroundColor: LIGHT_BG,
-  },
-
-  // Top half of page 1: FocoBar + hero + CTA button
-  heroSection: {
-    height: HERO_SECTION_H,
-    backgroundColor: LIGHT_BG,
-    justifyContent: 'flex-end',
-  },
   heroArea: {
-    paddingHorizontal: 38,
-    paddingTop: 12,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 4,
+    paddingBottom: 14,
   },
   heroLine: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 39,
-    fontWeight: '600',
+    fontSize: 33,           // reduced from 38 → 33pt so it doesn't crowd the pet
+    fontWeight: '500',
     color: INK,
-    letterSpacing: 1,
-    lineHeight: 43,
+    letterSpacing: -0.5,
+    lineHeight: 42,
   },
+
   pinkCircleBtn: {
-    width: 52,
-    height: 52,
+    width: 52, height: 52,
     borderRadius: 26,
     backgroundColor: PINK,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
-    shadowColor: '#c07090',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    marginBottom: 8,
+    shadowColor: PINK_TEXT,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
     elevation: 4,
   },
-  pinkCircleArrow: {
-    fontSize: 18,
-    color: INK,
-    fontWeight: '300',
-    letterSpacing: 1,
-  },
+  pinkCircleArrow: { fontSize: 20, color: PINK_TEXT, fontWeight: '700' },
 
-  // Bottom half of page 1: pet carousel
   petSection: {
-    height: PET_SECTION_H,
     backgroundColor: 'transparent',
-    zIndex: 20,
-  },
-  petRow:  { gap: 0 },
-  petCard: {
-    height: PET_SECTION_H,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  petCardInner: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 50,
   },
 
-  // Chat overlay — top-left, pure text, no bg/border
-  chatOverlay: {
-    position: 'absolute',
-    top: 18,
-    left: 22,
-    maxWidth: SCREEN_W * 0.60,
-    zIndex: 30,
-  },
-  chatReplyText: {
-    color: INK,
-    fontSize: 15,
-    fontFamily: 'Fraunces_500Medium',
-    fontWeight: '500',
-    backgroundColor: 'transparent',
-    lineHeight: 20,
-    marginBottom: 6,
-  },
-  chatInputText: {
-    color: INK,
-    fontSize: 14,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    padding: 0,
-    minWidth: 80,
-    lineHeight: 18,
-  },
-  chatDotBtn: {
-    position: 'absolute',
-    bottom: 28,
-    right: 22,
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: PINK,
+  carouselControls: {
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 35,
-    shadowColor: '#c07090',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.20,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingVertical: 6,
   },
-  chatDotIcon: {
-    color: INK,
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: 2,
-    lineHeight: 20,
+  changePetBtn: {
+    paddingHorizontal: 18, paddingVertical: 7,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(242,206,220,0.25)',
+  },
+  changePetText: {
+    fontSize: 11, color: PINK_TEXT, fontWeight: '600', letterSpacing: 0.3,
+  },
+  swipeCarouselHint: {
+    fontSize: 10, color: 'rgba(26,22,34,0.28)', letterSpacing: 0.3,
   },
 
-  // ── PAGE 2 ──────────────────────────────────────────────────────
-  // Exactly SCREEN_H; EmbeddedTabBar is absolute-positioned inside.
+  swipeUpHint: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0, right: 0,
+    alignItems: 'center',
+    gap: 2,
+  },
+  swipeUpArrow: { fontSize: 14, color: 'rgba(26,22,34,0.25)' },
+  swipeUpText:  { fontSize: 10, color: 'rgba(26,22,34,0.20)', letterSpacing: 0.3 },
+
+  // ── Page 2 ──────────────────────────────────────────────────────
   page2: {
-    height: SCREEN_H,
-    backgroundColor: DARK_BG,
-    borderTopLeftRadius:  40,
-    borderTopRightRadius: 40,
+    backgroundColor: INK,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     overflow: 'hidden',
-    position: 'relative',
   },
-  page2Scroll: {
-    flex: 1,
+  page2Handle: {
+    alignItems: 'center',
+    paddingTop: 10, paddingBottom: 4,
   },
+  handlePill: {
+    width: 36, height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+
   page2Content: {
-    paddingTop: 52,
-    paddingHorizontal: 29,
-    paddingBottom: EMBEDDED_TAB_RESERVED,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 16,
   },
 
   greetName: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 40,
-    fontWeight: '600',
-    color: '#fff',
-    letterSpacing: -0.4,
-    lineHeight: 44,
-    marginBottom: 6,
+    fontSize: 28, fontWeight: '500',
+    color: '#fff', letterSpacing: -0.3,
+    marginBottom: 4,
+    marginTop: 8,
   },
   greetSub: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.65)',
-    letterSpacing: -0.2,
-    marginBottom: 22,
-  },
-
-  // Stats preview tiles
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 6,
-  },
-  statsTile: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    gap: 4,
-  },
-  statsTileVal: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: -0.5,
-  },
-  statsTileLbl: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.50)',
-    textAlign: 'center',
-    lineHeight: 13,
+    fontSize: 13, color: 'rgba(255,255,255,0.45)',
+    letterSpacing: 0.1, marginBottom: 20,
   },
 
   sectionLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.71)',
-    letterSpacing: 0.2,
-    marginTop: 24,
-    marginBottom: 12,
+    fontSize: 10, fontWeight: '700',
+    color: 'rgba(255,255,255,0.32)',
+    letterSpacing: 1.4,
+    marginTop: 22, marginBottom: 10,
   },
 
   gaugeCard: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.10)',
     paddingVertical: 14,
     alignItems: 'center',
   },
 
-  taskRow: {
-    gap: 12,
-    paddingRight: 4,
+  taskRow: { gap: 12, paddingRight: 4 },
+
+  listCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 16,
+    marginBottom: 4,
   },
 
+  statsPreviewCard: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 18, paddingVertical: 16,
+    marginBottom: 10,
+  },
+  statsPreviewLabel: { fontSize: 13, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
+  statsPreviewValue: { fontSize: 22, fontWeight: '700', color: 'rgba(255,255,255,0.80)' },
+
   emptyTasks: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 14,
-    marginTop: 24,
-    textAlign: 'center',
+    fontSize: 13, color: 'rgba(255,255,255,0.35)',
+    textAlign: 'center', paddingVertical: 24,
   },
 
   viewAllBtn: {
-    marginTop: 24,
-    alignSelf: 'flex-start',
+    marginTop: 16,
+    paddingVertical: 12, paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
   },
   viewAllText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 13,
-    letterSpacing: 0.2,
-  },
-
-  statsPlaceholder: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 14,
-    lineHeight: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    textAlign: 'center',
+    fontSize: 13, color: 'rgba(255,255,255,0.55)', fontWeight: '500',
   },
 });
