@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
+import { usePetStore } from '@/stores/petStore';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -45,6 +46,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           userEmail: session?.user.email ?? null,
           userName: (session?.user.user_metadata?.name as string) ?? null,
         });
+        // Clear pet cache on logout so a new user never sees the previous user's pets
+        if (!session) usePetStore.getState().reset();
       });
     } catch {
       set({ isLoading: false });
@@ -54,5 +57,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     await supabase.auth.signOut();
     set({ isAuthenticated: false, userId: null, userEmail: null, userName: null });
+    usePetStore.getState().reset();
   },
 }));

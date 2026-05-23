@@ -53,6 +53,8 @@ export default function PetInfoScreen() {
 
   const searchPool = pets.length > 0 ? pets : mockPets;
 
+  // petDef (visual definition): petId param is the PETS constant id ('sunion'/'lily')
+  // — use it directly first, so collection→pet-info always shows the right 3D model + name
   const petDef =
     (petId ? PETS.find((p) => p.id === petId) : null) ??
     PETS.find((p) => p.id === (activePet?.name ?? '').toLowerCase()) ??

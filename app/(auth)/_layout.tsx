@@ -14,6 +14,7 @@ export default function AuthLayout() {
       <Stack.Screen name="consent" />
       <Stack.Screen name="done" />
       <Stack.Screen name="pet" />
+      <Stack.Screen name="focus-type" />
     </Stack>
   );
 }

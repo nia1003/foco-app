@@ -1,117 +1,110 @@
 /**
- * HomeScreen — daily dashboard hub
- * - Pet carousel: tap for detail view, 💬 for quick chat
- * - START FOCUS button → FocusSetupModal (pick pet / duration / mission)
+ * HomeScreen — two-section layout
+ *   Top (light): FOCO bar + "Welcome back / Start Focus." + pink CTA + pet carousel
+ *   Bottom (dark): greeting + timer gauge + deadlines + daily tasks
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Animated,
   Dimensions,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
-import { AppBackground } from '@/components/ui/AppBackground';
-import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { FocusSetupSheet } from '@/components/FocusSetupSheet';
 import { PetRenderer } from '@/components/pets/PetRenderer';
-import { Colors } from '@/constants/theme';
+import { TimerGauge } from '@/components/home/TimerGauge';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { getPets, getTasks, getCalendarData, chatWithPet } from '@/services/focoService';
-import { mockPets, mockTasks, getMockCalendarData } from '@/data/mockData';
-import { FocusCalendar } from '@/components/FocusCalendar';
-import type { Task, DayData } from '@/types';
+import { getPets, getTasks } from '@/services/focoService';
+import { mockPets, mockTasks } from '@/data/mockData';
+import type { Task } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const PET_CARD_W = Math.round(SCREEN_W * 0.58);
+const PET_CARD_W = Math.round(SCREEN_W * 0.72);
+const PET_SECTION_H = 260;
+const DARK_OVERLAP = 60;
 
-const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
+const PINK      = '#F2CEDC';
 const PINK_TEXT = '#b5607a';
+const INK       = '#1a1622';
 
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
+// ── TaskCard ─────────────────────────────────────────────────────────────────
+function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
+  return (
+    <View style={taskStyles.card}>
+      <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
+      <TouchableOpacity
+        style={taskStyles.btn}
+        onPress={onPress}
+        activeOpacity={0.8}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Text style={taskStyles.arrow}>→</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const taskStyles = StyleSheet.create({
+  card: {
+    width: 140,
+    height: 110,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 18,
+  },
+  btn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: PINK,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrow: {
+    fontSize: 14,
+    color: PINK_TEXT,
+    fontWeight: '700',
+  },
+});
+
+// ── HomeScreen ────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const router = useRouter();
-  const { userId, userName, userEmail } = useAuthStore();
-  const { pets, activePet, setPets, setActivePet, restoreActivePet, petsLastFetchedAt } = usePetStore();
+  const router   = useRouter();
   const { play } = useSound();
+  const { userId, userName, userEmail } = useAuthStore();
+  const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
 
   const storePool = pets.length > 0 ? pets : mockPets;
 
-  // ── Calendar state ─────────────────────────────────────────────
-  const nowDate = new Date();
-  const [calYear, setCalYear] = useState(nowDate.getFullYear());
-  const [calMonth, setCalMonth] = useState(nowDate.getMonth() + 1);
-  const [calData, setCalData] = useState<DayData[]>([]);
+  const [durationMin, setDurationMin]                   = useState(25);
+  const [activeCarouselIndex, setActiveCarouselIndex]   = useState(0);
+  const [pendingTasks, setPendingTasks]                 = useState<Task[]>([]);
 
-  // ── Focus modal state ──────────────────────────────────────────
-  const [showModal, setShowModal] = useState(false);
-  const [modalTasks, setModalTasks] = useState<Task[]>([]);
-
-  // ── Quick chat state ───────────────────────────────────────────
-  const [homeChatPetId, setHomeChatPetId] = useState<string | null>(null);
-  const [homeInput, setHomeInput] = useState('');
-  const [homeReply, setHomeReply] = useState<{ petId: string; text: string } | null>(null);
-  const [homeChatLoading, setHomeChatLoading] = useState(false);
-  const homeReplyOpacity = useRef(new Animated.Value(0)).current;
-  const homeLastChatAt = useRef(0);
-
-  const homeChatDef = homeChatPetId ? PETS.find((p) => p.id === homeChatPetId) : null;
-
-  const sendHomeChat = async () => {
-    const trimmed = homeInput.trim();
-    if (!trimmed || homeChatLoading || !homeChatPetId) return;
-    if (Date.now() - homeLastChatAt.current < 10_000) return;
-    homeLastChatAt.current = Date.now();
-
-    const chatPetId = homeChatPetId;
-    setHomeInput('');
-    setHomeChatPetId(null);
-    Keyboard.dismiss();
-    setHomeChatLoading(true);
-
-    try {
-      const reply = await chatWithPet(chatPetId, trimmed);
-      setHomeReply({ petId: chatPetId, text: reply });
-      homeReplyOpacity.setValue(0);
-      Animated.sequence([
-        Animated.timing(homeReplyOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.delay(4000),
-        Animated.timing(homeReplyOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
-      ]).start(() => setHomeReply(null));
-    } catch (e: any) {
-      const errText = e?.message === 'rate_limited' ? '再等一下嘛～' : '嗯…';
-      setHomeReply({ petId: chatPetId, text: errText });
-      homeReplyOpacity.setValue(0);
-      Animated.sequence([
-        Animated.timing(homeReplyOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.delay(2500),
-        Animated.timing(homeReplyOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
-      ]).start(() => setHomeReply(null));
-    } finally {
-      setHomeChatLoading(false);
-    }
-  };
-
+  // ── Data fetching ──────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
     const STALE_MS = 5 * 60 * 1000;
-    const isStale = !petsLastFetchedAt || Date.now() - petsLastFetchedAt > STALE_MS;
+    const isStale  = !petsLastFetchedAt || Date.now() - petsLastFetchedAt > STALE_MS;
     if (pets.length && !isStale) { restoreActivePet(); return; }
-
     getPets(userId)
       .then((fetched) => { setPets(fetched); restoreActivePet(); })
       .catch(() => { if (!pets.length) setPets(mockPets); });
@@ -119,318 +112,264 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!userId) {
-      setCalData(getMockCalendarData(calYear, calMonth));
+      setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
       return;
     }
-    getCalendarData(userId, calYear, calMonth)
-      .then(setCalData)
-      .catch(() => setCalData(getMockCalendarData(calYear, calMonth)));
-  }, [userId, calYear, calMonth]);
+    getTasks(userId)
+      .then((res) => setPendingTasks(res.tasks.filter((t) => t.status === 'pending')))
+      .catch(() => setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')));
+  }, [userId]);
 
-  const handleMonthChange = (y: number, m: number) => {
-    setCalYear(y);
-    setCalMonth(m);
+  // Sync carousel index to stored active pet on mount
+  useEffect(() => {
+    if (!activePet?.name) return;
+    const idx = UNLOCKED_DEFS.findIndex(
+      (p) => p.name.toLowerCase() === activePet.name.toLowerCase() || p.id === activePet.name.toLowerCase(),
+    );
+    if (idx >= 0) setActiveCarouselIndex(idx);
+  }, [activePet?.name]);
+
+  // ── Derived ────────────────────────────────────────────────────
+  const displayName     = userName ?? userEmail?.split('@')[0] ?? 'there';
+  const activePetDef    = UNLOCKED_DEFS[activeCarouselIndex] ?? UNLOCKED_DEFS[0];
+  const activePetRecord = storePool.find(
+    (p) => p.name.toLowerCase() === activePetDef?.id,
+  ) ?? storePool[0];
+
+  const deadlineTasks = pendingTasks.filter((t) => t.taskType === 'deadline');
+  const dailyTasks    = pendingTasks.filter((t) => t.taskType === 'daily' || !t.taskType);
+
+  // ── Handlers ───────────────────────────────────────────────────
+  const goFocus = (task?: Task) => {
+    play('transition_up');
+    router.push({
+      pathname: '/(app)/focus',
+      params: {
+        durationMin: String(durationMin),
+        petId: activePetRecord?.id ?? '',
+        ...(task ? { taskId: task.id, taskTitle: task.title } : {}),
+      },
+    });
   };
 
-  const openModal = async () => {
-    setShowModal(true);
-    if (modalTasks.length === 0) {
-      try {
-        const res = await getTasks(userId ?? '');
-        setModalTasks(res.tasks.filter((t: Task) => t.status === 'pending'));
-      } catch {
-        setModalTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
-      }
-    }
+  const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offset = e.nativeEvent.contentOffset.x;
+    const idx    = Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, Math.round(offset / PET_CARD_W)));
+    setActiveCarouselIndex(idx);
+
+    // Persist selection so it survives navigation away-and-back
+    const def    = UNLOCKED_DEFS[idx];
+    const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
+    if (record?.id) usePetStore.getState().setActivePet(record.id);
   };
 
-  const now = new Date();
-  const dateStr   = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
-  const hour      = now.getHours();
-  const timeGreet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const displayName = userName ?? userEmail?.split('@')[0] ?? 'there';
-
-  const modalPets = pets.length > 0 ? pets : mockPets;
-
+  // ── Render ─────────────────────────────────────────────────────
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.root}
-    >
-      <AppBackground />
-      <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
-
+    <View style={styles.root}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Greeting ─────────────────────────────── */}
-        <View style={styles.greeting}>
-          <Text style={styles.date}>{dateStr}</Text>
-          <Text style={styles.greet}>{timeGreet},{'\n'}{displayName}.</Text>
+        {/* ── LIGHT SECTION ──────────────────────────────────── */}
+        <View style={styles.lightSection}>
+          <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
+          <View style={styles.heroArea}>
+            <Text style={styles.heroLine}>Welcome back</Text>
+            <Text style={styles.heroLine}>Start Focus.</Text>
+          </View>
+          {/* Pink circle CTA — free focus, no task */}
+          <TouchableOpacity
+            style={styles.pinkCircleBtn}
+            onPress={() => { play('tap'); goFocus(); }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.pinkCircleArrow}>→</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* ── Pet Carousel ─────────────────────────── */}
-        <View style={styles.selectorSection}>
-          <View style={styles.selectorHeader}>
-            <Text style={styles.selectorEyebrow}>今天的夥伴</Text>
-            <TouchableOpacity
-              onPress={() => { play('tap'); router.push('/(app)/pet-collection' as any); }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.selectorAll}>全部 →</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Reply bubble — floats above the carousel */}
-          {homeReply && (
-            <Animated.View
-              style={[styles.homeReplyBubble, { opacity: homeReplyOpacity }]}
-              pointerEvents="none"
-            >
-              <Text style={styles.homeReplyText}>{homeReply.text}</Text>
-            </Animated.View>
-          )}
-
+        {/* ── PET CAROUSEL (transparent bg, sits above dark section) ── */}
+        <View style={styles.petSection}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.petRow}
+            contentContainerStyle={[
+              styles.petRow,
+              { paddingHorizontal: (SCREEN_W - PET_CARD_W) / 2 },
+            ]}
             decelerationRate="fast"
-            snapToInterval={PET_CARD_W + 12}
-            snapToAlignment="start"
-            keyboardShouldPersistTaps="handled"
+            snapToInterval={PET_CARD_W}
+            snapToAlignment="center"
+            onMomentumScrollEnd={handleCarouselScroll}
           >
-            {UNLOCKED_DEFS.map((def) => {
-              const p = storePool.find((r) => r.name.toLowerCase() === def.id) ?? storePool[0];
-              const xpPct = p.xp_next_level > 0 ? p.xp / p.xp_next_level : 0;
-
-              return (
-                <TouchableOpacity
-                  key={def.id}
-                  style={[styles.petCard, { width: PET_CARD_W }]}
-                  onPress={() => { play('tap'); setHomeChatPetId(def.id); }}
-                  activeOpacity={0.88}
-                >
-                  <View style={styles.petPreview}>
-                    <PetRenderer pet={def} size={150} interactive />
-                  </View>
-                  <Text style={styles.petCardName}>{def.name}</Text>
-                  <View style={styles.levelPill}>
-                    <Text style={[styles.levelPillText, { color: def.accent }]}>Lv.{p.level}</Text>
-                  </View>
-                  <View style={styles.xpBarBg}>
-                    <View style={[styles.xpBarFill, { width: `${Math.min(xpPct * 100, 100)}%` as any, backgroundColor: def.accent }]} />
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {UNLOCKED_DEFS.map((def) => (
+              <TouchableOpacity
+                key={def.id}
+                style={[styles.petCard, { width: PET_CARD_W }]}
+                onPress={() => {
+                  play('transition_up');
+                  router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
+                }}
+                activeOpacity={0.9}
+              >
+                <PetRenderer pet={def} size={230} interactive />
+              </TouchableOpacity>
+            ))}
           </ScrollView>
-
-          <Text style={styles.selectorHint}>點擊對話 · 詳情請至收藏頁</Text>
         </View>
 
-        {/* ── START FOCUS button ───────────────────── */}
-        <View style={styles.section}>
-          <FrostCard radius={28} padded={false}>
-            <TouchableOpacity
-              style={styles.startFocusBtn}
-              onPress={() => { play('tap'); openModal(); }}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.startFocusEyebrow}>準備好了嗎？</Text>
-              <Text style={styles.startFocusLabel}>START FOCUS →</Text>
-            </TouchableOpacity>
-          </FrostCard>
-        </View>
+        {/* ── DARK SECTION ───────────────────────────────────── */}
+        <View style={styles.darkSection}>
+          <Text style={styles.greetName}>Hi {displayName},</Text>
+          <Text style={styles.greetSub}>welcome to the headspace.</Text>
 
-        {/* ── Focus Calendar ───────────────────────── */}
-        <View style={styles.calSection}>
-          <View style={styles.calHeader}>
-            <Text style={styles.calEyebrow}>FOCUS HISTORY</Text>
+          <Text style={styles.sectionLabel}>timer</Text>
+          <View style={styles.gaugeCard}>
+            <TimerGauge value={durationMin} onChange={setDurationMin} />
           </View>
-          <FrostCard radius={24} padded={false}>
-            <View style={styles.calInner}>
-              <FocusCalendar
-                year={calYear}
-                month={calMonth}
-                data={calData}
-                onMonthChange={handleMonthChange}
-              />
-            </View>
-          </FrostCard>
+
+          {deadlineTasks.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>deadlines</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.taskRow}
+                nestedScrollEnabled
+              >
+                {deadlineTasks.map((task) => (
+                  <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          {dailyTasks.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>Daily</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.taskRow}
+                nestedScrollEnabled
+              >
+                {dailyTasks.map((task) => (
+                  <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          <View style={styles.bottomPad} />
         </View>
       </ScrollView>
-
-      {/* ── Quick chat input bar ─────────────────────────────────── */}
-      {homeChatPetId && (
-        <View style={styles.homeChatBar}>
-          <FrostCard radius={28} padded={false}>
-            <View style={styles.homeChatInputRow}>
-              <TextInput
-                autoFocus
-                style={styles.homeChatInput}
-                value={homeInput}
-                onChangeText={setHomeInput}
-                placeholder={`跟 ${homeChatDef?.name ?? ''} 說…`}
-                placeholderTextColor={Colors.inkFaint}
-                returnKeyType="send"
-                onSubmitEditing={sendHomeChat}
-                editable={!homeChatLoading}
-                multiline={false}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.homeChatSendBtn,
-                  { backgroundColor: homeChatDef?.accent ?? '#F2CEDC' },
-                  (!homeInput.trim() || homeChatLoading) && styles.homeSendDisabled,
-                ]}
-                disabled={!homeInput.trim() || homeChatLoading}
-                onPress={sendHomeChat}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.homeChatSendIcon}>↑</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.homeChatClose}
-                onPress={() => { setHomeChatPetId(null); Keyboard.dismiss(); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.homeChatCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          </FrostCard>
-        </View>
-      )}
-
-      {/* ── Focus Setup Sheet ────────────────────────────────────── */}
-      <FocusSetupSheet
-        visible={showModal}
-        onClose={() => setShowModal(false)}
-        pets={modalPets}
-        tasks={modalTasks}
-        initialPetId={activePet?.id ?? null}
-      />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
-  scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 120 },
+  root:          { flex: 1, backgroundColor: '#faf5ef' },
+  scroll:        { flex: 1 },
+  scrollContent: { paddingBottom: 0 },
 
-  greeting: { marginTop: 8, paddingHorizontal: 22, paddingBottom: 4 },
-  date: { fontSize: 13, color: Colors.inkSoft },
-  greet: {
+  lightSection: {
+    backgroundColor: '#faf5ef',
+    zIndex: 20,
+  },
+  heroArea: {
+    paddingHorizontal: 22,
+    paddingTop: 6,
+    paddingBottom: 16,
+  },
+  heroLine: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 32, fontWeight: '500',
-    color: Colors.ink, marginTop: 4,
-    letterSpacing: -0.4, lineHeight: 38,
+    fontSize: 38,
+    fontWeight: '500',
+    color: INK,
+    letterSpacing: -0.6,
+    lineHeight: 46,
   },
-
-  selectorSection: { marginTop: 20 },
-  selectorHeader: {
-    flexDirection: 'row', alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingHorizontal: 22, marginBottom: 12,
-  },
-  selectorEyebrow: {
-    fontSize: 11, fontWeight: '700',
-    color: Colors.inkFaint, letterSpacing: 1.4, textTransform: 'uppercase',
-  },
-  selectorAll: { fontSize: 13, fontWeight: '600', color: PINK_TEXT },
-  selectorHint: {
-    fontSize: 11, color: Colors.inkFaint,
-    textAlign: 'center', marginTop: 10, letterSpacing: 0.3,
-  },
-
-  // Reply bubble — overlays the top of the carousel
-  homeReplyBubble: {
-    position: 'absolute',
-    top: 44,
-    left: 22,
-    right: 22,
-    zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.97)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#14101c',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  homeReplyText: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 15,
-    color: Colors.ink,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  petRow: { paddingHorizontal: 22, gap: 12 },
-  petCard: {
-    paddingHorizontal: 12,
-    paddingTop: 8, paddingBottom: 12,
-    alignItems: 'center', overflow: 'visible',
-  },
-  petPreview: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center', marginBottom: 6, marginTop: 4 },
-  petCardName: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 17, fontWeight: '500',
-    color: Colors.ink, letterSpacing: -0.2, marginBottom: 5,
-  },
-  levelPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999, marginBottom: 10, backgroundColor: 'rgba(20,16,28,0.06)' },
-  levelPillText: { fontSize: 10, fontWeight: '700' },
-  xpBarBg: { width: '100%', height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)', overflow: 'hidden', marginBottom: 4 },
-  xpBarFill: { height: 4, borderRadius: 9999 },
-
-  // START FOCUS card
-  section: { marginTop: 14, paddingHorizontal: 18 },
-
-  // Calendar
-  calSection: { marginTop: 18, paddingHorizontal: 18, marginBottom: 8 },
-  calHeader: { marginBottom: 10 },
-  calEyebrow: {
-    fontSize: 11, fontWeight: '700',
-    color: Colors.inkFaint, letterSpacing: 1.4, textTransform: 'uppercase',
-  },
-  calInner: { padding: 16 },
-  startFocusBtn: { padding: 28, alignItems: 'center', gap: 6 },
-  startFocusEyebrow: { fontSize: 11, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6 },
-  startFocusLabel: { fontSize: 20, fontWeight: '700', color: Colors.ink, letterSpacing: 2 },
-
-  // ── Home quick chat bar ────────────────────────────────────────
-  homeChatBar: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  homeChatInputRow: {
-    flexDirection: 'row',
+  pinkCircleBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: PINK,
+    alignSelf: 'center',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 10,
+    shadowColor: PINK_TEXT,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  homeChatInput: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.ink,
-    paddingVertical: 4,
+  pinkCircleArrow: {
+    fontSize: 20,
+    color: PINK_TEXT,
+    fontWeight: '700',
   },
-  homeChatSendBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
+
+  petSection: {
+    height: PET_SECTION_H,
+    backgroundColor: 'transparent',
+    zIndex: 20,
   },
-  homeSendDisabled: { opacity: 0.35 },
-  homeChatSendIcon: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  homeChatClose: {
-    width: 28, height: 28,
-    alignItems: 'center', justifyContent: 'center',
+  petRow:  { gap: 0 },
+  petCard: {
+    height: PET_SECTION_H,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  homeChatCloseText: { fontSize: 14, color: Colors.inkSoft },
+
+  darkSection: {
+    backgroundColor: INK,
+    borderTopLeftRadius:  32,
+    borderTopRightRadius: 32,
+    marginTop: -DARK_OVERLAP,
+    paddingTop: DARK_OVERLAP + 28,
+    paddingHorizontal: 22,
+    zIndex: 10,
+    minHeight: 480,
+  },
+
+  greetName: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 28,
+    fontWeight: '500',
+    color: '#fff',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  greetSub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    letterSpacing: 0.1,
+    marginBottom: 24,
+  },
+
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.38)',
+    letterSpacing: 1.2,
+    marginTop: 24,
+    marginBottom: 10,
+  },
+
+  gaugeCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+
+  taskRow: {
+    gap: 12,
+    paddingRight: 4,
+  },
+
+  bottomPad: { height: 48 },
 });
