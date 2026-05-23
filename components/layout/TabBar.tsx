@@ -8,6 +8,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { useUIStore } from '@/stores/uiStore';
 
 type TabId = 'home' | 'missions' | 'stats';
 
@@ -89,8 +90,12 @@ export function TabBar() {
   const router = useRouter();
   const pathname = usePathname();
   const { colors, surfaces, isDark } = useAppTheme();
+  const homeTabBarVisible = useUIStore((s) => s.homeTabBarVisible);
 
   if (HIDDEN_ROUTES.some((r) => pathname.includes(r))) return null;
+
+  const isHome = pathname === '/home' || pathname.endsWith('/home');
+  if (isHome && !homeTabBarVisible) return null;
 
   const fg = colors.ink;
   const muted = colors.inkSoft;

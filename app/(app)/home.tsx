@@ -3,10 +3,11 @@
  *   Top (light): FOCO bar + "Welcome back / Start Focus." + pink CTA + pet carousel
  *   Bottom (dark): greeting + timer gauge + deadlines + daily tasks
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
@@ -23,6 +24,7 @@ import { TimerGauge } from '@/components/home/TimerGauge';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
+import { useUIStore } from '@/stores/uiStore';
 import { getPets, getTasks } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
@@ -114,6 +116,28 @@ export default function HomeScreen() {
   const tasksLastFetchedAt = useRef<number | null>(null);
   const TASKS_STALE_MS = 5 * 60 * 1000;
 
+  // ── Page 1 / Page 2 scroll logic ──────────────────────────
+  const mainScrollRef = useRef<ScrollView>(null);
+  const hasInitialScrolled = useRef(false);
+  const darkSectionYRef = useRef<number>(0);
+  const { setHomeTabBarVisible } = useUIStore();
+
+  const onDarkSectionLayout = useCallback((e: LayoutChangeEvent) => {
+    const y = e.nativeEvent.layout.y;
+    darkSectionYRef.current = y;
+    if (!hasInitialScrolled.current) {
+      hasInitialScrolled.current = true;
+      mainScrollRef.current?.scrollTo({ y, animated: false });
+      setHomeTabBarVisible(true);
+    }
+  }, [setHomeTabBarVisible]);
+
+  const onMainScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const threshold = darkSectionYRef.current - 80;
+    setHomeTabBarVisible(y >= threshold);
+  }, [setHomeTabBarVisible]);
+
   // ── Data fetching ──────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
@@ -190,10 +214,13 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
       <ScrollView
+        ref={mainScrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={50}
+        onScroll={onMainScroll}
       >
         {/* ── LIGHT SECTION ──────────────────────────────────── */}
         <View style={styles.lightSection}>
@@ -289,7 +316,7 @@ export default function HomeScreen() {
         </View>
 
         {/* ── DARK SECTION ───────────────────────────────────── */}
-        <View style={styles.darkSection}>
+        <View style={styles.darkSection} onLayout={onDarkSectionLayout}>
           <Text style={styles.greetName}>Hi {displayName},</Text>
           <Text style={styles.greetSub}>welcome to the headspace.</Text>
 
