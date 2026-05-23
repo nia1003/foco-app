@@ -134,20 +134,20 @@ const styles = StyleSheet.create({
   num: {
     fontSize: 40,
     fontWeight: '700',
-    color: '#1a1622',
+    color: '#ffffff',
     lineHeight: 44,
     letterSpacing: -1,
   },
   unit: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#aaa',
+    color: 'rgba(255,255,255,0.55)',
     letterSpacing: 2,
     marginTop: -2,
   },
   hint: {
     fontSize: 10,
-    color: '#bbb',
+    color: 'rgba(255,255,255,0.35)',
     letterSpacing: 0.3,
     marginTop: 4,
   },

@@ -28,7 +28,7 @@ import type { Task } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PET_CARD_W  = Math.round(SCREEN_W * 0.72);
-const PET_SECTION_H = 280;
+const PET_SECTION_H = 440;
 const DARK_OVERLAP  = 55;
 
 // Design tokens from Figma export
@@ -230,7 +230,7 @@ export default function HomeScreen() {
                 }}
                 activeOpacity={0.9}
               >
-                <PetRenderer pet={def} size={230} interactive />
+                <PetRenderer pet={def} size={460} interactive />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -303,11 +303,11 @@ const styles = StyleSheet.create({
   },
   heroLine: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 54,
+    fontSize: 44,
     fontWeight: '600',
     color: INK,
     letterSpacing: 1,
-    lineHeight: 58,
+    lineHeight: 48,
   },
   pinkCircleBtn: {
     width: 69,
