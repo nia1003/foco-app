@@ -51,7 +51,7 @@ const TABS: Tab[] = [
   },
   {
     id: 'missions',
-    label: 'Missions',
+    label: 'Tasks',
     href: '/(app)/missions',
     icon: (c) => (
       <View style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>

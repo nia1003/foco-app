@@ -136,6 +136,7 @@ export interface Task {
   // local-only fields (not yet persisted to DB)
   emoji?: string;
   memo?: string;
+  taskType?: 'daily' | 'deadline';
 }
 
 // sessions table（歷史清單用）
