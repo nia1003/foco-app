@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -105,6 +106,9 @@ export default function HomeScreen() {
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
+
+  // Drives per-pet scale/opacity; updated on native thread for 60fps
+  const scrollX = useRef(new Animated.Value(0)).current;
 
   // Staleness guard for task list
   const tasksLastFetchedAt = useRef<number | null>(null);
@@ -208,32 +212,80 @@ export default function HomeScreen() {
 
         {/* ── PET CAROUSEL ───────────────────────────────────── */}
         <View style={styles.petSection}>
-          <ScrollView
+          {/*
+           * Threshold / deadzone interpolation
+           * ─────────────────────────────────────────────────────────
+           * T = 20% of one card width = the "deadzone" on each side of
+           * the centred pet.
+           *
+           * For pet i, whose centre sits at x = i * PET_CARD_W:
+           *
+           *   scrollX:   … ─(c-W)──(c-T)────c────(c+T)──(c+W)─ …
+           *   scale:         0.65    1.0    1.0    1.0    0.65
+           *   opacity:       0.40    1.0    1.0    1.0    0.40
+           *
+           * Effect: the active pet holds full size for the first 20% of
+           * any swipe (deadzone), then smoothly shrinks over the remaining
+           * 80%.  The arriving pet grows only in the final 20% approach.
+           * Combined with decelerationRate=0.985, scrolling feels heavy
+           * and intentional rather than hair-trigger.
+           */}
+          <Animated.ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={[
               styles.petRow,
               { paddingHorizontal: (SCREEN_W - PET_CARD_W) / 2 },
             ]}
-            decelerationRate="fast"
+            decelerationRate={0.985}
             snapToInterval={PET_CARD_W}
             snapToAlignment="center"
+            disableIntervalMomentum
+            scrollEventThrottle={8}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true },
+            )}
             onMomentumScrollEnd={handleCarouselScroll}
           >
-            {UNLOCKED_DEFS.map((def) => (
-              <TouchableOpacity
-                key={def.id}
-                style={[styles.petCard, { width: PET_CARD_W }]}
-                onPress={() => {
-                  play('transition_up');
-                  router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
-                }}
-                activeOpacity={0.9}
-              >
-                <PetRenderer pet={def} size={460} interactive />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            {UNLOCKED_DEFS.map((def, i) => {
+              const c = i * PET_CARD_W;
+              const T = PET_CARD_W * 0.20; // deadzone half-width
+
+              const scale = scrollX.interpolate({
+                inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
+                outputRange: [0.65,            1.0,  1.0, 1.0,  0.65],
+                extrapolate: 'clamp',
+              });
+              const opacity = scrollX.interpolate({
+                inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
+                outputRange: [0.40,            1.0,  1.0, 1.0,  0.40],
+                extrapolate: 'clamp',
+              });
+
+              return (
+                <Animated.View
+                  key={def.id}
+                  style={[
+                    styles.petCard,
+                    { width: PET_CARD_W, transform: [{ scale }], opacity },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.petCardInner}
+                    onPress={() => {
+                      play('transition_up');
+                      router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
+                    }}
+                    activeOpacity={0.9}
+                  >
+                    {/* interactive=false prevents WebView pan from hijacking carousel scroll */}
+                    <PetRenderer pet={def} size={460} interactive={false} />
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </Animated.ScrollView>
         </View>
 
         {/* ── DARK SECTION ───────────────────────────────────── */}
@@ -340,6 +392,12 @@ const styles = StyleSheet.create({
   petRow:  { gap: 0 },
   petCard: {
     height: PET_SECTION_H,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  petCardInner: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-end',
   },

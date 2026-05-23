@@ -110,7 +110,7 @@ function buildHTML(accentHex: string): string {
     rotX+=(tX-rotX)*0.12;
     ch.position.y=Math.sin(t*0.80)*0.10;
     ch.rotation.z=Math.sin(t*0.45)*0.025;
-    ch.rotation.y=rotY+Math.sin(t*0.28)*0.025;
+    ch.rotation.y=rotY;
     ch.rotation.x=rotX;
     renderer.render(scene,camera);
     requestAnimationFrame(tick);

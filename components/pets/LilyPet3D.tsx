@@ -112,7 +112,7 @@ function buildHTML(color: string): string {
     rotX+=(tX-rotX)*0.15;
     ch.position.y=0.10+Math.sin(t*1.0)*0.08;
     ch.rotation.z=Math.sin(t*0.55)*0.04;
-    ch.rotation.y=rotY+Math.sin(t*0.3)*0.04;
+    ch.rotation.y=rotY;
     ch.rotation.x=rotX;
     renderer.render(scene,camera);
     requestAnimationFrame(tick);
