@@ -28,7 +28,7 @@ import { TimerGauge } from '@/components/home/TimerGauge';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { getPets, getTasks } from '@/services/focoService';
+import { chatWithPet, getPets, getTasks } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
@@ -238,8 +238,8 @@ export default function HomeScreen() {
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
 
   // Pet chat state
-  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string }>({
-    visible: false, msg: '', text: '',
+  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string; loading: boolean }>({
+    visible: false, msg: '', text: '', loading: false,
   });
   const chatInputRef = useRef<TextInput>(null);
 
@@ -251,17 +251,11 @@ export default function HomeScreen() {
   const TASKS_STALE_MS = 5 * 60 * 1000;
 
   // ── Page 1 / Page 2 scroll ─────────────────────────────────────
-  const mainScrollRef        = useRef<ScrollView>(null);
-  const hasInitialScrolled   = useRef(false);
-  const darkSectionYRef      = useRef<number>(0);
+  const mainScrollRef   = useRef<ScrollView>(null);
+  const darkSectionYRef = useRef<number>(0);
 
   const onDarkSectionLayout = useCallback((e: LayoutChangeEvent) => {
-    const y = e.nativeEvent.layout.y;
-    darkSectionYRef.current = y;
-    if (!hasInitialScrolled.current) {
-      hasInitialScrolled.current = true;
-      mainScrollRef.current?.scrollTo({ y, animated: false });
-    }
+    darkSectionYRef.current = e.nativeEvent.layout.y;
   }, []);
 
   const onMainScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -299,6 +293,11 @@ export default function HomeScreen() {
       })
       .catch(() => setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')));
   }, [userId]);
+
+  // Reset chat when the user swipes to a different pet
+  useEffect(() => {
+    setChat({ visible: false, msg: '', text: '', loading: false });
+  }, [activeCarouselIndex]);
 
   // Sync carousel index to stored active pet on mount
   useEffect(() => {
@@ -342,24 +341,44 @@ export default function HomeScreen() {
     if (record?.id) usePetStore.getState().setActivePet(record.id);
   };
 
-  // Tap pet → toggle chat bubble with random greeting
+  // Tap pet → show greeting without keyboard
   const handlePetPress = useCallback((petId: string) => {
     play('tap');
-    setChat((prev) => {
-      if (prev.visible) return { ...prev, visible: false };
-      const pool = PET_GREETINGS[petId] ?? PET_GREETINGS.sunion;
-      return {
-        visible: true,
-        msg: pool[Math.floor(Math.random() * pool.length)],
-        text: '',
-      };
-    });
+    const pool = PET_GREETINGS[petId] ?? PET_GREETINGS.sunion;
+    setChat((prev) => ({
+      ...prev,
+      visible: true,
+      msg: pool[Math.floor(Math.random() * pool.length)],
+      text: '',
+      loading: false,
+    }));
   }, [play]);
 
-  // Send button → focus TextInput to open keyboard
-  const handleSendPress = useCallback(() => {
-    chatInputRef.current?.focus();
-  }, []);
+  // "..." button → show greeting + open keyboard immediately
+  const handleChatBtnPress = useCallback(() => {
+    play('tap');
+    const pool = PET_GREETINGS[activePetDef.id] ?? PET_GREETINGS.sunion;
+    setChat({
+      visible: true,
+      msg: pool[Math.floor(Math.random() * pool.length)],
+      text: '',
+      loading: false,
+    });
+    setTimeout(() => chatInputRef.current?.focus(), 50);
+  }, [play, activePetDef]);
+
+  // Keyboard send → call Chat API with current pet's personality
+  const handleChatSubmit = useCallback(async () => {
+    const text = chat.text.trim();
+    if (!text || chat.loading) return;
+    setChat((p) => ({ ...p, text: '', loading: true }));
+    try {
+      const reply = await chatWithPet(activePetDef.id, text);
+      setChat((p) => ({ ...p, msg: reply, loading: false }));
+    } catch {
+      setChat((p) => ({ ...p, loading: false }));
+    }
+  }, [chat.text, chat.loading, activePetDef]);
 
   // ── Render ──────────────────────────────────────────────────────
   return (
@@ -458,32 +477,35 @@ export default function HomeScreen() {
           {/* ── Pet chat overlay — pure text, no bg/border ──── */}
           {chat.visible && (
             <View style={styles.chatOverlay} pointerEvents="box-none">
-              <View style={styles.chatRow} pointerEvents="auto">
-                <TextInput
-                  ref={chatInputRef}
-                  style={styles.chatPureText}
-                  value={chat.text}
-                  onChangeText={(t) => setChat((p) => ({ ...p, text: t }))}
-                  placeholder={chat.msg}
-                  placeholderTextColor="rgba(26,22,34,0.70)"
-                  returnKeyType="send"
-                  multiline={false}
-                  onSubmitEditing={() => {
-                    // Hook your API / message handler here (e.g., from stash)
-                    setChat((p) => ({ ...p, text: '', msg: p.msg }));
-                  }}
-                />
-                <TouchableOpacity
-                  style={styles.sendBtn}
-                  onPress={handleSendPress}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Text style={styles.sendArrow}>↑</Text>
-                </TouchableOpacity>
-              </View>
+              {/* Pet response / greeting text */}
+              <Text style={styles.chatReplyText}>
+                {chat.loading ? '···' : chat.msg}
+              </Text>
+              {/* Invisible input — receives keyboard input */}
+              <TextInput
+                ref={chatInputRef}
+                style={styles.chatInputText}
+                value={chat.text}
+                onChangeText={(t) => setChat((p) => ({ ...p, text: t }))}
+                placeholder="say something…"
+                placeholderTextColor="rgba(26,22,34,0.35)"
+                returnKeyType="send"
+                multiline={false}
+                onSubmitEditing={handleChatSubmit}
+                pointerEvents="auto"
+              />
             </View>
           )}
+
+          {/* ── Always-visible pink "···" chat button ─────── */}
+          <TouchableOpacity
+            style={styles.chatDotBtn}
+            onPress={handleChatBtnPress}
+            activeOpacity={0.75}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.chatDotIcon}>···</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── PAGE 2: DARK SECTION (HAS EMBEDDED TAB BAR) ────── */}
@@ -694,38 +716,51 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 18,
     left: 22,
-    maxWidth: SCREEN_W * 0.58,
+    maxWidth: SCREEN_W * 0.60,
     zIndex: 30,
   },
-  chatRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  chatPureText: {
-    flexShrink: 1,
+  chatReplyText: {
     color: INK,
     fontSize: 15,
     fontFamily: 'Fraunces_500Medium',
     fontWeight: '500',
     backgroundColor: 'transparent',
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  chatInputText: {
+    color: INK,
+    fontSize: 14,
+    backgroundColor: 'transparent',
     borderWidth: 0,
     padding: 0,
-    lineHeight: 20,
+    minWidth: 80,
+    lineHeight: 18,
   },
-  sendBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  // Always-visible pink "···" circle button
+  chatDotBtn: {
+    position: 'absolute',
+    bottom: 28,
+    right: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: PINK,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    zIndex: 35,
+    shadowColor: '#c07090',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.20,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  sendArrow: {
+  chatDotIcon: {
     color: INK,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 2,
+    lineHeight: 20,
   },
 
   // ── Dark section (Page 2) ────────────────────────────────────────
