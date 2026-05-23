@@ -19,7 +19,6 @@ import { useSound } from '@/components/SoundProvider';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { TimerGauge } from '@/components/home/TimerGauge';
-import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
@@ -134,7 +133,7 @@ export default function HomeScreen() {
   const displayName    = userName ?? userEmail?.split('@')[0] ?? 'there';
   const activePetDef   = UNLOCKED_DEFS[activeCarouselIndex] ?? UNLOCKED_DEFS[0];
   const activePetRecord = storePool.find(
-    (p) => p.name.toLowerCase() === activePetDef?.id || p.id === activePetDef?.id,
+    (p) => p.name.toLowerCase() === activePetDef?.id,
   ) ?? storePool[0];
 
   const deadlineTasks = pendingTasks.filter((t) => t.taskType === 'deadline');
@@ -155,8 +154,13 @@ export default function HomeScreen() {
 
   const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offset = e.nativeEvent.contentOffset.x;
-    const idx    = Math.round(offset / PET_CARD_W);
-    setActiveCarouselIndex(Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, idx)));
+    const idx    = Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, Math.round(offset / PET_CARD_W)));
+    setActiveCarouselIndex(idx);
+
+    // Persist selection so it survives navigation away-and-back
+    const def    = UNLOCKED_DEFS[idx];
+    const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
+    if (record?.id) usePetStore.getState().setActivePet(record.id);
   };
 
   // ── Render ─────────────────────────────────────────────────────
