@@ -46,6 +46,7 @@ export const Spacing = {
   "md": 8,
   "lg": 12,
   "xl": 16,
+  "xxl": 28,
   "2xl": 24,
   "xxl": 28,
   "3xl": 32,
@@ -84,7 +85,7 @@ export const FontWeight = {
   "medium": "500",
   "semibold": "600",
   "bold": "700"
-};
+} as const;
 
 export const Shadow = {
   sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },

@@ -1,11 +1,5 @@
-/**
- * FocusScreen — Pomodoro timer (FOCO 完整版)
- * - 接收 durationMin + taskId 參數
- * - 使用擴充後的 useTimer（追蹤 pause/left_app 統計）
- * - 結束時 POST session-complete → 導向 Reward
- * - 寵物直接浮在畫面中央（無圓形 orb）
- */
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Animated,
   Modal,
@@ -16,18 +10,27 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
+import { WavyTimer } from '@/components/ui/WavyTimer';
 import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { PETS } from '@/constants/pets';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { useTimer } from '@/hooks/useTimer';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { useSound } from '@/components/SoundProvider';
+import { completeSession } from '@/services/focoService';
+import { mockSessionResult } from '@/data/mockData';
 import type { SessionPayload } from '@/types';
 
 export default function FocusScreen() {
   const router = useRouter();
-  const { durationMin = '25', taskId, petId: paramPetId, taskTitle } = useLocalSearchParams<{
+  const {
+    durationMin = '25',
+    taskId,
+    petId: paramPetId,
+    taskTitle,
+  } = useLocalSearchParams<{
     durationMin?: string;
     taskId?: string;
     petId?: string;
@@ -40,56 +43,95 @@ export default function FocusScreen() {
   const durationSeconds = Number(durationMin) * 60;
 
   // Resolve pet definition for 3D render — use the param pet, not necessarily activePet
-  const resolvedPetRecord = allPets.find((p) => p.id === resolvedPetId) ?? storePet;
+  const resolvedPetRecord =
+    allPets.find((p) => p.id === resolvedPetId) ?? storePet;
   const activePetDef =
     (resolvedPetRecord
       ? PETS.find((p) => p.id === resolvedPetRecord.name.toLowerCase()) ??
-        PETS.find((p) => p.id === 'sunion')
-      : PETS.find((p) => p.id === 'sunion')) ?? PETS[0];
+        PETS.find((p) => p.id === 'xingwang')
+      : PETS.find((p) => p.id === 'xingwang')) ?? PETS[0];
 
   const { play, playToggle } = useSound();
+  const { surfaces, screenBg } = useAppTheme();
   const [showQuitModal, setShowQuitModal] = React.useState(false);
 
   // Use a ref so handleEnd always reads the latest value and stale closures can't freeze the screen
   const submittingRef = useRef(false);
 
-  const floatAnim  = useRef(new Animated.Value(0)).current;
-  const scaleAnim  = useRef(new Animated.Value(1)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const { phase, paused, mm, ss, start, pause, resume, skipToReflection, getSnapshot, setTaskId } =
-    useTimer({
-      durationSeconds,
-      onComplete: () => handleEnd(false),
-    });
+  const {
+    phase,
+    paused,
+    mm,
+    ss,
+    progress,
+    start,
+    pause,
+    resume,
+    skipToReflection,
+    reset,
+    getSnapshot,
+    setTaskId,
+  } = useTimer({
+    durationSeconds,
+    onComplete: () => handleEnd(false),
+  });
 
-  useEffect(() => {
-    setTaskId(taskId ?? null);
-    start();
-  }, []);
+  const elapsedProgress = 1 - progress;
+
+  useFocusEffect(
+    useCallback(() => {
+      setTaskId(taskId ?? null);
+      start();
+      return () => {
+        reset();
+      };
+    }, [durationSeconds, taskId]),
+  );
 
   // Float + subtle pulse when running
   useEffect(() => {
     if (!paused && phase === 'timer') {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(floatAnim, { toValue: -10, duration: 2200, useNativeDriver: true }),
-          Animated.timing(floatAnim, { toValue:   0, duration: 2200, useNativeDriver: true }),
+          Animated.timing(floatAnim, {
+            toValue: -10,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatAnim, {
+            toValue: 0,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
         ]),
       ).start();
       Animated.loop(
         Animated.sequence([
-          Animated.timing(scaleAnim, { toValue: 1.04, duration: 2200, useNativeDriver: true }),
-          Animated.timing(scaleAnim, { toValue: 1,    duration: 2200, useNativeDriver: true }),
+          Animated.timing(scaleAnim, {
+            toValue: 1.04,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 2200,
+            useNativeDriver: true,
+          }),
         ]),
       ).start();
     } else {
-      floatAnim.stopAnimation(); floatAnim.setValue(0);
-      scaleAnim.stopAnimation(); scaleAnim.setValue(1);
+      floatAnim.stopAnimation();
+      floatAnim.setValue(0);
+      scaleAnim.stopAnimation();
+      scaleAnim.setValue(1);
     }
   }, [paused, phase]);
 
-  // ── Session complete — navigate to reflection first ──
-  const handleEnd = (earlyStop: boolean) => {
+  // ── Session complete ──────────────────────────
+  const handleEnd = async (earlyStop: boolean) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
 
@@ -101,11 +143,8 @@ export default function FocusScreen() {
       0,
     );
     const completed = actualDuration >= snap.plannedDuration * 0.9;
+
     const startedAtISO = new Date(snap.startedAt).toISOString();
-    const defaultCompletion = Math.min(
-      Math.round((actualDuration / Math.max(snap.plannedDuration, 1)) * 100),
-      100,
-    );
 
     const payload: SessionPayload = {
       user_id: userId ?? 'unknown',
@@ -133,60 +172,63 @@ export default function FocusScreen() {
       ...(taskTitle ? { task_title: taskTitle } : {}),
     };
 
-    submittingRef.current = false;
-
-    // Hand off to reflection screen — it calls the API after collecting user input
-    router.replace({
-      pathname: '/(app)/reflection',
-      params: {
-        payloadJson: JSON.stringify(payload),
-        localStatsJson: JSON.stringify(localStats),
-        defaultCompletion: String(defaultCompletion),
-      },
-    });
+    try {
+      const result = await completeSession(payload);
+      router.replace({
+        pathname: '/(app)/reward',
+        params: { result: JSON.stringify({ ...result, ...localStats }) },
+      });
+    } catch (err) {
+      console.error('[FOCO] session-complete failed:', err);
+      router.replace({
+        pathname: '/(app)/reward',
+        params: {
+          result: JSON.stringify({ ...mockSessionResult, ...localStats }),
+        },
+      });
+    } finally {
+      // Reset so the user can retry if navigation somehow fails
+      submittingRef.current = false;
+    }
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
 
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Flow State · {durationMin}m</Text>
-          {taskTitle ? (
-            <Text style={styles.taskName}>{taskTitle}</Text>
-          ) : null}
+          {taskTitle ? <Text style={styles.taskName}>{taskTitle}</Text> : null}
         </View>
 
-        {/* Pet + timer */}
+        {/* Wavy ring + pet + countdown */}
         <View style={styles.petArea}>
-          {/* Floating pet */}
-          <Animated.View
-            style={{
-              transform: [
-                { translateY: floatAnim },
-                { scale: scaleAnim },
-              ],
-            }}
+          <WavyTimer
+            progress={elapsedProgress}
+            timeLabel={`${mm}:${ss}`}
+            caption={paused ? 'PAUSED' : undefined}
+            size={320}
           >
-            <PetRenderer pet={activePetDef} size={220} />
-          </Animated.View>
-
-          {/* Timer display */}
-          <View style={styles.timerBox}>
-            <Text style={styles.timerNumerals}>{mm}:{ss}</Text>
-            {paused && (
-              <Text style={styles.timerCaption}>PAUSED</Text>
-            )}
-          </View>
+            <Animated.View
+              style={{
+                transform: [{ translateY: floatAnim }, { scale: scaleAnim }],
+              }}
+            >
+              <PetRenderer pet={activePetDef} size={160} />
+            </Animated.View>
+          </WavyTimer>
         </View>
 
         {/* Controls: Quit | Pause/Resume | Done */}
         <View style={styles.controls}>
           <TouchableOpacity
             style={styles.controlBtn}
-            onPress={() => { play('tap'); setShowQuitModal(true); }}
+            onPress={() => {
+              play('tap');
+              setShowQuitModal(true);
+            }}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✕</Text>
@@ -194,19 +236,31 @@ export default function FocusScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.mainBtn, paused && styles.mainBtnPaused]}
+            style={[
+              styles.mainBtn,
+              {
+                backgroundColor: surfaces.ctaBg,
+                shadowColor: surfaces.shadowColor,
+              },
+              paused && { opacity: 0.9 },
+            ]}
             onPress={() => {
               playToggle(paused); // paused→resume: toggle_on; running→pause: toggle_off
               paused ? resume() : pause();
             }}
             activeOpacity={0.85}
           >
-            <Text style={styles.mainBtnText}>{paused ? '▶ Resume' : '⏸ Pause'}</Text>
+            <Text style={[styles.mainBtnText, { color: surfaces.ctaText }]}>
+              {paused ? '▶ Resume' : '⏸ Pause'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.controlBtn}
-            onPress={() => { play('transition_up'); handleEnd(false); }}
+            onPress={() => {
+              play('transition_up');
+              handleEnd(false);
+            }}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✓</Text>
@@ -217,16 +271,23 @@ export default function FocusScreen() {
 
       {/* Quit modal */}
       <Modal visible={showQuitModal} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => { play('tap'); setShowQuitModal(false); }}
+        <View
+          style={[
+            styles.modalOverlay,
+            { backgroundColor: surfaces.modalBackdrop },
+          ]}
         >
-          <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: surfaces.modalSheetBg,
+                borderColor: surfaces.dividerStrong,
+              },
+            ]}
+          >
             <Text style={styles.modalTitle}>提前結束？</Text>
-            <Text style={styles.modalSub}>
-              放棄會影響你的 DISC 分析結果。
-            </Text>
+            <Text style={styles.modalSub}>放棄會影響你的 DISC 分析結果。</Text>
             <TouchableOpacity
               style={styles.modalQuitBtn}
               onPress={() => {
@@ -241,13 +302,16 @@ export default function FocusScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.modalKeepBtn}
-              onPress={() => { play('tap'); setShowQuitModal(false); }}
+              onPress={() => {
+                play('tap');
+                setShowQuitModal(false);
+              }}
               activeOpacity={0.7}
             >
               <Text style={styles.modalKeepText}>繼續專注</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -282,23 +346,6 @@ const styles = StyleSheet.create({
     gap: 20,
   },
 
-  // Timer below pet
-  timerBox: { alignItems: 'center', gap: 4 },
-  timerNumerals: {
-    fontFamily: 'Fraunces_400Regular',
-    fontSize: 60,
-    fontWeight: '400',
-    color: Colors.ink,
-    letterSpacing: -2,
-    lineHeight: 68,
-  },
-  timerCaption: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.inkFaint,
-    letterSpacing: 2.5,
-  },
-
   // Controls
   controls: {
     flexDirection: 'row',
@@ -314,37 +361,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingVertical: 16,
     borderRadius: 9999,
-    backgroundColor: Colors.ink,
-    shadowColor: Colors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 6,
   },
-  mainBtnPaused: { backgroundColor: Colors.inkSoft as string },
-  mainBtnText: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  mainBtnText: { fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
 
   // Quit modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   modalCard: {
     width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.72)',
     borderRadius: 28,
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.80)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.15,
     shadowRadius: 24,
-    elevation: 4,
+    elevation: 12,
+    overflow: 'hidden',
   },
   modalTitle: {
     fontFamily: 'Fraunces_500Medium',

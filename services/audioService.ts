@@ -29,6 +29,7 @@ const SOUND_ASSETS: Record<Exclude<SoundName, 'tap'>, any> = {
 
 // ── internal state ────────────────────────────
 let initialized = false;
+let soundEnabled = true;
 let tapIndex = 0;
 const tapPool: (Audio.Sound | null)[] = [null, null, null, null];
 const sounds: Partial<Record<Exclude<SoundName, 'tap'>, Audio.Sound>> = {};
@@ -52,6 +53,14 @@ async function loadSound(asset: any): Promise<Audio.Sound> {
 
 // ── public API ────────────────────────────────
 export const audioService = {
+  setEnabled(enabled: boolean) {
+    soundEnabled = enabled;
+  },
+
+  isEnabled() {
+    return soundEnabled;
+  },
+
   async init() {
     if (initialized) return;
     try {
@@ -74,7 +83,7 @@ export const audioService = {
   },
 
   async play(name: SoundName, volume = 0.45) {
-    if (!initialized) return;
+    if (!initialized || !soundEnabled) return;
     try {
       if (name === 'tap') {
         const now = Date.now();

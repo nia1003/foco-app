@@ -1,169 +1,33 @@
-/**
- * MissionsScreen — Quest list + My Tasks (FOCO)
- * v3: Quest cards 與 My Tasks 格式統一（FrostCard + Start + Delete）
- *     Quest 使用 local state，可刪除
- */
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { Colors } from '@/constants/theme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { createMissionsStyles } from '@/styles/missionsScreen.styles';
 import { useAuthStore } from '@/stores/authStore';
-import { getTasks, createTask, deleteTask } from '@/services/focoService';
-import { mockTasks } from '@/data/mockData';
-import type { Task } from '@/types';
+import { usePetStore } from '@/stores/petStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useSound } from '@/components/SoundProvider';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useFocusLaunch } from '@/hooks/useFocusLaunch';
+import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
+import { getTasks, deleteTask } from '@/services/focoService';
+import { mockPets, mockTasks } from '@/data/mockData';
+import { AddTaskModal } from '@/components/tasks/AddTaskModal';
+import { TaskIcon } from '@/components/tasks/TaskIcon';
+import { resolveTaskIcon } from '@/lib/taskIcon';
+import type { Task, TaskCategory } from '@/types';
 
-// ── 品牌淺粉色 ────────────────────────────────
-const PINK = '#F2CEDC';
-const PINK_TEXT = '#b5607a';
-
-// ── Emoji options ─────────────────────────────
-const EMOJI_OPTIONS = [
-  '📚', '✏️', '💻', '🎯',
-  '💼', '🎨', '🎵', '🏃',
-  '🔬', '🌱', '☕', '💡',
-  '📝', '🎤', '🏋️', '⭐',
-];
-
-// ── Duration Slider（5–120 分鐘）────────────────
-const MIN_DUR = 5;
-const MAX_DUR = 120;
-const THUMB = 28; // thumb diameter
-
-function DurationSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const trackW = useSharedValue(0);
-  const thumbX = useSharedValue(0);
-
-  // Sync thumb when value resets externally (e.g., modal resetModal())
-  useEffect(() => {
-    if (trackW.value === 0) return;
-    const progress = (value - MIN_DUR) / (MAX_DUR - MIN_DUR);
-    thumbX.value = progress * (trackW.value - THUMB);
-  }, [value]);
-
-  const clamp = (x: number): number => {
-    'worklet';
-    return Math.max(0, Math.min(trackW.value - THUMB, x - THUMB / 2));
-  };
-
-  const xToVal = (x: number): number => {
-    'worklet';
-    const maxX = trackW.value - THUMB;
-    if (maxX <= 0) return MIN_DUR;
-    return Math.round(MIN_DUR + Math.max(0, Math.min(1, x / maxX)) * (MAX_DUR - MIN_DUR));
-  };
-
-  const gesture = Gesture.Pan()
-    .onBegin((e) => {
-      thumbX.value = clamp(e.x);
-      runOnJS(onChange)(xToVal(thumbX.value));
-    })
-    .onUpdate((e) => {
-      thumbX.value = clamp(e.x);
-      runOnJS(onChange)(xToVal(thumbX.value));
-    });
-
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: thumbX.value }],
-  }));
-
-  const fillStyle = useAnimatedStyle(() => {
-    const maxX = trackW.value - THUMB;
-    if (maxX <= 0) return { width: 0 };
-    return { width: Math.max(0, (thumbX.value / maxX) * trackW.value) };
-  });
-
-  return (
-    <View style={sliderStyles.wrap}>
-      <View style={sliderStyles.labelRow}>
-        <Text style={sliderStyles.minLabel}>{MIN_DUR}m</Text>
-        <Text style={sliderStyles.valueLabel}>{value} min</Text>
-        <Text style={sliderStyles.maxLabel}>{MAX_DUR}m</Text>
-      </View>
-
-      <GestureDetector gesture={gesture}>
-        <View
-          style={sliderStyles.container}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            trackW.value = w;
-            const progress = (value - MIN_DUR) / (MAX_DUR - MIN_DUR);
-            thumbX.value = progress * (w - THUMB);
-          }}
-        >
-          {/* Track + fill */}
-          <View style={sliderStyles.track} pointerEvents="none">
-            <Animated.View style={[sliderStyles.fill, fillStyle]} />
-          </View>
-          {/* Thumb */}
-          <Animated.View style={[sliderStyles.thumb, thumbStyle]} pointerEvents="none" />
-        </View>
-      </GestureDetector>
-    </View>
-  );
-}
-
-const sliderStyles = StyleSheet.create({
-  wrap: { marginBottom: 24 },
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  minLabel: { fontSize: 11, color: Colors.inkFaint },
-  maxLabel: { fontSize: 11, color: Colors.inkFaint },
-  valueLabel: { fontSize: 15, fontWeight: '700', color: PINK_TEXT },
-  // Full-height hit area so touch anywhere on the row works
-  container: {
-    height: THUMB,
-    justifyContent: 'center',
-  },
-  track: {
-    height: 6,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(20,16,28,0.08)',
-    overflow: 'hidden',
-  },
-  fill: {
-    position: 'absolute',
-    left: 0,
-    height: 6,
-    borderRadius: 9999,
-    backgroundColor: PINK,
-  },
-  thumb: {
-    position: 'absolute',
-    top: 0,
-    width: THUMB,
-    height: THUMB,
-    borderRadius: THUMB / 2,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: PINK_TEXT,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-});
-
-// ── Quest types & data ───────────────────────
-type TabType = 'active' | 'daily' | 'special';
+type TabType = 'task' | 'daily';
 
 type Quest = {
   id: string;
@@ -173,97 +37,148 @@ type Quest = {
   reward: string;
   emoji: string;
   duration_min: number;
+  category: TaskCategory;
 };
 
 type QuestsState = Record<TabType, Quest[]>;
 
 const INITIAL_QUESTS: QuestsState = {
-  active: [
-    { id: 'q1', title: 'Morning Focus Sprint', sub: 'Complete 3 sessions before noon', progress: 0.66, reward: '+30 XP', emoji: '🌅', duration_min: 25 },
-    { id: 'q2', title: 'Book Worm',             sub: 'Read for 2 hours total',          progress: 0.45, reward: '+25 XP', emoji: '📚', duration_min: 50 },
-    { id: 'q3', title: 'Inbox Zero',             sub: 'Clear your email queue',          progress: 0.20, reward: '+15 XP', emoji: '📬', duration_min: 15 },
+  task: [
+    {
+      id: 'q1',
+      title: 'Morning Focus Sprint',
+      sub: 'Complete 3 sessions before noon',
+      progress: 0.66,
+      reward: '+30 XP',
+      emoji: '🌅',
+      duration_min: 25,
+      category: 'task',
+    },
+    {
+      id: 'q2',
+      title: 'Book Worm',
+      sub: 'Read for 2 hours total',
+      progress: 0.45,
+      reward: '+25 XP',
+      emoji: '📚',
+      duration_min: 50,
+      category: 'task',
+    },
+    {
+      id: 'q3',
+      title: 'Inbox Zero',
+      sub: 'Clear your email queue',
+      progress: 0.2,
+      reward: '+15 XP',
+      emoji: '📬',
+      duration_min: 15,
+      category: 'task',
+    },
+    {
+      id: 'q6',
+      title: 'First Week!',
+      sub: 'Complete 7 days in a row',
+      progress: 0.43,
+      reward: '🏆 Trophy',
+      emoji: '⭐',
+      duration_min: 25,
+      category: 'task',
+    },
   ],
   daily: [
-    { id: 'q4', title: 'Daily Checkin', sub: 'Log at least 1 session today',  progress: 0.0, reward: '+5 XP',  emoji: '✅', duration_min: 15 },
-    { id: 'q5', title: 'Flow State',    sub: 'Complete a 50-min session',      progress: 0.0, reward: '+20 XP', emoji: '🌊', duration_min: 50 },
-  ],
-  special: [
-    { id: 'q6', title: 'First Week!', sub: 'Complete 7 days in a row', progress: 0.43, reward: '🏆 Trophy', emoji: '⭐', duration_min: 25 },
+    {
+      id: 'q4',
+      title: 'Daily Checkin',
+      sub: 'Log at least 1 session today',
+      progress: 0.0,
+      reward: '+5 XP',
+      emoji: '✅',
+      duration_min: 15,
+      category: 'daily',
+    },
+    {
+      id: 'q5',
+      title: 'Flow State',
+      sub: 'Complete a 50-min session',
+      progress: 0.0,
+      reward: '+20 XP',
+      emoji: '🌊',
+      duration_min: 50,
+      category: 'daily',
+    },
   ],
 };
 
-// ── Main Screen ──────────────────────────────
 export default function MissionsScreen() {
-  const [tab, setTab] = useState<TabType>('active');
-  const router = useRouter();
-  const { userId } = useAuthStore();
+  const [tab, setTab] = useState<TabType>('task');
+  const { userId, userName, userEmail } = useAuthStore();
+  const { pets, activePet } = usePetStore();
+  const { play } = useSound();
+  const { screenBg, colors } = useAppTheme();
+  const styles = useThemedStyles(createMissionsStyles);
+  const { launchFocus } = useFocusLaunch();
+  const focusDurationMin = usePreferencesStore((s) => s.focusDurationMin);
+  const avatarUri = usePreferencesStore((s) => s.avatarUri);
 
-  // My Tasks state
   const [tasks, setTasks] = useState<Task[]>(mockTasks.tasks);
-  const [showModal, setShowModal] = useState(false);
-
-  // Quest state（local only，可刪除）
   const [questsState, setQuestsState] = useState<QuestsState>(INITIAL_QUESTS);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
 
-  // New task form state
-  const [newTitle, setNewTitle] = useState('');
-  const [newDuration, setNewDuration] = useState(25);
-  const [newEmoji, setNewEmoji] = useState('📚');
-  const [newMemo, setNewMemo] = useState('');
-  const [creating, setCreating] = useState(false);
+  const displayName = userName ?? userEmail?.split('@')[0] ?? '?';
+  const settingsAvatar = displayName[0]?.toUpperCase() ?? '?';
+  const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
 
   useEffect(() => {
     if (!userId) return;
     getTasks(userId)
-      .then((res) => setTasks(res.tasks))
+      .then((res) =>
+        setTasks(
+          res.tasks.map((t) => ({ ...t, category: t.category ?? 'task' })),
+        ),
+      )
       .catch(() => {});
   }, [userId]);
 
-  const resetModal = () => {
-    setNewTitle('');
-    setNewDuration(25);
-    setNewEmoji('📚');
-    setNewMemo('');
+  const pendingTasks = tasks.filter((t) => t.status === 'pending');
+  const tabTasks = pendingTasks.filter((t) => (t.category ?? 'task') === tab);
+  const currentQuests = questsState[tab];
+
+  const buildSetup = (
+    partial: Partial<FocusQuickSetupValue>,
+  ): FocusQuickSetupValue => ({
+    taskMode: 'none',
+    selectedTaskId: null,
+    newIconType: 'emoji',
+    newIcon: '📚',
+    newTitle: '',
+    newMemo: '',
+    selectedPetId: activePet?.id ?? modalPets[0]?.id ?? null,
+    durationMin: focusDurationMin,
+    ...partial,
+  });
+
+  const startFocus = async (
+    partial: Partial<FocusQuickSetupValue>,
+    opts?: { fallbackTitle?: string },
+  ) => {
+    play('tap');
+    const setup = buildSetup(partial);
+    await launchFocus(setup, pendingTasks, opts);
   };
 
-  const handleCreate = async () => {
-    if (!newTitle.trim() || !userId) return;
-    try {
-      setCreating(true);
-      const task = await createTask(userId, newTitle.trim(), newDuration);
-      const enriched: Task = { ...task, emoji: newEmoji, memo: newMemo.trim() || undefined };
-      setTasks((prev) => [enriched, ...prev]);
-      resetModal();
-      setShowModal(false);
-    } catch {
-      Alert.alert('建立失敗', '請稍後再試');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  // My Tasks delete（樂觀刪除 + 失敗還原）
   const handleDeleteTask = (taskId: string, taskTitle: string) => {
     Alert.alert(
-      '刪除任務',
-      `確定要刪除「${taskTitle}」嗎？\n已完成的計時紀錄不受影響。`,
+      'Delete task',
+      `Delete "${taskTitle}"?\nCompleted focus sessions will stay in your history.`,
       [
-        { text: '取消', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: '刪除',
+          text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            // 先從 UI 移除（樂觀更新）
             setTasks((prev) => prev.filter((t) => t.id !== taskId));
-            // DB 操作失敗 → 還原任務，並提示使用者
             deleteTask(taskId).catch(() => {
-              setTasks((prev) => {
-                // 如果已還原過就不重複加
-                if (prev.find((t) => t.id === taskId)) return prev;
-                const restored = tasks.find((t) => t.id === taskId);
-                return restored ? [restored, ...prev] : prev;
-              });
-              Alert.alert('刪除失敗', '網路異常，任務已還原，請稍後再試。');
+              Alert.alert('Delete failed', 'Network error. Please try again.');
             });
           },
         },
@@ -271,34 +186,26 @@ export default function MissionsScreen() {
     );
   };
 
-  // Quest delete（local state only）
   const handleDeleteQuest = (questId: string, questTitle: string) => {
-    Alert.alert(
-      '移除任務',
-      `確定要移除「${questTitle}」嗎？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '移除',
-          style: 'destructive',
-          onPress: () => {
-            setQuestsState((prev) => ({
-              ...prev,
-              [tab]: prev[tab].filter((q) => q.id !== questId),
-            }));
-          },
+    Alert.alert('Remove quest', `Remove "${questTitle}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          setQuestsState((prev) => ({
+            ...prev,
+            [tab]: prev[tab].filter((q) => q.id !== questId),
+          }));
         },
-      ],
-    );
+      },
+    ]);
   };
 
-  const pendingTasks = tasks.filter((t) => t.status === 'pending');
-  const currentQuests = questsState[tab];
-
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
-      <FocoBar />
+      <FocoBar avatar={settingsAvatar} avatarUri={avatarUri} />
 
       <ScrollView
         style={styles.scroll}
@@ -310,35 +217,43 @@ export default function MissionsScreen() {
           <Text style={styles.title}>Missions</Text>
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => setShowModal(true)}
+            onPress={() => {
+              play('tap');
+              setAddTaskOpen(true);
+            }}
             activeOpacity={0.75}
           >
             <Text style={styles.addBtnText}>+ Task</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Tab pills */}
         <View style={styles.tabs}>
-          {(['active', 'daily', 'special'] as TabType[]).map((t) => (
+          {(['task', 'daily'] as TabType[]).map((t) => (
             <TouchableOpacity
               key={t}
               style={[styles.tabPill, tab === t && styles.tabPillActive]}
-              onPress={() => setTab(t)}
+              onPress={() => {
+                play('tap');
+                setTab(t);
+              }}
               activeOpacity={0.75}
             >
-              <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+              <Text
+                style={[styles.tabLabel, tab === t && styles.tabLabelActive]}
+              >
+                {t === 'task' ? 'Task' : 'Daily'}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ── Quest cards（格式與 My Tasks 統一）── */}
         <View style={styles.list}>
           {currentQuests.length === 0 && (
             <FrostCard radius={20} padded={false}>
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No quests in this category.</Text>
+                <Text style={styles.emptyText}>
+                  No quests in this category.
+                </Text>
               </View>
             </FrostCard>
           )}
@@ -347,43 +262,45 @@ export default function MissionsScreen() {
             <View key={q.id} style={styles.myTaskWrap}>
               <FrostCard radius={20} padded={false}>
                 <View style={styles.myTaskCard}>
-                  {/* Emoji badge */}
                   <View style={styles.taskEmojiWrap}>
                     <Text style={styles.taskEmoji}>{q.emoji}</Text>
                   </View>
-
-                  {/* Info */}
                   <View style={styles.myTaskInfo}>
                     <Text style={styles.myTaskTitle}>{q.title}</Text>
                     <Text style={styles.myTaskSub}>{q.sub}</Text>
-                    {/* Progress bar */}
                     <View style={styles.progressBg}>
-                      <View style={[styles.progressFill, { width: `${q.progress * 100}%` as any }]} />
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${q.progress * 100}%` as `${number}%` },
+                        ]}
+                      />
                     </View>
-                    <Text style={styles.questReward}>{q.reward} · {q.duration_min} min</Text>
+                    <Text style={styles.questReward}>{q.duration_min} min</Text>
                   </View>
-
-                  {/* Actions */}
                   <View style={styles.taskActions}>
                     <TouchableOpacity
                       style={styles.myTaskStartBtn}
                       onPress={() =>
-                        router.push({
-                          pathname: '/(app)/focus',
-                          params: { durationMin: String(q.duration_min) },
-                        })
+                        startFocus(
+                          { taskMode: 'none' },
+                          { fallbackTitle: `${q.emoji} ${q.title}` },
+                        )
                       }
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.myTaskStartText}>▶ Start</Text>
+                      <Text style={styles.myTaskStartIcon}>▶</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteBtn}
-                      onPress={() => handleDeleteQuest(q.id, q.title)}
+                      onPress={() => {
+                        play('tap');
+                        handleDeleteQuest(q.id, q.title);
+                      }}
                       activeOpacity={0.7}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Trash2 size={16} color={Colors.inkFaint} />
+                      <Trash2 size={16} color={colors.inkFaint} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -392,253 +309,79 @@ export default function MissionsScreen() {
           ))}
         </View>
 
-        {/* ── My Tasks ──────────────────────────── */}
         <View style={styles.myTasksSection}>
           <Text style={styles.myTasksLabel}>MY TASKS</Text>
 
-          {pendingTasks.length === 0 && (
+          {tabTasks.length === 0 && (
             <FrostCard radius={20} padded={false}>
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No tasks yet — add one above!</Text>
+                <Text style={styles.emptyText}>No tasks in this category.</Text>
               </View>
             </FrostCard>
           )}
 
-          {pendingTasks.map((task) => (
-            <View key={task.id} style={styles.myTaskWrap}>
-              <FrostCard radius={20} padded={false}>
-                <View style={styles.myTaskCard}>
-                  {/* Emoji badge */}
-                  <View style={styles.taskEmojiWrap}>
-                    <Text style={styles.taskEmoji}>{task.emoji ?? '📝'}</Text>
+          <View style={styles.taskList}>
+            {tabTasks.map((task) => (
+              <View key={task.id} style={styles.myTaskWrap}>
+                <FrostCard radius={20} padded={false}>
+                  <View style={styles.myTaskCard}>
+                    <View style={styles.taskEmojiWrap}>
+                      <TaskIcon icon={resolveTaskIcon(task)} size={20} />
+                    </View>
+                    <View style={styles.myTaskInfo}>
+                      <Text style={styles.myTaskTitle}>{task.title}</Text>
+                      <Text style={styles.myTaskSub}>
+                        {task.duration_min} min
+                      </Text>
+                      {task.memo ? (
+                        <Text style={styles.myTaskMemo} numberOfLines={1}>
+                          {task.memo}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.taskActions}>
+                      <TouchableOpacity
+                        style={styles.myTaskStartBtn}
+                        onPress={() =>
+                          startFocus({
+                            taskMode: 'existing',
+                            selectedTaskId: task.id,
+                          })
+                        }
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.myTaskStartIcon}>▶</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => {
+                          play('tap');
+                          handleDeleteTask(task.id, task.title);
+                        }}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Trash2 size={16} color={colors.inkFaint} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-
-                  {/* Info */}
-                  <View style={styles.myTaskInfo}>
-                    <Text style={styles.myTaskTitle}>{task.title}</Text>
-                    <Text style={styles.myTaskSub}>{task.duration_min} min</Text>
-                    {task.memo ? (
-                      <Text style={styles.myTaskMemo} numberOfLines={1}>{task.memo}</Text>
-                    ) : null}
-                  </View>
-
-                  {/* Actions */}
-                  <View style={styles.taskActions}>
-                    <TouchableOpacity
-                      style={styles.myTaskStartBtn}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/(app)/focus',
-                          params: { durationMin: String(task.duration_min), taskId: task.id },
-                        })
-                      }
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.myTaskStartText}>▶ Start</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteBtn}
-                      onPress={() => handleDeleteTask(task.id, task.title)}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Trash2 size={16} color={Colors.inkFaint} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </FrostCard>
-            </View>
-          ))}
+                </FrostCard>
+              </View>
+            ))}
+          </View>
         </View>
       </ScrollView>
 
-      {/* ── Add Task Modal ─────────────────────── */}
-      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowModal(false); resetModal(); }}>
-        <KeyboardAvoidingView
-          style={styles.modalKav}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => { setShowModal(false); resetModal(); }}
-          />
-          <View style={styles.modalSheet}>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-            >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            <View>
-            <FrostCard radius={28}>
-              <Text style={styles.modalTitle}>New Task</Text>
-
-              {/* Emoji picker */}
-              <Text style={styles.modalLabel}>PICK AN EMOJI</Text>
-              <View style={styles.emojiGrid}>
-                {EMOJI_OPTIONS.map((em) => (
-                  <TouchableOpacity
-                    key={em}
-                    style={[styles.emojiCell, newEmoji === em && styles.emojiCellActive]}
-                    onPress={() => setNewEmoji(em)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={styles.emojiCellText}>{em}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Task name */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>TASK NAME</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newTitle}
-                onChangeText={setNewTitle}
-                placeholder="What do you want to focus on?"
-                placeholderTextColor={Colors.inkFaint}
-                returnKeyType="next"
-              />
-              <View style={styles.modalUnderline} />
-
-              {/* Memo */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>MEMO <Text style={styles.optionalTag}>(optional)</Text></Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newMemo}
-                onChangeText={(t) => setNewMemo(t.slice(0, 60))}
-                placeholder="Short note…"
-                placeholderTextColor={Colors.inkFaint}
-                returnKeyType="done"
-                maxLength={60}
-              />
-              <View style={styles.modalUnderlineRow}>
-                <View style={[styles.modalUnderline, { flex: 1 }]} />
-                <Text style={styles.charCount}>{newMemo.length}/60</Text>
-              </View>
-
-              {/* Duration slider */}
-              <Text style={[styles.modalLabel, { marginTop: 20 }]}>FOCUS DURATION</Text>
-              <View style={{ marginTop: 12 }}>
-                <DurationSlider value={newDuration} onChange={setNewDuration} />
-              </View>
-
-              {/* Actions */}
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.modalCancelBtn}
-                  onPress={() => { setShowModal(false); resetModal(); }}
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalCreateBtn, (!newTitle.trim() || creating) && styles.disabled]}
-                  disabled={!newTitle.trim() || creating}
-                  onPress={handleCreate}
-                >
-                  <Text style={styles.modalCreateText}>{creating ? 'Creating…' : 'Create'}</Text>
-                </TouchableOpacity>
-              </View>
-            </FrostCard>
-            </View>
-            </TouchableWithoutFeedback>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <AddTaskModal
+        visible={addTaskOpen}
+        category={tab}
+        defaultDurationMin={focusDurationMin}
+        userId={userId}
+        onClose={() => setAddTaskOpen(false)}
+        onCreated={(task) =>
+          setTasks((prev) => [{ ...task, category: tab }, ...prev])
+        }
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.beige },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 18, paddingBottom: 120 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
-  title: { fontFamily: 'Fraunces_500Medium', fontSize: 42, fontWeight: '500', color: Colors.ink, letterSpacing: -0.5 },
-  addBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: Colors.ink },
-  addBtnText: { fontSize: 12, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
-  tabs: { flexDirection: 'row', gap: 8, marginTop: 20, marginBottom: 4 },
-  tabPill: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9999,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.6)',
-  },
-  tabPillActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  tabLabel: { fontSize: 13, fontWeight: '500', color: Colors.inkSoft },
-  tabLabelActive: { color: '#fff', fontWeight: '600' },
-
-  // Unified quest + task card styles
-  list: { gap: 10, marginTop: 8 },
-  myTasksSection: { marginTop: 24 },
-  myTasksLabel: { fontSize: 10, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1.6, marginBottom: 10 },
-  emptyState: { padding: 20, alignItems: 'center' },
-  emptyText: { fontSize: 13, color: Colors.inkFaint },
-  myTaskWrap: { marginBottom: 0 },
-  myTaskCard: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  taskEmojiWrap: {
-    width: 42, height: 42, borderRadius: 14,
-    backgroundColor: 'rgba(242,206,220,0.35)',
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  taskEmoji: { fontSize: 22 },
-  myTaskInfo: { flex: 1 },
-  myTaskTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
-  myTaskSub: { fontSize: 12, color: Colors.inkSoft, marginTop: 1 },
-  myTaskMemo: { fontSize: 11, color: Colors.inkFaint, marginTop: 2, fontStyle: 'italic' },
-  // Quest-specific info elements
-  progressBg: { marginTop: 7, height: 4, borderRadius: 9999, backgroundColor: 'rgba(20,16,28,0.08)' },
-  progressFill: { height: 4, borderRadius: 9999, backgroundColor: PINK },
-  questReward: { fontSize: 10, fontWeight: '600', color: PINK_TEXT, marginTop: 4 },
-  // Action buttons
-  taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
-  myTaskStartBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999, backgroundColor: PINK },
-  myTaskStartText: { fontSize: 12, fontWeight: '700', color: PINK_TEXT },
-  deleteBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(20,16,28,0.06)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  // Modal
-  modalKav: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  modalSheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
-  modalTitle: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 22, fontWeight: '500', color: Colors.ink, marginBottom: 16,
-  },
-  modalLabel: {
-    fontSize: 11, fontWeight: '700', color: Colors.inkFaint,
-    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10,
-  },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  emojiCell: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(20,16,28,0.05)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'transparent',
-  },
-  emojiCellActive: {
-    backgroundColor: 'rgba(242,206,220,0.45)',
-    borderColor: PINK_TEXT,
-  },
-  emojiCellText: { fontSize: 22 },
-  modalInput: { fontSize: 17, fontWeight: '500', color: Colors.ink, paddingVertical: 6 },
-  modalUnderline: { height: 1.2, backgroundColor: 'rgba(20,16,28,0.15)', marginTop: 4 },
-  modalUnderlineRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  charCount: { fontSize: 10, color: Colors.inkFaint },
-  optionalTag: { fontSize: 10, fontWeight: '400', color: Colors.inkFaint, textTransform: 'none' },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  modalCancelBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 9999,
-    alignItems: 'center', backgroundColor: 'rgba(20,16,28,0.06)',
-  },
-  modalCancelText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
-  modalCreateBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 9999,
-    alignItems: 'center', backgroundColor: Colors.ink,
-  },
-  modalCreateText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  disabled: { opacity: 0.4 },
-});

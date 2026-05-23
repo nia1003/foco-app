@@ -14,6 +14,7 @@ interface AuthState {
   userName: string | null;
 
   restoreSession: () => Promise<void>;
+  updateProfile: (payload: { name?: string; avatarUrl?: string | null }) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -51,6 +52,32 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
     } catch {
       set({ isLoading: false });
+    }
+  },
+
+  updateProfile: async ({ name, avatarUrl }) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { error: 'Not signed in' };
+
+      const meta = { ...(user.user_metadata ?? {}) } as Record<string, unknown>;
+      if (name !== undefined) meta.name = name.trim();
+      if (avatarUrl !== undefined) {
+        if (avatarUrl) meta.avatar_url = avatarUrl;
+        else delete meta.avatar_url;
+      }
+
+      const { data, error } = await supabase.auth.updateUser({ data: meta });
+      if (error) return { error: error.message };
+
+      set({
+        userName: (data.user?.user_metadata?.name as string) ?? null,
+      });
+      return {};
+    } catch {
+      return { error: 'Update failed' };
     }
   },
 

@@ -33,9 +33,17 @@ import { chatWithPet } from '@/services/focoService';
 const { height: SCREEN_H } = Dimensions.get('window');
 
 // Sheet geometry
-const PEEK_H   = 200;              // visible when collapsed: handle + name + level
-const SHEET_H  = SCREEN_H * 0.72;
+const PEEK_H   = 256;              // visible when collapsed: handle + name + trait + level/XP + button
+const SHEET_H  = SCREEN_H * 0.76;
 const MAX_DRAG = SHEET_H - PEEK_H;
+
+// Auto-greeting shown when the page loads (no API call)
+const PET_GREETINGS: Record<string, string> = {
+  sunion: '嗨嗨！今天也要一起加油喔！☀️',
+  lily:   '喲，來了啊！準備好迎接今天了嗎？',
+  fluff:  '……靜靜地，陪你。',
+  stay:   '專注。',
+};
 
 // Level metadata
 const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }> = {
@@ -77,7 +85,26 @@ export default function PetInfoScreen() {
   const replyOpacity = useRef(new Animated.Value(0)).current;
   const lastChatAt = useRef(0);
   // Chat bar floats above the peek section; slides up when keyboard opens
-  const chatBarBottom = useRef(new Animated.Value(PEEK_H + 8)).current;
+  const chatBarBottom = useRef(new Animated.Value(PEEK_H + 10)).current;
+  // Chat bar fades in on mount and greeting fades in shortly after
+  const chatBarOpacity = useRef(new Animated.Value(0)).current;
+
+  // On mount: fade in chat bar, then show auto-greeting
+  useEffect(() => {
+    Animated.timing(chatBarOpacity, { toValue: 1, duration: 350, delay: 300, useNativeDriver: true }).start();
+
+    const greeting = PET_GREETINGS[petDef.id] ?? '嗨！';
+    const timer = setTimeout(() => {
+      setPetReply(greeting);
+      replyOpacity.setValue(0);
+      Animated.sequence([
+        Animated.timing(replyOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.delay(9000),
+        Animated.timing(replyOpacity, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ]).start(() => setPetReply(''));
+    }, 700);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const showEv = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -91,7 +118,7 @@ export default function PetInfoScreen() {
     });
     const hide = Keyboard.addListener(hideEv, (e) => {
       Animated.timing(chatBarBottom, {
-        toValue: PEEK_H + 8,
+        toValue: PEEK_H + 10,
         duration: Platform.OS === 'ios' ? ((e as any).duration ?? 250) : 200,
         useNativeDriver: false,
       }).start();
@@ -210,12 +237,32 @@ export default function PetInfoScreen() {
           <View style={styles.handle} />
         </View>
 
-        {/* Always-visible: name + level */}
+        {/* Always-visible: name + trait + level/XP + detail button */}
         <View style={styles.peekSection}>
           <Text style={styles.petName}>{petDef.name}</Text>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
+          <Text style={styles.petTrait}>{petDef.trait}</Text>
+
+          <View style={styles.peekMetaRow}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelBadgeText}>Lv.{level} · {info.label}</Text>
+            </View>
+            <Text style={styles.peekXP}>{pet.xp} / {pet.xp_next_level} XP</Text>
           </View>
+
+          <View style={styles.peekXpBarBg}>
+            <View style={[styles.peekXpBarFill, {
+              width: `${Math.min(xpProgress * 100, 100)}%` as any,
+              backgroundColor: petDef.accent,
+            }]} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.detailBtn}
+            onPress={() => springTo(0)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.detailBtnText}>查看詳情 →</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Scrollable details */}
@@ -286,8 +333,9 @@ export default function PetInfoScreen() {
         </ScrollView>
       </Animated.View>
 
-      {/* ── Chat input bar — floats just above the peek section ── */}
+      {/* ── Chat input bar — fades in on mount, floats above peek ── */}
       <Animated.View style={[styles.chatBar, { bottom: chatBarBottom }]}>
+        <Animated.View style={{ opacity: chatBarOpacity }}>
         <View style={styles.chatInputRow}>
           <TextInput
             style={styles.chatInput}
@@ -311,6 +359,7 @@ export default function PetInfoScreen() {
             </TouchableOpacity>
           )}
         </View>
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -423,30 +472,69 @@ const styles = StyleSheet.create({
   // Peek section (always visible)
   peekSection: {
     paddingHorizontal: 22,
-    paddingBottom: 14,
+    paddingBottom: 12,
+    gap: 6,
   },
   petName: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '500',
     color: Colors.ink,
     letterSpacing: -0.4,
   },
+  petTrait: {
+    fontSize: 13,
+    color: Colors.inkSoft,
+    marginTop: -2,
+  },
+  peekMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
   levelBadge: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 9999,
     backgroundColor: 'rgba(242,206,220,0.40)',
     borderWidth: 1,
     borderColor: 'rgba(181,96,122,0.20)',
   },
   levelBadgeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#b5607a',
     letterSpacing: 0.3,
+  },
+  peekXP: {
+    fontSize: 12,
+    color: Colors.inkSoft,
+    fontWeight: '500',
+  },
+  peekXpBarBg: {
+    height: 5,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(20,16,28,0.08)',
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  peekXpBarFill: {
+    height: 5,
+    borderRadius: 9999,
+  },
+  detailBtn: {
+    marginTop: 6,
+    backgroundColor: Colors.ink,
+    borderRadius: 9999,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  detailBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
 
   // Scrollable detail content

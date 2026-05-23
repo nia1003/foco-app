@@ -1,66 +1,111 @@
-/**
- * SettingsScreen — 帳號、偏好設定、登出
- * FOCO 設計風格（FrostCard + AppBackground + FocoBar）
- */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import {
+  createSettingsStyles,
+  type SettingsStyles,
+} from '@/styles/settingsScreen.styles';
+import {
+  APP_STYLE_OPTIONS,
+  usePreferencesStore,
+} from '@/stores/preferencesStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { useSessionStore } from '@/stores/sessionStore';
+import { audioService } from '@/services/audioService';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { logout, userEmail, userName } = useAuthStore();
+  const { screenBg, colors } = useAppTheme();
+  const styles = useThemedStyles(createSettingsStyles);
+  const { logout, userEmail, userName, updateProfile } = useAuthStore();
   const { reset: resetPets } = usePetStore();
-  const { reset: resetSessions } = useSessionStore();
-
   const { play, playToggle } = useSound();
-  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const soundEnabled = usePreferencesStore((s) => s.soundEnabled);
+  const darkMode = usePreferencesStore((s) => s.darkMode);
+  const appStyleId = usePreferencesStore((s) => s.appStyleId);
+  const avatarUri = usePreferencesStore((s) => s.avatarUri);
+  const setSoundEnabled = usePreferencesStore((s) => s.setSoundEnabled);
+  const setDarkMode = usePreferencesStore((s) => s.setDarkMode);
+  const setAppStyleId = usePreferencesStore((s) => s.setAppStyleId);
+  const setAvatarUri = usePreferencesStore((s) => s.setAvatarUri);
+
+  const [nameDraft, setNameDraft] = useState(userName ?? '');
+  const [savingName, setSavingName] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(true);
+
+  useEffect(() => {
+    setNameDraft(userName ?? userEmail?.split('@')[0] ?? '');
+  }, [userName, userEmail]);
 
   const displayName = userName ?? userEmail?.split('@')[0] ?? '—';
   const initial = displayName[0]?.toUpperCase() ?? '?';
 
-  // ── 登出 ────────────────────────────────────────
+  const handleSaveName = async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) {
+      Alert.alert('名稱不可為空');
+      return;
+    }
+    setSavingName(true);
+    const { error } = await updateProfile({ name: trimmed });
+    setSavingName(false);
+    if (error) Alert.alert('更新失敗', error);
+    else play('tap');
+  };
+
+  const handlePickAvatar = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('需要相簿權限', '請在系統設定中允許存取相片');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    const uri = result.assets[0].uri;
+    await setAvatarUri(uri);
+    await updateProfile({ avatarUrl: uri });
+    play('tap');
+  };
+
   const handleLogout = () => {
-    Alert.alert(
-      '登出',
-      '確定要登出嗎？',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '登出',
-          style: 'destructive',
-          onPress: async () => {
-            // 1. 清除各 store 狀態
-            resetPets();
-            resetSessions();
-            // 2. 登出 Supabase session + 清除 authStore
-            await logout();
-            // 3. 回到登入頁
-            router.replace('/(auth)');
-          },
+    Alert.alert('登出', '確定要登出嗎？', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '登出',
+        style: 'destructive',
+        onPress: async () => {
+          resetPets();
+          await logout();
+          router.replace('/(auth)');
         },
-      ],
-    );
+      },
+    ]);
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
       <FocoBar back />
 
@@ -68,58 +113,133 @@ export default function SettingsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>Settings</Text>
 
-        {/* ── 帳號 ── */}
-        <Section label="ACCOUNT">
+        <Section label="ACCOUNT" styles={styles}>
           <FrostCard radius={20} padded={false}>
             <View style={styles.profileRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initial}</Text>
-              </View>
+              <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8}>
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initial}</Text>
+                  </View>
+                )}
+                <Text style={styles.changePhoto}>更換頭貼</Text>
+              </TouchableOpacity>
               <View style={{ flex: 1 }}>
-                <Text style={styles.profileName}>{displayName}</Text>
+                <Text style={styles.fieldLabel}>使用者名稱</Text>
+                <TextInput
+                  style={styles.nameInput}
+                  value={nameDraft}
+                  onChangeText={setNameDraft}
+                  placeholder="Your name"
+                  placeholderTextColor={colors.inkFaint}
+                />
+                <TouchableOpacity
+                  style={[styles.saveBtn, savingName && styles.saveBtnDisabled]}
+                  onPress={handleSaveName}
+                  disabled={savingName}
+                >
+                  <Text style={styles.saveBtnText}>
+                    {savingName ? '儲存中…' : '儲存名稱'}
+                  </Text>
+                </TouchableOpacity>
                 <Text style={styles.profileEmail}>{userEmail ?? '—'}</Text>
               </View>
             </View>
           </FrostCard>
         </Section>
 
-        {/* ── 偏好設定 ── */}
-        <Section label="PREFERENCES">
+        <Section label="APP 樣式" styles={styles}>
+          <FrostCard radius={20} padded={false}>
+            <View style={styles.styleRow}>
+              {APP_STYLE_OPTIONS.map((opt) => {
+                const active = appStyleId === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.styleChip, active && styles.styleChipActive]}
+                    onPress={() => {
+                      play('tap');
+                      void setAppStyleId(opt.id);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[styles.swatch, { backgroundColor: opt.swatch }]}
+                    />
+                    <Text
+                      style={[
+                        styles.styleLabel,
+                        active && styles.styleLabelActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </FrostCard>
+        </Section>
+
+        <Section label="PREFERENCES" styles={styles}>
           <FrostCard radius={20} padded={false}>
             <ToggleRow
-              label="音效"
-              sub="計時期間的提示音"
-              value={soundEnabled}
-              onChange={(v) => { playToggle(v); setSoundEnabled(v); }}
+              styles={styles}
+              label="夜間模式"
+              sub="深色背景與淺色文字"
+              value={darkMode}
+              onChange={(v) => {
+                playToggle(v);
+                void setDarkMode(v);
+              }}
             />
             <View style={styles.divider} />
             <ToggleRow
+              styles={styles}
+              label="音效"
+              sub="計時與按鈕提示音"
+              value={soundEnabled}
+              onChange={async (v) => {
+                await setSoundEnabled(v);
+                if (v) void audioService.playToggle(true);
+              }}
+            />
+            <View style={styles.divider} />
+            <ToggleRow
+              styles={styles}
               label="通知"
               sub="專注結束時提醒"
               value={notifEnabled}
-              onChange={(v) => { playToggle(v); setNotifEnabled(v); }}
+              onChange={(v) => {
+                playToggle(v);
+                setNotifEnabled(v);
+              }}
             />
           </FrostCard>
         </Section>
 
-        {/* ── 關於 ── */}
-        <Section label="ABOUT">
+        <Section label="ABOUT" styles={styles}>
           <FrostCard radius={20} padded={false}>
-            <AboutRow label="版本" value="1.0.0" />
+            <AboutRow styles={styles} label="版本" value="1.0.0" />
             <View style={styles.divider} />
-            <AboutRow label="隱私政策" value="›" />
+            <AboutRow styles={styles} label="隱私政策" value="›" />
             <View style={styles.divider} />
-            <AboutRow label="服務條款" value="›" />
+            <AboutRow styles={styles} label="服務條款" value="›" />
           </FrostCard>
         </Section>
 
-        {/* ── 登出 ── */}
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={() => { play('tap'); handleLogout(); }}
+          onPress={() => {
+            play('tap');
+            handleLogout();
+          }}
           activeOpacity={0.8}
         >
           <Text style={styles.logoutText}>登出</Text>
@@ -129,9 +249,15 @@ export default function SettingsScreen() {
   );
 }
 
-// ── 小元件 ──────────────────────────────────────
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({
+  label,
+  children,
+  styles,
+}: {
+  label: string;
+  children: React.ReactNode;
+  styles: SettingsStyles;
+}) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionLabel}>{label}</Text>
@@ -141,16 +267,19 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 }
 
 function ToggleRow({
+  styles,
   label,
   sub,
   value,
   onChange,
 }: {
+  styles: SettingsStyles;
   label: string;
   sub: string;
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const { colors, surfaces } = useAppTheme();
   return (
     <View style={styles.toggleRow}>
       <View style={{ flex: 1 }}>
@@ -160,14 +289,22 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ true: Colors.pinkHot, false: 'rgba(20,16,28,0.12)' }}
+        trackColor={{ true: colors.pinkHot, false: surfaces.chartTrack }}
         thumbColor="#fff"
       />
     </View>
   );
 }
 
-function AboutRow({ label, value }: { label: string; value: string }) {
+function AboutRow({
+  styles,
+  label,
+  value,
+}: {
+  styles: SettingsStyles;
+  label: string;
+  value: string;
+}) {
   return (
     <View style={styles.aboutRow}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -175,118 +312,3 @@ function AboutRow({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
-
-// ── Styles ───────────────────────────────────────
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 18, paddingBottom: 80 },
-
-  title: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 42,
-    fontWeight: '500',
-    color: Colors.ink,
-    marginTop: 8,
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-
-  section: { marginTop: 20 },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.inkFaint,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-    paddingLeft: 4,
-  },
-
-  // Profile
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 18,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.pinkHot,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  profileName: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 18,
-    fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: -0.2,
-  },
-  profileEmail: {
-    fontSize: 12,
-    color: Colors.inkSoft,
-    marginTop: 2,
-  },
-
-  // Rows
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(20,16,28,0.08)',
-    marginHorizontal: 18,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  aboutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  rowLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.ink,
-  },
-  rowSub: {
-    fontSize: 12,
-    color: Colors.inkSoft,
-    marginTop: 2,
-  },
-  rowValue: {
-    fontSize: 15,
-    color: Colors.inkSoft,
-  },
-
-  // Logout
-  logoutBtn: {
-    marginTop: 28,
-    height: 52,
-    borderRadius: 9999,
-    borderWidth: 1.5,
-    borderColor: '#e05555',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(224,85,85,0.06)',
-  },
-  logoutText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#e05555',
-    letterSpacing: 0.3,
-  },
-});

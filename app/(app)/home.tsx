@@ -35,6 +35,29 @@ const PINK      = '#F2CEDC';
 const PINK_TEXT = '#b5607a';
 const INK       = '#1a1622';
 
+const DAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
 // ── TaskCard ─────────────────────────────────────────────────────────────────
@@ -94,6 +117,9 @@ export default function HomeScreen() {
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
 
   const storePool = pets.length > 0 ? pets : mockPets;
+  const modalPets = pets.length > 0 ? pets : mockPets;
+  const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
+  const [starting, setStarting] = useState(false);
 
   const [durationMin, setDurationMin]                   = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex]   = useState(0);
@@ -106,8 +132,11 @@ export default function HomeScreen() {
     const isStale  = !petsLastFetchedAt || Date.now() - petsLastFetchedAt > STALE_MS;
     if (pets.length && !isStale) { restoreActivePet(); return; }
     getPets(userId)
-      .then((fetched) => { setPets(fetched); restoreActivePet(); })
-      .catch(() => { if (!pets.length) setPets(mockPets); });
+      .then((fetched) => {
+        setPets(fetched);
+        restoreActivePet();
+      })
+      .catch(() => setPets(mockPets));
   }, [userId]);
 
   useEffect(() => {

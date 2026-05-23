@@ -105,6 +105,66 @@
       "$type": "color",
       "description": "Sign-in button glass fill"
     },
+    "ink": {
+      "value": "#1a1622",
+      "$type": "color",
+      "description": "Legacy ink text"
+    },
+    "inkSoft": {
+      "value": "rgba(26,22,34,0.62)",
+      "$type": "color",
+      "description": "Legacy ink soft"
+    },
+    "inkFaint": {
+      "value": "rgba(26,22,34,0.38)",
+      "$type": "color",
+      "description": "Legacy ink faint"
+    },
+    "blobPink": {
+      "value": "#f6cfdc",
+      "$type": "color",
+      "description": "Wallpaper blob pink"
+    },
+    "blobLavender": {
+      "value": "#e8d5ec",
+      "$type": "color",
+      "description": "Wallpaper blob lavender"
+    },
+    "blobBlue": {
+      "value": "#d6e3f0",
+      "$type": "color",
+      "description": "Wallpaper blob blue"
+    },
+    "blobPeach": {
+      "value": "#f9d8c7",
+      "$type": "color",
+      "description": "Wallpaper blob peach"
+    },
+    "softBg": {
+      "value": "#faf5ef",
+      "$type": "color",
+      "description": "Legacy soft background"
+    },
+    "glassChrome": {
+      "value": "rgba(255,255,255,0.78)",
+      "$type": "color",
+      "description": "Legacy glass chrome"
+    },
+    "glassClear": {
+      "value": "rgba(255,255,255,0.55)",
+      "$type": "color",
+      "description": "Legacy glass clear"
+    },
+    "frostCard": {
+      "value": "rgba(255,255,255,0.62)",
+      "$type": "color",
+      "description": "Legacy frost card"
+    },
+    "signInBtn": {
+      "value": "rgba(255,255,255,0.85)",
+      "$type": "color",
+      "description": "Legacy sign in button"
+    },
     "white": {
       "value": "#FFFFFF",
       "$type": "color",
@@ -212,6 +272,11 @@
       "$type": "dimension",
       "description": "Extra large (16)"
     },
+    "xxl": {
+      "value": "28px",
+      "$type": "dimension",
+      "description": "Alias between 2xl and 3xl"
+    },
     "2xl": {
       "value": "24px",
       "$type": "dimension",
@@ -296,6 +361,11 @@
       "$type": "dimension",
       "description": "Medium (alias for base)"
     },
+    "md": {
+      "value": "16px",
+      "$type": "dimension",
+      "description": "Alias for base"
+    },
     "lg": {
       "value": "18px",
       "$type": "dimension",
@@ -310,6 +380,11 @@
       "value": "24px",
       "$type": "dimension",
       "description": "2× large"
+    },
+    "xxl": {
+      "value": "28px",
+      "$type": "dimension",
+      "description": "Between 2xl and 3xl"
     },
     "xxl": {
       "value": "28px",

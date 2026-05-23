@@ -7,6 +7,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 type TabId = 'home' | 'missions' | 'stats';
 
@@ -44,7 +45,7 @@ const TABS: Tab[] = [
           position: 'absolute', bottom: 0,
           width: 5, height: 7,
           borderRadius: 1,
-          backgroundColor: c === Colors.ink ? 'rgba(250,245,239,0.9)' : 'rgba(255,255,255,0.4)',
+          backgroundColor: 'rgba(255,255,255,0.35)',
         }} />
       </View>
     ),
@@ -84,25 +85,32 @@ const TABS: Tab[] = [
 // 這些路由不顯示 tab bar
 const HIDDEN_ROUTES = ['/focus', '/reward', '/analysis', '/pet-info'];
 
-interface TabBarProps {
-  dark?: boolean;
-}
-
-export function TabBar({ dark = false }: TabBarProps) {
+export function TabBar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { colors, surfaces, isDark } = useAppTheme();
 
-  // focus / reward / analysis / pet-info 頁面隱藏
   if (HIDDEN_ROUTES.some((r) => pathname.includes(r))) return null;
 
-  const fg = dark ? '#fff' : Colors.ink;
-  const muted = dark ? 'rgba(255,255,255,0.55)' : Colors.inkSoft;
-  const glassColor = dark ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.78)';
-  const glassBorder = dark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.60)';
+  const fg = colors.ink;
+  const muted = colors.inkSoft;
+  const glassColor = surfaces.pillBg;
+  const glassBorder = surfaces.pillBorder;
+  const activeBg = surfaces.pillActiveBg;
+  const activeBorder = surfaces.pillActiveBorder;
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.pill, { backgroundColor: glassColor, borderColor: glassBorder }]}>
+      <View
+        style={[
+          styles.pill,
+          {
+            backgroundColor: glassColor,
+            borderColor: glassBorder,
+            shadowColor: surfaces.shadowColor,
+          },
+        ]}
+      >
         {TABS.map((tab) => {
           // home 需要精確比對避免誤判 /home 在其他路由中
           const isActive =
@@ -110,8 +118,6 @@ export function TabBar({ dark = false }: TabBarProps) {
               ? pathname === '/home' || pathname.endsWith('/home')
               : pathname.includes(tab.id);
           const color = isActive ? fg : muted;
-          const activeBg = dark ? 'rgba(255,255,255,0.16)' : 'rgba(242,206,220,0.55)';
-          const activeBorder = dark ? 'rgba(255,255,255,0.18)' : 'rgba(181,96,122,0.20)';
 
           return (
             <TouchableOpacity
@@ -126,7 +132,7 @@ export function TabBar({ dark = false }: TabBarProps) {
                   borderColor: activeBorder,
                 }]} />
               )}
-              {tab.icon(color)}
+              {tab.icon(isActive ? fg : muted)}
               <Text style={[styles.label, { color, fontWeight: isActive ? '600' : '500' }]}>
                 {tab.label}
               </Text>

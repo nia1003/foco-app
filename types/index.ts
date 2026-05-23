@@ -125,15 +125,21 @@ export interface FocoPet {
 }
 
 // tasks table
+export type TaskCategory = 'task' | 'daily';
+
+export type TaskIconType = 'emoji' | 'svg';
+
 export interface Task {
   id: string;
   user_id: string;
   title: string;
   duration_min: number;
   status: 'pending' | 'done' | 'deleted';
+  category?: TaskCategory;
   created_at: string;
-  completion_percent?: number;  // 0–100, persisted across sessions
-  // local-only fields (not yet persisted to DB)
+  icon_type?: TaskIconType | null;
+  icon_value?: string | null;
+  /** @deprecated use icon_type + icon_value */
   emoji?: string;
   memo?: string;
   taskType?: 'daily' | 'deadline';
@@ -142,6 +148,7 @@ export interface Task {
 // sessions table（歷史清單用）
 export interface SessionRecord {
   id: string;
+  task_id?: string | null;
   actual_duration: number;   // 秒
   completed: boolean;
   focus_type_result: FocusType;
@@ -170,10 +177,12 @@ export interface SessionPayload {
   early_stop: boolean;
   started_at: string;          // ISO string
   events: SessionEvent[];      // 個別事件時間軸
-  // ── 微反思欄位（reflection screen 填入）──────
-  distraction_reasons?: string[];  // 分心標籤陣列
-  completion_percent?: number;     // 使用者自評完成度 0–100
-  mood_score?: number;             // 心情 1–5
+  /** Reflection screen — distraction tag ids */
+  distraction_reasons?: string[];
+  /** Reflection screen — self-rated completion 0–100 */
+  completion_percent?: number;
+  /** Reflection screen — mood 1 (worst) – 5 (best) */
+  mood_score?: number;
 }
 
 // Edge Function 回傳（+ focus.tsx 補充的本地計時統計）
@@ -231,5 +240,7 @@ export interface SessionSummary {
 export interface DayData {
   date: string;           // 'YYYY-MM-DD'
   session_count: number;
+  /** Total focus seconds on this day (sum of session durations) */
+  total_focus_sec: number;
   sessions: SessionSummary[];
 }

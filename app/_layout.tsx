@@ -13,6 +13,7 @@ import {
   Fraunces_600SemiBold,
 } from '@expo-google-fonts/fraunces';
 import { useAuthStore } from '@/stores/authStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { audioService } from '@/services/audioService';
 import { SoundProvider } from '@/components/SoundProvider';
 
@@ -22,6 +23,8 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, isLoading, restoreSession } = useAuthStore();
+  const darkMode = usePreferencesStore((s) => s.darkMode);
+  const hydratePrefs = usePreferencesStore((s) => s.hydrate);
 
   const splashHiddenRef = useRef(false);
 
@@ -34,8 +37,9 @@ export default function RootLayout() {
   // 初始化 Audio + 恢復 Token Session
   useEffect(() => {
     audioService.init();
+    hydratePrefs();
     restoreSession();
-  }, [restoreSession]);
+  }, [restoreSession, hydratePrefs]);
 
   // 路由守衛：isLoading 結束後決定跳去哪
   useEffect(() => {
@@ -56,7 +60,7 @@ export default function RootLayout() {
 
   return (
     <SoundProvider>
-      <StatusBar style="auto" />
+      <StatusBar style={darkMode ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }} />
     </SoundProvider>
   );
