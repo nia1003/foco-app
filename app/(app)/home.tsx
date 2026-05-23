@@ -3,7 +3,7 @@
  *   Top (light): FOCO bar + "Welcome back / Start Focus." + pink CTA + pet carousel
  *   Bottom (dark): greeting + timer gauge + deadlines + daily tasks
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   NativeScrollEvent,
@@ -35,29 +35,6 @@ const PINK      = '#F2CEDC';
 const PINK_TEXT = '#b5607a';
 const INK       = '#1a1622';
 
-const DAYS = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
 // ── TaskCard ─────────────────────────────────────────────────────────────────
@@ -117,35 +94,41 @@ export default function HomeScreen() {
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
 
   const storePool = pets.length > 0 ? pets : mockPets;
-  const modalPets = pets.length > 0 ? pets : mockPets;
-  const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
-  const [starting, setStarting] = useState(false);
 
-  const [durationMin, setDurationMin]                   = useState(25);
-  const [activeCarouselIndex, setActiveCarouselIndex]   = useState(0);
-  const [pendingTasks, setPendingTasks]                 = useState<Task[]>([]);
+  const [durationMin, setDurationMin]                 = useState(25);
+  const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
+  const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
+
+  // Staleness guard for task list — avoids re-fetching on every tab-back
+  const tasksLastFetchedAt = useRef<number | null>(null);
+  const TASKS_STALE_MS = 5 * 60 * 1000;
 
   // ── Data fetching ──────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
     const STALE_MS = 5 * 60 * 1000;
+    // pets.length guard ensures a freshly-reset store (post-logout) always refetches
     const isStale  = !petsLastFetchedAt || Date.now() - petsLastFetchedAt > STALE_MS;
     if (pets.length && !isStale) { restoreActivePet(); return; }
     getPets(userId)
-      .then((fetched) => {
-        setPets(fetched);
-        restoreActivePet();
-      })
-      .catch(() => setPets(mockPets));
+      .then((fetched) => { setPets(fetched); restoreActivePet(); })
+      .catch(() => { if (!pets.length) setPets(mockPets); });
   }, [userId]);
 
   useEffect(() => {
     if (!userId) {
       setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
+      tasksLastFetchedAt.current = null;
       return;
     }
+    const isStale = !tasksLastFetchedAt.current ||
+      Date.now() - tasksLastFetchedAt.current > TASKS_STALE_MS;
+    if (!isStale) return;
     getTasks(userId)
-      .then((res) => setPendingTasks(res.tasks.filter((t) => t.status === 'pending')))
+      .then((res) => {
+        setPendingTasks(res.tasks.filter((t) => t.status === 'pending'));
+        tasksLastFetchedAt.current = Date.now();
+      })
       .catch(() => setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')));
   }, [userId]);
 
@@ -153,7 +136,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!activePet?.name) return;
     const idx = UNLOCKED_DEFS.findIndex(
-      (p) => p.name.toLowerCase() === activePet.name.toLowerCase() || p.id === activePet.name.toLowerCase(),
+      (p) => p.name.toLowerCase() === activePet.name.toLowerCase(),
     );
     if (idx >= 0) setActiveCarouselIndex(idx);
   }, [activePet?.name]);
@@ -161,10 +144,12 @@ export default function HomeScreen() {
   // ── Derived ────────────────────────────────────────────────────
   const displayName     = userName ?? userEmail?.split('@')[0] ?? 'there';
   const activePetDef    = UNLOCKED_DEFS[activeCarouselIndex] ?? UNLOCKED_DEFS[0];
+  // FocoPet.name matches the PETS constant id (e.g. "Sunion" → id "sunion")
   const activePetRecord = storePool.find(
     (p) => p.name.toLowerCase() === activePetDef?.id,
   ) ?? storePool[0];
 
+  // taskType is a local-only field; backend tasks land in dailyTasks via !t.taskType
   const deadlineTasks = pendingTasks.filter((t) => t.taskType === 'deadline');
   const dailyTasks    = pendingTasks.filter((t) => t.taskType === 'daily' || !t.taskType);
 
@@ -176,7 +161,10 @@ export default function HomeScreen() {
       params: {
         durationMin: String(durationMin),
         petId: activePetRecord?.id ?? '',
-        ...(task ? { taskId: task.id, taskTitle: task.title } : {}),
+        // Always pass taskId so focus.tsx gets a consistent signal;
+        // empty string is treated as null task_id in the session payload
+        taskId: task?.id ?? '',
+        ...(task ? { taskTitle: task.title } : {}),
       },
     });
   };

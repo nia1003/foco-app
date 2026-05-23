@@ -30,8 +30,11 @@ interface Props {
 }
 
 export function TimerGauge({ value, onChange }: Props) {
-  const valueRef = useRef(value);
-  valueRef.current = value;
+  const valueRef    = useRef(value);
+  valueRef.current  = value;
+  // Keep onChange ref fresh so PanResponder never holds a stale callback
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const dragStart = useRef({ x: 0, val: value });
 
   const pan = useRef(
@@ -46,7 +49,7 @@ export function TimerGauge({ value, onChange }: Props) {
         const steps = Math.round(dx / 13);
         const raw = dragStart.current.val + steps * STEP;
         const snapped = Math.max(MIN_VAL, Math.min(MAX_VAL, Math.round(raw / STEP) * STEP));
-        if (snapped !== valueRef.current) onChange(snapped);
+        if (snapped !== valueRef.current) onChangeRef.current(snapped);
       },
     }),
   ).current;

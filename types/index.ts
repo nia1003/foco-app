@@ -139,6 +139,7 @@ export interface Task {
   created_at: string;
   icon_type?: TaskIconType | null;
   icon_value?: string | null;
+  completion_percent?: number;  // 0–100, persisted across sessions
   /** @deprecated use icon_type + icon_value */
   emoji?: string;
   memo?: string;

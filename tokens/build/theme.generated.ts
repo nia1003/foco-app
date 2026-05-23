@@ -46,7 +46,6 @@ export const Spacing = {
   "md": 8,
   "lg": 12,
   "xl": 16,
-  "xxl": 28,
   "2xl": 24,
   "xxl": 28,
   "3xl": 32,
