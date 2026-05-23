@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '500',
     letterSpacing: 6,
     paddingLeft: 6,

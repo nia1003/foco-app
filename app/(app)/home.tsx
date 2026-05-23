@@ -3,9 +3,11 @@
  *   Top (light): FOCO bar + "Welcome back / Start Focus." + pink CTA + pet carousel
  *   Bottom (dark): greeting + timer gauge + deadlines + daily tasks
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
+  LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
@@ -22,13 +24,14 @@ import { TimerGauge } from '@/components/home/TimerGauge';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
+import { useUIStore } from '@/stores/uiStore';
 import { getPets, getTasks } from '@/services/focoService';
 import { mockPets, mockTasks } from '@/data/mockData';
 import type { Task } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PET_CARD_W  = Math.round(SCREEN_W * 0.72);
-const PET_SECTION_H = 280;
+const PET_SECTION_H = 440;
 const DARK_OVERLAP  = 55;
 
 // Design tokens from Figma export
@@ -106,9 +109,34 @@ export default function HomeScreen() {
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
 
+  // Drives per-pet scale/opacity; updated on native thread for 60fps
+  const scrollX = useRef(new Animated.Value(0)).current;
+
   // Staleness guard for task list
   const tasksLastFetchedAt = useRef<number | null>(null);
   const TASKS_STALE_MS = 5 * 60 * 1000;
+
+  // ── Page 1 / Page 2 scroll logic ──────────────────────────
+  const mainScrollRef = useRef<ScrollView>(null);
+  const hasInitialScrolled = useRef(false);
+  const darkSectionYRef = useRef<number>(0);
+  const { setHomeTabBarVisible } = useUIStore();
+
+  const onDarkSectionLayout = useCallback((e: LayoutChangeEvent) => {
+    const y = e.nativeEvent.layout.y;
+    darkSectionYRef.current = y;
+    if (!hasInitialScrolled.current) {
+      hasInitialScrolled.current = true;
+      mainScrollRef.current?.scrollTo({ y, animated: false });
+      setHomeTabBarVisible(true);
+    }
+  }, [setHomeTabBarVisible]);
+
+  const onMainScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const threshold = darkSectionYRef.current - 80;
+    setHomeTabBarVisible(y >= threshold);
+  }, [setHomeTabBarVisible]);
 
   // ── Data fetching ──────────────────────────────────────────────
   useEffect(() => {
@@ -186,10 +214,13 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
       <ScrollView
+        ref={mainScrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={50}
+        onScroll={onMainScroll}
       >
         {/* ── LIGHT SECTION ──────────────────────────────────── */}
         <View style={styles.lightSection}>
@@ -208,36 +239,84 @@ export default function HomeScreen() {
 
         {/* ── PET CAROUSEL ───────────────────────────────────── */}
         <View style={styles.petSection}>
-          <ScrollView
+          {/*
+           * Threshold / deadzone interpolation
+           * ─────────────────────────────────────────────────────────
+           * T = 20% of one card width = the "deadzone" on each side of
+           * the centred pet.
+           *
+           * For pet i, whose centre sits at x = i * PET_CARD_W:
+           *
+           *   scrollX:   … ─(c-W)──(c-T)────c────(c+T)──(c+W)─ …
+           *   scale:         0.65    1.0    1.0    1.0    0.65
+           *   opacity:       0.40    1.0    1.0    1.0    0.40
+           *
+           * Effect: the active pet holds full size for the first 20% of
+           * any swipe (deadzone), then smoothly shrinks over the remaining
+           * 80%.  The arriving pet grows only in the final 20% approach.
+           * Combined with decelerationRate=0.985, scrolling feels heavy
+           * and intentional rather than hair-trigger.
+           */}
+          <Animated.ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={[
               styles.petRow,
               { paddingHorizontal: (SCREEN_W - PET_CARD_W) / 2 },
             ]}
-            decelerationRate="fast"
+            decelerationRate={0.985}
             snapToInterval={PET_CARD_W}
             snapToAlignment="center"
+            disableIntervalMomentum
+            scrollEventThrottle={8}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true },
+            )}
             onMomentumScrollEnd={handleCarouselScroll}
           >
-            {UNLOCKED_DEFS.map((def) => (
-              <TouchableOpacity
-                key={def.id}
-                style={[styles.petCard, { width: PET_CARD_W }]}
-                onPress={() => {
-                  play('transition_up');
-                  router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
-                }}
-                activeOpacity={0.9}
-              >
-                <PetRenderer pet={def} size={230} interactive />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            {UNLOCKED_DEFS.map((def, i) => {
+              const c = i * PET_CARD_W;
+              const T = PET_CARD_W * 0.20; // deadzone half-width
+
+              const scale = scrollX.interpolate({
+                inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
+                outputRange: [0.65,            1.0,  1.0, 1.0,  0.65],
+                extrapolate: 'clamp',
+              });
+              const opacity = scrollX.interpolate({
+                inputRange:  [c - PET_CARD_W, c - T, c, c + T, c + PET_CARD_W],
+                outputRange: [0.40,            1.0,  1.0, 1.0,  0.40],
+                extrapolate: 'clamp',
+              });
+
+              return (
+                <Animated.View
+                  key={def.id}
+                  style={[
+                    styles.petCard,
+                    { width: PET_CARD_W, transform: [{ scale }], opacity },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.petCardInner}
+                    onPress={() => {
+                      play('transition_up');
+                      router.push({ pathname: '/(app)/pet-info', params: { petId: def.id } });
+                    }}
+                    activeOpacity={0.9}
+                  >
+                    {/* interactive=false prevents WebView pan from hijacking carousel scroll */}
+                    <PetRenderer pet={def} size={460} interactive={false} />
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </Animated.ScrollView>
         </View>
 
         {/* ── DARK SECTION ───────────────────────────────────── */}
-        <View style={styles.darkSection}>
+        <View style={styles.darkSection} onLayout={onDarkSectionLayout}>
           <Text style={styles.greetName}>Hi {displayName},</Text>
           <Text style={styles.greetSub}>welcome to the headspace.</Text>
 
@@ -303,11 +382,11 @@ const styles = StyleSheet.create({
   },
   heroLine: {
     fontFamily: 'Fraunces_500Medium',
-    fontSize: 54,
+    fontSize: 44,
     fontWeight: '600',
     color: INK,
     letterSpacing: 1,
-    lineHeight: 58,
+    lineHeight: 48,
   },
   pinkCircleBtn: {
     width: 69,
@@ -340,6 +419,12 @@ const styles = StyleSheet.create({
   petRow:  { gap: 0 },
   petCard: {
     height: PET_SECTION_H,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  petCardInner: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
