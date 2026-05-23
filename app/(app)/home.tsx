@@ -663,80 +663,22 @@ export default function HomeScreen() {
                 </>
               )}
 
-              {/* ── Tasks tab ───────────────────────────────── */}
-              {activePage2Tab === 'tasks' && (
-                <>
-                  <Text style={styles.greetName}>Tasks</Text>
-                  <Text style={styles.greetSub}>all pending missions.</Text>
-                  {pendingTasks.length === 0 ? (
-                    <Text style={styles.emptyTasks}>No pending tasks — add one to get started!</Text>
-                  ) : (
-                    <>
-                      {deadlineTasks.length > 0 && (
-                        <>
-                          <Text style={styles.sectionLabel}>deadlines</Text>
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.taskRow}
-                            nestedScrollEnabled
-                          >
-                            {deadlineTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                            ))}
-                          </ScrollView>
-                        </>
-                      )}
-                      {dailyTasks.length > 0 && (
-                        <>
-                          <Text style={styles.sectionLabel}>daily</Text>
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.taskRow}
-                            nestedScrollEnabled
-                          >
-                            {dailyTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                            ))}
-                          </ScrollView>
-                        </>
-                      )}
-                      <TouchableOpacity
-                        style={styles.viewAllBtn}
-                        onPress={() => router.push('/(app)/missions' as any)}
-                        activeOpacity={0.75}
-                      >
-                        <Text style={styles.viewAllText}>View full task manager →</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </>
-              )}
-
-              {/* ── Stats tab ───────────────────────────────── */}
-              {activePage2Tab === 'stats' && (
-                <>
-                  <Text style={styles.greetName}>Stats</Text>
-                  <Text style={styles.greetSub}>your focus journey.</Text>
-                  <View style={styles.gaugeCard}>
-                    <Text style={styles.statsPlaceholder}>
-                      {'Sessions this week: —\nFocus time today: —'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.viewAllBtn}
-                    onPress={() => router.push('/(app)/stats' as any)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={styles.viewAllText}>View full statistics →</Text>
-                  </TouchableOpacity>
-                </>
-              )}
             </Reanimated.ScrollView>
 
-            {/* Tab bar lives INSIDE the dark card — slides with it */}
-            <EmbeddedTabBar active={activePage2Tab} onPress={setActivePage2Tab} />
+            {/* Tab bar lives INSIDE the dark card — slides with it.
+                Home stays inline; Tasks + Stats navigate to the real pink screens. */}
+            <EmbeddedTabBar
+              active={activePage2Tab}
+              onPress={(tab) => {
+                if (tab === 'tasks') {
+                  router.push('/(app)/missions' as any);
+                } else if (tab === 'stats') {
+                  router.push('/(app)/stats' as any);
+                } else {
+                  setActivePage2Tab(tab);
+                }
+              }}
+            />
           </View>{/* /PAGE 2 */}
 
         </Reanimated.View>
@@ -978,15 +920,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.55)',
     fontSize: 13,
     letterSpacing: 0.2,
-  },
-
-  statsPlaceholder: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 14,
-    lineHeight: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    textAlign: 'center',
   },
 
   // ── Pink return-arrow on Page 2 ──────────────────────────────
