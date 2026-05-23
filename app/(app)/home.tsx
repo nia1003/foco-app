@@ -244,9 +244,8 @@ export default function HomeScreen() {
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
-  const [carouselLocked, setCarouselLocked]           = useState(false);
 
-  // ref for programmatic scroll-to-center on lock
+  // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const carouselRef = useRef<any>(null);
 
@@ -423,8 +422,8 @@ export default function HomeScreen() {
     const def    = UNLOCKED_DEFS[idx];
     const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
     if (record?.id) usePetStore.getState().setActivePet(record.id);
-    // Lock after pet snaps to center — scrollEnabled will become false
-    setCarouselLocked(true);
+    // Smooth-scroll to guarantee perfect horizontal centre after momentum ends
+    carouselRef.current?.scrollTo({ x: idx * PET_CARD_W, animated: true });
   };
 
   // Tap pet → show random greeting (no keyboard)
@@ -495,7 +494,6 @@ export default function HomeScreen() {
               <Animated.ScrollView
                 ref={carouselRef}
                 horizontal
-                scrollEnabled={!carouselLocked}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={[
                   styles.petRow,
@@ -546,18 +544,6 @@ export default function HomeScreen() {
                   );
                 })}
               </Animated.ScrollView>
-
-              {/* ── Carousel lock toggle ─── */}
-              {carouselLocked && (
-                <TouchableOpacity
-                  style={styles.unlockCarouselBtn}
-                  onPress={() => setCarouselLocked(false)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
-                >
-                  <Text style={styles.unlockCarouselText}>↔ change pet</Text>
-                </TouchableOpacity>
-              )}
 
               {/* ── Chat overlay — pure text, no bg/border ─── */}
               {chat.visible && (
@@ -849,12 +835,12 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   chatReplyText: {
-    color: INK,
-    fontSize: 15,
+    color: '#1A1622',        // exact spec: #1A1622
+    fontSize: 12,            // reduced from 15 → 12pt per spec
     fontFamily: 'Fraunces_500Medium',
     fontWeight: '500',
     backgroundColor: 'transparent',
-    lineHeight: 20,
+    lineHeight: 17,
     marginBottom: 6,
   },
   chatInputText: {
@@ -903,6 +889,7 @@ const styles = StyleSheet.create({
   },
   page2Scroll: {
     flex: 1,
+    backgroundColor: DARK_BG,   // prevents white flash on iOS over-scroll bounce
   },
   page2Content: {
     paddingTop: 52,
@@ -1002,25 +989,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── Carousel lock (Change 1) ─────────────────────────────────
-  unlockCarouselBtn: {
-    position: 'absolute',
-    bottom: 56,
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,200,239,0.28)',
-    zIndex: 40,
-  },
-  unlockCarouselText: {
-    fontSize: 12,
-    color: '#c07090',
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-
-  // ── Pink return-arrow on Page 2 (Change 3) ──────────────────
+  // ── Pink return-arrow on Page 2 ──────────────────────────────
   page2ReturnArrow: {
     position: 'absolute',
     top: 14,
