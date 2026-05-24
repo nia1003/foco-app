@@ -1,20 +1,29 @@
 import { Platform, StyleSheet } from 'react-native';
 import type { AppTheme } from '@/hooks/useAppTheme';
 
-export function createStatsStyles({ colors, surfaces }: AppTheme) {
+const BG   = '#EFE8E0';
+const CARD = '#E6E6E6';
+const INK  = '#1a1622';
+
+export function createStatsStyles({ colors }: AppTheme) {
   return StyleSheet.create({
-    root: { flex: 1 },
+    root: { flex: 1, backgroundColor: BG },
     scroll: { flex: 1 },
     scrollContent: { paddingHorizontal: 18, paddingBottom: 120 },
+    flatCard: {
+      backgroundColor: CARD,
+      borderRadius: 20,
+      overflow: 'hidden',
+    },
     title: {
       fontFamily: 'Fraunces_500Medium',
       fontSize: 42,
       fontWeight: '500',
-      color: colors.ink,
+      color: INK,
       marginTop: 12,
       letterSpacing: -0.5,
     },
-    sub: { fontSize: 13, color: colors.inkSoft, marginTop: 4 },
+    sub: { fontSize: 13, color: 'rgba(26,22,34,0.55)', marginTop: 4 },
     summaryRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
     summaryCard: { flex: 1 },
     summaryInner: { padding: 14 },
@@ -22,13 +31,13 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
       fontFamily: 'Fraunces_500Medium',
       fontSize: 22,
       fontWeight: '500',
-      color: colors.ink,
+      color: INK,
       letterSpacing: -0.4,
     },
     summaryLabel: {
       fontSize: 9,
       fontWeight: '700',
-      color: colors.inkFaint,
+      color: 'rgba(26,22,34,0.45)',
       letterSpacing: 1.4,
       textTransform: 'uppercase',
       marginTop: 6,
@@ -37,18 +46,18 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
     calEyebrow: {
       fontSize: 11,
       fontWeight: '700',
-      color: colors.inkFaint,
+      color: 'rgba(26,22,34,0.45)',
       letterSpacing: 1.4,
       textTransform: 'uppercase',
       marginBottom: 10,
     },
     calInner: { padding: 16 },
     chartCard: { padding: 22, paddingTop: 26, overflow: 'visible' },
-    chartTitle: { fontSize: 14, fontWeight: '600', color: colors.ink },
+    chartTitle: { fontSize: 14, fontWeight: '600', color: INK },
     chartTitleLeft: { alignSelf: 'flex-start' },
     chartSub: {
       fontSize: 11,
-      color: colors.inkFaint,
+      color: 'rgba(26,22,34,0.45)',
       marginTop: 4,
       marginBottom: 4,
       alignSelf: 'flex-start',
@@ -63,9 +72,9 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
     periodModeLabel: {
       fontSize: 12,
       fontWeight: '600',
-      color: colors.inkFaint,
+      color: 'rgba(26,22,34,0.40)',
     },
-    periodModeLabelActive: { color: colors.pinkText },
+    periodModeLabelActive: { color: INK },
     chartNav: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -75,13 +84,13 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
       paddingHorizontal: 2,
     },
     chartNavBtn: { padding: 4 },
-    chartNavArrow: { fontSize: 22, color: colors.inkSoft, fontWeight: '300' },
-    chartNavArrowDisabled: { color: colors.inkFaint, opacity: 0.35 },
+    chartNavArrow: { fontSize: 22, color: 'rgba(26,22,34,0.55)', fontWeight: '300' },
+    chartNavArrowDisabled: { opacity: 0.25 },
     chartPeriodLabel: {
       flex: 1,
       fontSize: 12,
       fontWeight: '500',
-      color: colors.inkSoft,
+      color: 'rgba(26,22,34,0.55)',
       textAlign: 'center',
     },
     chartTitleRow: {
@@ -90,11 +99,11 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
       justifyContent: 'space-between',
       marginBottom: 18,
     },
-    chartTitleChevron: { fontSize: 20, color: colors.inkFaint },
+    chartTitleChevron: { fontSize: 20, color: 'rgba(26,22,34,0.40)' },
     selectedDetail: { marginTop: 10 },
     selectedDetailText: {
       fontSize: 12,
-      color: colors.inkSoft,
+      color: 'rgba(26,22,34,0.55)',
       textAlign: 'center',
     },
     breakdownCard: { padding: 22, alignItems: 'center' },
@@ -107,8 +116,8 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
     },
     dominantEmoji: { fontSize: 28, fontWeight: '700' },
     dominantInfo: { flex: 1 },
-    dominantLabel: { fontSize: 15, fontWeight: '600', color: colors.ink },
-    dominantSub: { fontSize: 12, color: colors.inkSoft, marginTop: 2 },
+    dominantLabel: { fontSize: 15, fontWeight: '600', color: INK },
+    dominantSub: { fontSize: 12, color: 'rgba(26,22,34,0.55)', marginTop: 2 },
     dominantBadge: {
       paddingHorizontal: 10,
       paddingVertical: 4,
@@ -123,35 +132,35 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
       gap: 12,
       paddingVertical: 10,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: surfaces.dividerStrong,
+      borderBottomColor: 'rgba(26,22,34,0.12)',
     },
     sessionDot: {
       width: 7,
       height: 7,
       borderRadius: 4,
       flexShrink: 0,
-      backgroundColor: surfaces.sessionDot,
+      backgroundColor: INK,
     },
     sessionInfo: { flex: 1 },
     sessionTitle: {
       fontSize: 14,
       fontWeight: '600',
-      color: colors.ink,
+      color: INK,
       textTransform: 'capitalize',
     },
-    sessionSub: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
+    sessionSub: { fontSize: 11, color: 'rgba(26,22,34,0.55)', marginTop: 2 },
     sessionRight: { alignItems: 'flex-end', gap: 1 },
     sessionXP: {
       fontSize: 14,
       fontWeight: '700',
-      color: colors.pinkText,
+      color: INK,
       letterSpacing: -0.3,
     },
-    sessionXPLabel: { fontSize: 9, color: colors.inkFaint, letterSpacing: 0.8 },
+    sessionXPLabel: { fontSize: 9, color: 'rgba(26,22,34,0.45)', letterSpacing: 0.8 },
     shareOpenBtn: {
       marginTop: 20,
-      backgroundColor: surfaces.ctaBg,
-      borderRadius: 8,
+      backgroundColor: '#111111',
+      borderRadius: 14,
       paddingVertical: 14,
       alignItems: 'center',
     },
@@ -159,7 +168,7 @@ export function createStatsStyles({ colors, surfaces }: AppTheme) {
       fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
       fontSize: 13,
       fontWeight: '700',
-      color: surfaces.ctaText,
+      color: '#ffffff',
       letterSpacing: 2,
     },
   });
