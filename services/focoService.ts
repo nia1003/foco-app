@@ -12,28 +12,22 @@ function xpNextLevel(level: number): number {
   return level < 5 ? XP_THRESHOLDS[level] : 900;
 }
 
-// ── pet-chat（呼叫 Supabase Edge Function → Claude Haiku）────
+// ── pet-chat（呼叫 Supabase Edge Function → Together AI）────
 export async function chatWithPet(petId: string, message: string): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  const { data, error } = await supabase.functions.invoke('pet-chat', {
+    body: { petId, message },
+  });
 
-  const res = await fetch(
-    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/pet-chat`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ petId, message }),
-    },
-  );
+  if (error) {
+    // FunctionsHttpError has a context.status; extract it when available
+    const status = (error as { context?: { status?: number } }).context?.status;
+    if (status === 429) throw new Error('rate_limited');
+    throw new Error(error.message ?? 'ai_error');
+  }
 
-  if (res.status === 429) throw new Error('rate_limited');
-  if (!res.ok) throw new Error('ai_error');
-
-  const { reply } = await res.json();
-  return reply as string;
+  const reply = data?.reply as string | undefined;
+  if (!reply) throw new Error('empty_reply');
+  return reply;
 }
 
 // ── session-complete（呼叫 Supabase Edge Function）

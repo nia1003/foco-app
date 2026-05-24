@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
@@ -38,6 +39,7 @@ import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { chatWithPet, getPets } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
@@ -238,6 +240,7 @@ export default function HomeScreen() {
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
   const { tasks, addTask, fetchTasks } = useTaskStore();
+  const avatarUri = usePreferencesStore((s) => s.avatarUri);
 
   const storePool = pets.length > 0 ? pets : mockPets;
 
@@ -251,8 +254,8 @@ export default function HomeScreen() {
   const carouselRef = useRef<any>(null);
 
   // Pet chat state
-  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string; loading: boolean }>({
-    visible: false, msg: '', text: '', loading: false,
+  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string; loading: boolean; err: string }>({
+    visible: false, msg: '', text: '', loading: false, err: '',
   });
   const chatInputRef = useRef<TextInput>(null);
 
@@ -332,7 +335,7 @@ export default function HomeScreen() {
 
   // Reset chat when user swipes to a different pet
   useEffect(() => {
-    setChat({ visible: false, msg: '', text: '', loading: false });
+    setChat({ visible: false, msg: '', text: '', loading: false, err: '' });
   }, [activeCarouselIndex]);
 
   // Sync carousel to stored active pet on mount
@@ -407,6 +410,7 @@ export default function HomeScreen() {
       msg: pool[Math.floor(Math.random() * pool.length)],
       text: '',
       loading: false,
+      err: '',
     });
     setTimeout(() => chatInputRef.current?.focus(), 50);
   }, [play, activePetDef]);
@@ -415,12 +419,17 @@ export default function HomeScreen() {
   const handleChatSubmit = useCallback(async () => {
     const text = chat.text.trim();
     if (!text || chat.loading) return;
-    setChat((p) => ({ ...p, text: '', loading: true }));
+    setChat((p) => ({ ...p, text: '', loading: true, err: '' }));
     try {
       const reply = await chatWithPet(activePetDef.id, text);
       setChat((p) => ({ ...p, msg: reply, loading: false }));
-    } catch {
-      setChat((p) => ({ ...p, loading: false }));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'error';
+      const friendly =
+        msg === 'rate_limited' ? '請稍等一下再聊～' :
+        msg === 'Not authenticated' ? '請先登入再和我說話！' :
+        '嗚…我現在說不出話來 (´；ω；`)';
+      setChat((p) => ({ ...p, loading: false, err: friendly }));
     }
   }, [chat.text, chat.loading, activePetDef]);
 
@@ -508,7 +517,7 @@ export default function HomeScreen() {
               {chat.visible && (
                 <View style={styles.chatOverlay} pointerEvents="box-none">
                   <Text style={styles.chatReplyText}>
-                    {chat.loading ? '···' : chat.msg}
+                    {chat.loading ? '···' : chat.err ? chat.err : chat.msg}
                   </Text>
                   <TextInput
                     ref={chatInputRef}
@@ -541,15 +550,31 @@ export default function HomeScreen() {
           {/* ═══════════════ PAGE 2: light dashboard ═══════════════ */}
           <View style={styles.page2}>
 
-            {/* Back to Page 1 button — top-right corner */}
-            <TouchableOpacity
-              style={styles.page2BackBtn}
-              onPress={goToPage1}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.page2BackIcon}>↑</Text>
-            </TouchableOpacity>
+            {/* Page 2 top bar: ↑ back + FOCO wordmark + avatar */}
+            <View style={styles.page2Bar}>
+              <TouchableOpacity
+                style={styles.page2BarBtn}
+                onPress={goToPage1}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.page2BarBtnIcon}>↑</Text>
+              </TouchableOpacity>
+              <Text style={styles.page2BarWordmark}>FOCO</Text>
+              <TouchableOpacity
+                style={styles.page2BarAvatar}
+                onPress={() => { play('tap'); router.push('/(app)/settings'); }}
+                activeOpacity={0.75}
+              >
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.page2BarAvatarImg} />
+                ) : (
+                  <Text style={styles.page2BarAvatarText}>
+                    {displayName[0]?.toUpperCase() ?? '?'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
             <Reanimated.ScrollView
               style={styles.page2Scroll}
@@ -821,7 +846,7 @@ const styles = StyleSheet.create({
     backgroundColor: DARK_BG,   // prevents white flash on iOS over-scroll bounce
   },
   page2Content: {
-    paddingTop: 52,
+    paddingTop: 16,
     paddingHorizontal: 29,
     paddingBottom: EMBEDDED_TAB_RESERVED,
   },
@@ -926,23 +951,57 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // ── Pink return-arrow on Page 2 ──────────────────────────────
-  page2BackBtn: {
+  // ── Page 2 top bar (replaces absolute back button) ───────────
+  page2Bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    height: 56,
+    flexShrink: 0,
+  },
+  page2BarWordmark: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 6,
+    color: INK,
+    paddingLeft: 6,
+  },
+  page2BarBtn: {
     position: 'absolute',
-    top: 62,
-    right: 18,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    left: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#E6E6E6',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 50,
   },
-  page2BackIcon: {
+  page2BarBtnIcon: {
     fontSize: 16,
     color: INK,
     fontWeight: '600',
     lineHeight: 18,
+  },
+  page2BarAvatar: {
+    position: 'absolute',
+    right: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#c4b5d6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  page2BarAvatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  page2BarAvatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
 });
