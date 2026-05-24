@@ -50,8 +50,8 @@ const PET_SECTION_H = 440;
 const HERO_SECTION_H = SCREEN_H - PET_SECTION_H; // fills rest of page 1
 const EMBEDDED_TAB_RESERVED = 96;
 
-const LIGHT_BG = '#fbfbfb';
-const DARK_BG  = '#252525';
+const LIGHT_BG = '#EFE8E0';
+const DARK_BG  = 'rgba(255,255,255,0.98)';
 const PINK     = '#ffc8ef';
 const INK      = '#1a1622';
 
@@ -91,21 +91,15 @@ const PET_GREETINGS: Record<string, string[]> = {
 function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
   return (
     <View style={taskStyles.card}>
-      <BlurView intensity={32} tint="default" style={StyleSheet.absoluteFillObject} />
-      <View style={[StyleSheet.absoluteFillObject, taskStyles.glassOverlay]} pointerEvents="none" />
-      <View style={taskStyles.glassSheen} pointerEvents="none" />
-      <View style={[StyleSheet.absoluteFillObject, taskStyles.glassBorder]} pointerEvents="none" />
-      <View style={taskStyles.inner}>
-        <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
-        <TouchableOpacity
-          style={taskStyles.btn}
-          onPress={onPress}
-          activeOpacity={0.8}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={taskStyles.arrow}>→</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
+      <TouchableOpacity
+        style={taskStyles.btn}
+        onPress={onPress}
+        activeOpacity={0.8}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Text style={taskStyles.arrow}>→</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -115,27 +109,7 @@ const taskStyles = StyleSheet.create({
     width: 137,
     height: 135,
     borderRadius: 16,
-    overflow: 'hidden',
-  },
-  glassOverlay: {
-    backgroundColor: 'rgba(255,255,255,0.13)',
-    borderRadius: 16,
-  },
-  glassSheen: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: '52%',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  glassBorder: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.30)',
-    borderRadius: 16,
-  },
-  inner: {
-    flex: 1,
+    backgroundColor: '#E6E6E6',
     paddingHorizontal: 18,
     paddingVertical: 16,
     justifyContent: 'space-between',
@@ -144,7 +118,7 @@ const taskStyles = StyleSheet.create({
   title: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#ffffff',
+    color: INK,
     lineHeight: 16,
     alignSelf: 'flex-start',
   },
@@ -152,13 +126,13 @@ const taskStyles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: PINK,
+    backgroundColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
   },
   arrow: {
     fontSize: 18,
-    color: INK,
+    color: '#ffffff',
     fontWeight: '700',
     letterSpacing: 2,
   },
@@ -627,10 +601,6 @@ export default function HomeScreen() {
                       { val: '—', lbl: 'streak\ndays' },
                     ].map((item) => (
                       <View key={item.lbl} style={styles.statsTile}>
-                        <BlurView intensity={32} tint="default" style={StyleSheet.absoluteFillObject} />
-                        <View style={[StyleSheet.absoluteFillObject, styles.statsTileOverlay]} pointerEvents="none" />
-                        <View style={styles.statsTileSheen} pointerEvents="none" />
-                        <View style={[StyleSheet.absoluteFillObject, styles.statsTileBorder]} pointerEvents="none" />
                         <Text style={styles.statsTileVal}>{item.val}</Text>
                         <Text style={styles.statsTileLbl}>{item.lbl}</Text>
                       </View>
@@ -645,7 +615,7 @@ export default function HomeScreen() {
                       onPress={() => openHomeTaskModal('daily')}
                       activeOpacity={0.75}
                     >
-                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                      <Plus size={16} color="#ffffff" strokeWidth={2.8} />
                     </TouchableOpacity>
                   </View>
                   {dailyTasks.length > 0 && (
@@ -670,7 +640,7 @@ export default function HomeScreen() {
                       onPress={() => openHomeTaskModal('task')}
                       activeOpacity={0.75}
                     >
-                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                      <Plus size={16} color="#ffffff" strokeWidth={2.8} />
                     </TouchableOpacity>
                   </View>
                   {deadlineTasks.length > 0 && (
@@ -777,12 +747,12 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: PINK,
+    backgroundColor: '#111111',
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    shadowColor: '#c07090',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
@@ -790,7 +760,7 @@ const styles = StyleSheet.create({
   },
   pinkCircleArrow: {
     fontSize: 18,
-    color: INK,
+    color: '#ffffff',
     fontWeight: '300',
     letterSpacing: 1,
   },
@@ -890,7 +860,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Fraunces_500Medium',
     fontSize: 40,
     fontWeight: '600',
-    color: '#fff',
+    color: INK,
     letterSpacing: -0.4,
     lineHeight: 44,
     marginBottom: 6,
@@ -899,7 +869,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Fraunces_500Medium',
     fontSize: 18,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.65)',
+    color: 'rgba(26,22,34,0.50)',
     letterSpacing: -0.2,
     marginBottom: 22,
   },
@@ -913,46 +883,29 @@ const styles = StyleSheet.create({
   statsTile: {
     flex: 1,
     borderRadius: 16,
-    overflow: 'hidden',
+    backgroundColor: '#E6E6E6',
     paddingVertical: 14,
     paddingHorizontal: 10,
     alignItems: 'center',
     gap: 4,
     minHeight: 72,
   },
-  statsTileOverlay: {
-    backgroundColor: 'rgba(255,255,255,0.13)',
-    borderRadius: 16,
-  },
-  statsTileSheen: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: '52%',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  statsTileBorder: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.30)',
-    borderRadius: 16,
-  },
   statsTileVal: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#ffffff',
+    color: INK,
     letterSpacing: -0.5,
   },
   statsTileLbl: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.50)',
+    color: 'rgba(26,22,34,0.50)',
     textAlign: 'center',
     lineHeight: 13,
   },
 
   sectionLabel: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.71)',
+    color: 'rgba(26,22,34,0.55)',
     letterSpacing: 0.2,
     marginTop: 24,
     marginBottom: 12,
@@ -967,7 +920,7 @@ const styles = StyleSheet.create({
   },
   sectionLabelInHeader: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.71)',
+    color: 'rgba(26,22,34,0.55)',
     letterSpacing: 0.2,
     lineHeight: 18,
   },
@@ -975,10 +928,10 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: PINK,
+    backgroundColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.95,
+    opacity: 0.90,
   },
 
 
@@ -988,7 +941,7 @@ const styles = StyleSheet.create({
   },
 
   emptyTasks: {
-    color: 'rgba(255,255,255,0.45)',
+    color: 'rgba(26,22,34,0.40)',
     fontSize: 14,
     marginTop: 24,
     textAlign: 'center',
@@ -1015,7 +968,7 @@ const styles = StyleSheet.create({
   },
   page2ReturnArrowIcon: {
     fontSize: 22,
-    color: PINK,
+    color: INK,
     fontWeight: '700',
     lineHeight: 26,
   },
