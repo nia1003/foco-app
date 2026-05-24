@@ -9,6 +9,7 @@ interface TaskStore {
   tasksLastFetchedAt: number | null;
   setTasks: (tasks: Task[]) => void;
   addTask: (task: Task) => void;
+  updateTask: (task: Task) => void;
   removeTask: (taskId: string) => void;
   fetchTasks: (userId: string | null, options?: { force?: boolean }) => Promise<void>;
   reset: () => void;
@@ -36,6 +37,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   addTask: (task) =>
     set((state) => ({
       tasks: [normalizeTask(task), ...state.tasks.filter((t) => t.id !== task.id)],
+    })),
+
+  updateTask: (task) =>
+    set((state) => ({
+      tasks: state.tasks.map((item) =>
+        item.id === task.id ? normalizeTask(task) : item,
+      ),
     })),
 
   removeTask: (taskId) =>
