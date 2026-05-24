@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -90,15 +91,20 @@ const PET_GREETINGS: Record<string, string[]> = {
 function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
   return (
     <View style={taskStyles.card}>
-      <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
-      <TouchableOpacity
-        style={taskStyles.btn}
-        onPress={onPress}
-        activeOpacity={0.8}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Text style={taskStyles.arrow}>→</Text>
-      </TouchableOpacity>
+      <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, taskStyles.glassOverlay]} pointerEvents="none" />
+      <View style={[StyleSheet.absoluteFillObject, taskStyles.glassBorder]} pointerEvents="none" />
+      <View style={taskStyles.inner}>
+        <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
+        <TouchableOpacity
+          style={taskStyles.btn}
+          onPress={onPress}
+          activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={taskStyles.arrow}>→</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -107,33 +113,42 @@ const taskStyles = StyleSheet.create({
   card: {
     width: 137,
     height: 135,
-    backgroundColor: 'rgba(255,255,255,0.90)',
-    borderRadius: 11,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  glassOverlay: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+  },
+  glassBorder: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.90)',
-    paddingHorizontal: 22,
-    paddingVertical: 18,
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 16,
+  },
+  inner: {
+    flex: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    overflow: 'hidden',
   },
   title: {
     fontSize: 12,
     fontWeight: '600',
-    color: INK,
+    color: '#ffffff',
     lineHeight: 16,
     alignSelf: 'flex-start',
   },
   btn: {
-    width: 44,
-    height: 44,
-    borderRadius: 34,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: PINK,
     alignItems: 'center',
     justifyContent: 'center',
   },
   arrow: {
-    fontSize: 20,
+    fontSize: 18,
     color: INK,
     fontWeight: '700',
     letterSpacing: 2,
@@ -597,18 +612,19 @@ export default function HomeScreen() {
 
                   {/* Stats preview row */}
                   <View style={styles.statsRow}>
-                    <View style={styles.statsTile}>
-                      <Text style={styles.statsTileVal}>—</Text>
-                      <Text style={styles.statsTileLbl}>sessions{'\n'}this week</Text>
-                    </View>
-                    <View style={styles.statsTile}>
-                      <Text style={styles.statsTileVal}>—</Text>
-                      <Text style={styles.statsTileLbl}>focus time{'\n'}today</Text>
-                    </View>
-                    <View style={styles.statsTile}>
-                      <Text style={styles.statsTileVal}>—</Text>
-                      <Text style={styles.statsTileLbl}>streak{'\n'}days</Text>
-                    </View>
+                    {[
+                      { val: '—', lbl: 'sessions\nthis week' },
+                      { val: '—', lbl: 'focus time\ntoday' },
+                      { val: '—', lbl: 'streak\ndays' },
+                    ].map((item) => (
+                      <View key={item.lbl} style={styles.statsTile}>
+                        <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFillObject} />
+                        <View style={[StyleSheet.absoluteFillObject, styles.statsTileOverlay]} pointerEvents="none" />
+                        <View style={[StyleSheet.absoluteFillObject, styles.statsTileBorder]} pointerEvents="none" />
+                        <Text style={styles.statsTileVal}>{item.val}</Text>
+                        <Text style={styles.statsTileLbl}>{item.lbl}</Text>
+                      </View>
+                    ))}
                   </View>
 
                   {/* Daily tasks preview */}
@@ -668,7 +684,12 @@ export default function HomeScreen() {
                   {/* Timer */}
                   <Text style={styles.sectionLabel}>timer</Text>
                   <View style={styles.gaugeCard}>
-                    <TimerGauge value={durationMin} onChange={setDurationMin} />
+                    <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFillObject} />
+                    <View style={[StyleSheet.absoluteFillObject, styles.gaugeGlassOverlay]} pointerEvents="none" />
+                    <View style={[StyleSheet.absoluteFillObject, styles.gaugeGlassBorder]} pointerEvents="none" />
+                    <View style={styles.gaugeInner}>
+                      <TimerGauge value={durationMin} onChange={setDurationMin} />
+                    </View>
                   </View>
                 </>
               )}
@@ -888,12 +909,22 @@ const styles = StyleSheet.create({
   },
   statsTile: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 16,
+    overflow: 'hidden',
     paddingVertical: 14,
     paddingHorizontal: 10,
     alignItems: 'center',
     gap: 4,
+    minHeight: 72,
+  },
+  statsTileOverlay: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+  },
+  statsTileBorder: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 16,
   },
   statsTileVal: {
     fontSize: 22,
@@ -940,8 +971,19 @@ const styles = StyleSheet.create({
   },
 
   gaugeCard: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 20,
+    overflow: 'hidden',
+  },
+  gaugeGlassOverlay: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+  },
+  gaugeGlassBorder: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 20,
+  },
+  gaugeInner: {
     paddingVertical: 14,
     alignItems: 'center',
   },
