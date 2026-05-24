@@ -34,7 +34,7 @@ const PET_PROMPTS: Record<string, string> = {
 禁止：廢話、感嘆號、超過 20 字。`,
 }
 
-const TOGETHER_API_URL = 'https://api.together.xyz/v1/chat/completions'
+const TOGETHER_API_URL = 'https://api.together.ai/v1/chat/completions'
 const TOGETHER_MODEL   = 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free'
 
 serve(async (req: Request) => {
@@ -97,11 +97,12 @@ serve(async (req: Request) => {
     // ── Call Together AI ───────────────────────────────────────
     const togetherKey = Deno.env.get('TOGETHER_API_KEY') ?? ''
     if (!togetherKey) {
-      console.error('TOGETHER_API_KEY not set')
+      console.error('[pet-chat] TOGETHER_API_KEY is not set in Supabase Secrets')
       return new Response(JSON.stringify({ error: 'ai_error' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    console.log('[pet-chat] calling Together AI, petId:', petId)
 
     const systemPrompt = PET_PROMPTS[petId] ?? PET_PROMPTS['sunion']
 
@@ -125,11 +126,12 @@ serve(async (req: Request) => {
 
     if (!togetherRes.ok) {
       const err = await togetherRes.text()
-      console.error('Together AI error:', togetherRes.status, err)
-      return new Response(JSON.stringify({ error: 'ai_error' }), {
+      console.error('[pet-chat] Together AI error:', togetherRes.status, err)
+      return new Response(JSON.stringify({ error: 'ai_error', detail: togetherRes.status }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    console.log('[pet-chat] Together AI success')
 
     const togetherData = await togetherRes.json()
     const reply: string = togetherData.choices?.[0]?.message?.content?.trim() ?? '...'
