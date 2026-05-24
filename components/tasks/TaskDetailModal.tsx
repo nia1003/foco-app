@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Animated,
-  Easing,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -10,14 +9,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Edit3 } from 'lucide-react-native';
-import { TaskIcon } from '@/components/tasks/TaskIcon';
-import { TaskIconPickerContent } from '@/components/tasks/TaskIconPickerContent';
-import { DEFAULT_TASK_ICON, type TaskIconValue } from '@/lib/taskIcon';
 import { useSound } from '@/components/SoundProvider';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { TaskIcon } from '@/components/tasks/TaskIcon';
+import { TaskIconPickerContent } from '@/components/tasks/TaskIconPickerContent';
+import { DEFAULT_TASK_ICON, type TaskIconValue } from '@/lib/taskIcon';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -26,14 +24,16 @@ import { mockPets } from '@/data/mockData';
 import { useFocusLaunch } from '@/hooks/useFocusLaunch';
 import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
 import { updateTask as updateTaskApi } from '@/services/focoService';
-import type { Task } from '@/types';
-import MissionsScreen from './index';
 
-export default function MissionTaskScreen() {
-  const params = useLocalSearchParams<{ id?: string | string[] }>();
-  const router = useRouter();
+interface Props {
+  visible: boolean;
+  taskId: string | null;
+  onClose: () => void;
+}
+
+export function TaskDetailModal({ visible, taskId, onClose }: Props) {
   const { play } = useSound();
-  const { colors } = useAppTheme();
+  const { colors, surfaces } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const { launchFocus } = useFocusLaunch();
 
@@ -41,16 +41,7 @@ export default function MissionTaskScreen() {
   const { pets, activePet } = usePetStore();
   const focusDurationMin = usePreferencesStore((s) => s.focusDurationMin);
   const { tasks, fetchTasks, updateTask: updateTaskInStore } = useTaskStore();
-  const backdropOpacity = useMemo(() => new Animated.Value(0), []);
-  const sheetOpacity = useMemo(() => new Animated.Value(0), []);
-  const sheetTranslateY = useMemo(() => new Animated.Value(22), []);
-  const sheetScale = useMemo(() => new Animated.Value(0.98), []);
-
-  const taskId = Array.isArray(params.id) ? params.id[0] : params.id ?? '';
-  const task = useMemo(
-    () => tasks.find((item) => item.id === taskId) ?? null,
-    [tasks, taskId],
-  );
+  const task = useMemo(() => tasks.find((item) => item.id === taskId) ?? null, [tasks, taskId]);
   const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
 
   const [editing, setEditing] = useState(false);
@@ -59,44 +50,13 @@ export default function MissionTaskScreen() {
   const [icon, setIcon] = useState<TaskIconValue>(DEFAULT_TASK_ICON);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [fetchAttempted, setFetchAttempted] = useState(false);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(backdropOpacity, {
-        toValue: 1,
-        duration: 180,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetOpacity, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetTranslateY, {
-        toValue: 0,
-        duration: 240,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetScale, {
-        toValue: 1,
-        duration: 240,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [backdropOpacity, sheetOpacity, sheetScale, sheetTranslateY]);
-
-  useEffect(() => {
-    if (!userId) {
-      setFetchAttempted(true);
-      return;
+    if (!visible) return;
+    if (userId) {
+      fetchTasks(userId, { force: true }).catch(() => {});
     }
-    fetchTasks(userId, { force: true }).finally(() => setFetchAttempted(true));
-  }, [userId, fetchTasks]);
+  }, [visible, userId, fetchTasks]);
 
   useEffect(() => {
     if (!task) return;
@@ -131,6 +91,7 @@ export default function MissionTaskScreen() {
   const handleStart = async () => {
     if (!task) return;
     play('tap');
+    onClose();
     const setup = buildSetup({
       taskMode: 'existing',
       selectedTaskId: task.id,
@@ -168,96 +129,12 @@ export default function MissionTaskScreen() {
     }
   };
 
-  const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 140,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetOpacity, {
-        toValue: 0,
-        duration: 140,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetTranslateY, {
-        toValue: 18,
-        duration: 160,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetScale, {
-        toValue: 0.98,
-        duration: 160,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(() => router.replace('/(app)/missions'));
-  };
-
-  if (!task) {
-    return (
-      <View style={styles.root}>
-        <MissionsScreen />
-        <Pressable style={styles.backdrop} onPress={handleClose}>
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.backdropTint, { opacity: backdropOpacity }]}
-          />
-          <Animated.View
-            style={[
-              styles.sheet,
-              {
-                opacity: sheetOpacity,
-                transform: [
-                  { translateY: sheetTranslateY },
-                  { scale: sheetScale },
-                ],
-              },
-            ]}
-          >
-            <Text style={styles.title}>
-              {fetchAttempted ? 'Task not found' : 'Loading task'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {fetchAttempted
-                ? 'The task may have been deleted.'
-                : 'Fetching the latest task details.'}
-            </Text>
-            <TouchableOpacity style={styles.createBtn} onPress={handleClose} activeOpacity={0.85}>
-              <Text style={styles.createText}>Back</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </Pressable>
-      </View>
-    );
-  }
-
-  const isReadOnly = !editing;
+  if (!visible) return null;
 
   return (
-    <View style={styles.root}>
-      <MissionsScreen />
-      <Pressable style={styles.backdrop} onPress={handleClose}>
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.backdropTint, { opacity: backdropOpacity }]}
-        />
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              opacity: sheetOpacity,
-              transform: [
-                { translateY: sheetTranslateY },
-                { scale: sheetScale },
-              ],
-            },
-          ]}
-        >
-          <Pressable onPress={(e) => e.stopPropagation()}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           {iconPickerOpen ? (
             <>
               <TouchableOpacity
@@ -281,9 +158,25 @@ export default function MissionTaskScreen() {
             </>
           ) : (
             <>
-              <Text style={styles.title}>{editing ? 'Edit Task' : 'Task Details'}</Text>
+              <View style={styles.headerRow}>
+                <Text style={styles.title}>{editing ? 'Edit Task' : 'Task Details'}</Text>
+                <TouchableOpacity
+                  style={[styles.editBtn, editing && styles.editBtnActive]}
+                  onPress={() => {
+                    play('tap');
+                    setEditing((value) => !value);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Edit3 size={15} color={editing ? colors.pinkText : colors.inkSoft} />
+                  <Text style={[styles.editBtnText, editing && styles.editBtnTextActive]}>
+                    {editing ? 'Editing' : 'Edit'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.subtitle}>
-                {task.category === 'daily' ? 'Daily mission' : 'Standard task'}
+                {task?.category === 'daily' ? 'Daily mission' : 'Standard task'}
               </Text>
 
               <TouchableOpacity
@@ -298,37 +191,21 @@ export default function MissionTaskScreen() {
                 <View style={styles.iconPreview}>
                   <TaskIcon icon={icon} size={26} />
                 </View>
-                <Text style={styles.iconBtnLabel}>
-                  {editing ? 'Change icon' : 'Icon'}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.editBtn, editing && styles.editBtnActive]}
-                  onPress={() => {
-                    play('tap');
-                    setEditing((value) => !value);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Edit3 size={15} color={editing ? colors.pinkText : colors.inkSoft} />
-                  <Text style={[styles.editBtnText, editing && styles.editBtnTextActive]}>
-                    {editing ? 'Editing' : 'Edit'}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.iconBtnLabel}>{editing ? 'Change icon' : 'Icon'}</Text>
               </TouchableOpacity>
 
               <TextInput
-                style={[styles.input, isReadOnly && styles.inputReadOnly]}
+                style={[styles.input, !editing && styles.inputReadOnly]}
                 value={title}
                 onChangeText={setTitle}
                 placeholder="What do you want to focus on?"
                 placeholderTextColor={colors.inkFaint}
                 editable={editing}
                 selectTextOnFocus={editing}
-                autoFocus={false}
               />
 
               <TextInput
-                style={[styles.input, styles.memoInput, isReadOnly && styles.inputReadOnly]}
+                style={[styles.input, styles.memoInput, !editing && styles.inputReadOnly]}
                 value={memo}
                 onChangeText={setMemo}
                 placeholder="Memo"
@@ -338,16 +215,14 @@ export default function MissionTaskScreen() {
                 textAlignVertical="top"
               />
 
-              <Text style={styles.durationHint}>
-                Focus length: {task.duration_min} min
-              </Text>
+              <Text style={styles.durationHint}>Focus length: {task?.duration_min} min</Text>
 
               <View style={styles.actions}>
                 <TouchableOpacity
                   style={styles.cancelBtn}
                   onPress={() => {
                     play('tap');
-                    handleClose();
+                    onClose();
                   }}
                   activeOpacity={0.8}
                 >
@@ -366,24 +241,19 @@ export default function MissionTaskScreen() {
               </View>
             </>
           )}
-          </Pressable>
-        </Animated.View>
+        </Pressable>
       </Pressable>
-    </View>
+    </Modal>
   );
 }
 
-function createStyles({ colors, surfaces }: ReturnType<typeof useAppTheme>) {
+function createStyles({ colors, surfaces }: any) {
   return StyleSheet.create({
-    root: { flex: 1 },
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      flex: 1,
+      backgroundColor: surfaces.modalBackdrop,
       justifyContent: 'center',
       padding: 24,
-    },
-    backdropTint: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: surfaces.modalBackdrop,
     },
     sheet: {
       borderRadius: 24,
@@ -399,31 +269,30 @@ function createStyles({ colors, surfaces }: ReturnType<typeof useAppTheme>) {
       shadowOpacity: 0.2,
       shadowRadius: 24,
     },
+    backRow: { marginBottom: 8, alignSelf: 'flex-start' },
+    backText: { fontSize: 14, fontWeight: '600', color: colors.pinkText },
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 2,
+      gap: 12,
     },
-    headerSpacer: { width: 56 },
-    backRow: { marginBottom: 8, alignSelf: 'flex-start' },
-    backText: { fontSize: 14, fontWeight: '600', color: colors.pinkText },
     title: {
+      flex: 1,
       fontSize: 18,
       fontWeight: '700',
       color: colors.ink,
       textAlign: 'center',
-      flex: 1,
     },
     editBtn: {
-      marginLeft: 'auto',
       minWidth: 56,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 9999,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
       gap: 5,
-      paddingVertical: 6,
-      borderRadius: 9999,
       backgroundColor: surfaces.modalInsetBg,
       borderWidth: 0.5,
       borderColor: surfaces.dividerStrong,
@@ -457,11 +326,7 @@ function createStyles({ colors, surfaces }: ReturnType<typeof useAppTheme>) {
       borderWidth: 0.5,
       borderColor: surfaces.dividerStrong,
     },
-    iconBtnLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.pinkText,
-    },
+    iconBtnLabel: { fontSize: 14, fontWeight: '600', color: colors.pinkText },
     input: {
       fontSize: 16,
       color: colors.ink,
@@ -470,23 +335,10 @@ function createStyles({ colors, surfaces }: ReturnType<typeof useAppTheme>) {
       borderBottomColor: surfaces.divider,
       marginBottom: 10,
     },
-    inputReadOnly: {
-      color: colors.inkSoft,
-    },
-    memoInput: {
-      minHeight: 72,
-      fontSize: 14,
-      lineHeight: 19,
-    },
-    durationHint: {
-      fontSize: 12,
-      color: colors.inkFaint,
-      marginBottom: 18,
-    },
-    actions: {
-      flexDirection: 'row',
-      gap: 10,
-    },
+    inputReadOnly: { color: colors.inkSoft },
+    memoInput: { minHeight: 72, fontSize: 14, lineHeight: 19 },
+    durationHint: { fontSize: 12, color: colors.inkFaint, marginBottom: 18 },
+    actions: { flexDirection: 'row', gap: 10 },
     cancelBtn: {
       flex: 1,
       paddingVertical: 14,
@@ -496,11 +348,7 @@ function createStyles({ colors, surfaces }: ReturnType<typeof useAppTheme>) {
       borderWidth: 0.5,
       borderColor: surfaces.dividerStrong,
     },
-    cancelText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.inkSoft,
-    },
+    cancelText: { fontSize: 14, fontWeight: '600', color: colors.inkSoft },
     createBtn: {
       flex: 1,
       paddingVertical: 14,
@@ -509,40 +357,6 @@ function createStyles({ colors, surfaces }: ReturnType<typeof useAppTheme>) {
       backgroundColor: surfaces.ctaBg,
     },
     createBtnDisabled: { opacity: 0.6 },
-    createText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: surfaces.ctaText,
-    },
-    emptyWrap: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 28,
-    },
-    emptyTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.ink,
-      marginBottom: 8,
-    },
-    emptySub: {
-      fontSize: 13,
-      color: colors.inkFaint,
-      textAlign: 'center',
-      lineHeight: 18,
-    },
-    emptyBtn: {
-      marginTop: 18,
-      paddingHorizontal: 18,
-      paddingVertical: 12,
-      borderRadius: 9999,
-      backgroundColor: surfaces.ctaBg,
-    },
-    emptyBtnText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: surfaces.ctaText,
-    },
+    createText: { fontSize: 14, fontWeight: '700', color: surfaces.ctaText },
   });
 }

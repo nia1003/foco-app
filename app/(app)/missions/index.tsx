@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
@@ -24,6 +23,7 @@ import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
 import { deleteTask } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
+import { TaskDetailModal } from '../../../components/tasks/TaskDetailModal';
 import { TaskIcon } from '@/components/tasks/TaskIcon';
 import { resolveTaskIcon } from '@/lib/taskIcon';
 import type { Task } from '@/types';
@@ -32,7 +32,7 @@ type TabType = 'task' | 'daily';
 
 export default function MissionsScreen() {
   const [tab, setTab] = useState<TabType>('task');
-  const router = useRouter();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet } = usePetStore();
   const { play } = useSound();
@@ -166,7 +166,7 @@ export default function MissionsScreen() {
                   <View style={styles.myTaskCard}>
                     <TouchableOpacity
                       style={styles.taskInfoPressable}
-                      onPress={() => router.push({ pathname: '/(app)/missions/[id]', params: { id: task.id } })}
+                      onPress={() => setSelectedTaskId(task.id)}
                       activeOpacity={0.78}
                     >
                       <View style={styles.taskEmojiWrap}>
@@ -226,6 +226,12 @@ export default function MissionsScreen() {
         onCreated={(task) =>
           addTask({ ...task, category: tab })
         }
+      />
+
+      <TaskDetailModal
+        visible={selectedTaskId !== null}
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
       />
     </View>
   );
