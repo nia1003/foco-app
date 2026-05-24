@@ -28,17 +28,20 @@ import Reanimated, {
   useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { TimerGauge } from '@/components/home/TimerGauge';
+import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { chatWithPet, getPets, getTasks } from '@/services/focoService';
-import { mockPets, mockTasks } from '@/data/mockData';
-import type { Task } from '@/types';
+import { useTaskStore } from '@/stores/taskStore';
+import { chatWithPet, getPets } from '@/services/focoService';
+import { mockPets } from '@/data/mockData';
+import type { Task, TaskCategory } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PET_CARD_W    = Math.round(SCREEN_W * 0.72);
@@ -237,13 +240,14 @@ export default function HomeScreen() {
   const { play } = useSound();
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
+  const { tasks, addTask, fetchTasks } = useTaskStore();
 
   const storePool = pets.length > 0 ? pets : mockPets;
 
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
-  const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
+  const [addTaskCategory, setAddTaskCategory]         = useState<TaskCategory | null>(null);
 
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -346,9 +350,6 @@ export default function HomeScreen() {
   }, [page]);
 
   // ── Staleness guard ─────────────────────────────────────────────
-  const tasksLastFetchedAt = useRef<number | null>(null);
-  const TASKS_STALE_MS = 5 * 60 * 1000;
-
   // ── Data fetching ───────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
@@ -361,21 +362,8 @@ export default function HomeScreen() {
   }, [userId]);
 
   useEffect(() => {
-    if (!userId) {
-      setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
-      tasksLastFetchedAt.current = null;
-      return;
-    }
-    const isStale = !tasksLastFetchedAt.current ||
-      Date.now() - tasksLastFetchedAt.current > TASKS_STALE_MS;
-    if (!isStale) return;
-    getTasks(userId)
-      .then((res) => {
-        setPendingTasks(res.tasks.filter((t) => t.status === 'pending'));
-        tasksLastFetchedAt.current = Date.now();
-      })
-      .catch(() => setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')));
-  }, [userId]);
+    fetchTasks(userId).catch(() => {});
+  }, [userId, fetchTasks]);
 
   // Reset chat when user swipes to a different pet
   useEffect(() => {
@@ -398,8 +386,9 @@ export default function HomeScreen() {
     (p) => p.name.toLowerCase() === activePetDef?.id,
   ) ?? storePool[0];
 
-  const deadlineTasks = pendingTasks.filter((t) => t.taskType === 'deadline');
-  const dailyTasks    = pendingTasks.filter((t) => t.taskType === 'daily' || !t.taskType);
+  const pendingTasks  = tasks.filter((t) => t.status === 'pending');
+  const deadlineTasks = pendingTasks.filter((t) => (t.category ?? 'task') === 'task');
+  const dailyTasks    = pendingTasks.filter((t) => (t.category ?? 'task') === 'daily');
 
   // ── Handlers ────────────────────────────────────────────────────
   const goFocus = (task?: Task) => {
@@ -414,6 +403,11 @@ export default function HomeScreen() {
       },
     });
   };
+
+  const openHomeTaskModal = useCallback((category: TaskCategory) => {
+    play('tap');
+    setAddTaskCategory(category);
+  }, [play]);
 
   const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const xOffset = e.nativeEvent.contentOffset.x;
@@ -618,37 +612,53 @@ export default function HomeScreen() {
                   </View>
 
                   {/* Daily tasks preview */}
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabelInHeader}>daily tasks</Text>
+                    <TouchableOpacity
+                      style={styles.addTaskBtn}
+                      onPress={() => openHomeTaskModal('daily')}
+                      activeOpacity={0.75}
+                    >
+                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                    </TouchableOpacity>
+                  </View>
                   {dailyTasks.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>daily tasks</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.taskRow}
-                        nestedScrollEnabled
-                      >
-                        {dailyTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                        ))}
-                      </ScrollView>
-                    </>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {dailyTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
                   )}
 
                   {/* Deadline tasks preview */}
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabelInHeader}>deadlines</Text>
+                    <TouchableOpacity
+                      style={styles.addTaskBtn}
+                      onPress={() => openHomeTaskModal('task')}
+                      activeOpacity={0.75}
+                    >
+                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                    </TouchableOpacity>
+                  </View>
                   {deadlineTasks.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>deadlines</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.taskRow}
-                        nestedScrollEnabled
-                      >
-                        {deadlineTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                        ))}
-                      </ScrollView>
-                    </>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {deadlineTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
                   )}
 
                   {dailyTasks.length === 0 && deadlineTasks.length === 0 && (
@@ -683,6 +693,19 @@ export default function HomeScreen() {
 
         </Reanimated.View>
       </GestureDetector>
+
+      <AddTaskModal
+        visible={addTaskCategory !== null}
+        category={addTaskCategory ?? 'task'}
+        defaultDurationMin={durationMin}
+        userId={userId}
+        onClose={() => setAddTaskCategory(null)}
+        onCreated={(task) => {
+          const category = addTaskCategory ?? 'task';
+          addTask({ ...task, category });
+          setAddTaskCategory(null);
+        }}
+      />
     </View>
   );
 }
@@ -891,6 +914,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     marginTop: 24,
     marginBottom: 12,
+  },
+  sectionHeader: {
+    marginTop: 24,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 10,
+  },
+  sectionLabelInHeader: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.71)',
+    letterSpacing: 0.2,
+    lineHeight: 18,
+  },
+  addTaskBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: PINK,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.95,
   },
 
   gaugeCard: {

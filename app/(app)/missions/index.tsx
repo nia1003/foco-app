@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -16,98 +15,19 @@ import { createMissionsStyles } from '@/styles/missionsScreen.styles';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useTaskStore } from '@/stores/taskStore';
 import { useSound } from '@/components/SoundProvider';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { useFocusLaunch } from '@/hooks/useFocusLaunch';
 import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
-import { getTasks, deleteTask } from '@/services/focoService';
-import { mockPets, mockTasks } from '@/data/mockData';
+import { deleteTask } from '@/services/focoService';
+import { mockPets } from '@/data/mockData';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { TaskIcon } from '@/components/tasks/TaskIcon';
 import { resolveTaskIcon } from '@/lib/taskIcon';
-import type { Task, TaskCategory } from '@/types';
+import type { Task } from '@/types';
 
 type TabType = 'task' | 'daily';
-
-type Quest = {
-  id: string;
-  title: string;
-  sub: string;
-  progress: number;
-  reward: string;
-  emoji: string;
-  duration_min: number;
-  category: TaskCategory;
-};
-
-type QuestsState = Record<TabType, Quest[]>;
-
-const INITIAL_QUESTS: QuestsState = {
-  task: [
-    {
-      id: 'q1',
-      title: 'Morning Focus Sprint',
-      sub: 'Complete 3 sessions before noon',
-      progress: 0.66,
-      reward: '+30 XP',
-      emoji: '🌅',
-      duration_min: 25,
-      category: 'task',
-    },
-    {
-      id: 'q2',
-      title: 'Book Worm',
-      sub: 'Read for 2 hours total',
-      progress: 0.45,
-      reward: '+25 XP',
-      emoji: '📚',
-      duration_min: 50,
-      category: 'task',
-    },
-    {
-      id: 'q3',
-      title: 'Inbox Zero',
-      sub: 'Clear your email queue',
-      progress: 0.2,
-      reward: '+15 XP',
-      emoji: '📬',
-      duration_min: 15,
-      category: 'task',
-    },
-    {
-      id: 'q6',
-      title: 'First Week!',
-      sub: 'Complete 7 days in a row',
-      progress: 0.43,
-      reward: '🏆 Trophy',
-      emoji: '⭐',
-      duration_min: 25,
-      category: 'task',
-    },
-  ],
-  daily: [
-    {
-      id: 'q4',
-      title: 'Daily Checkin',
-      sub: 'Log at least 1 session today',
-      progress: 0.0,
-      reward: '+5 XP',
-      emoji: '✅',
-      duration_min: 15,
-      category: 'daily',
-    },
-    {
-      id: 'q5',
-      title: 'Flow State',
-      sub: 'Complete a 50-min session',
-      progress: 0.0,
-      reward: '+20 XP',
-      emoji: '🌊',
-      duration_min: 50,
-      category: 'daily',
-    },
-  ],
-};
 
 export default function MissionsScreen() {
   const [tab, setTab] = useState<TabType>('task');
@@ -120,8 +40,7 @@ export default function MissionsScreen() {
   const focusDurationMin = usePreferencesStore((s) => s.focusDurationMin);
   const avatarUri = usePreferencesStore((s) => s.avatarUri);
 
-  const [tasks, setTasks] = useState<Task[]>(mockTasks.tasks);
-  const [questsState, setQuestsState] = useState<QuestsState>(INITIAL_QUESTS);
+  const { tasks, addTask, removeTask, fetchTasks } = useTaskStore();
   const [addTaskOpen, setAddTaskOpen] = useState(false);
 
   const displayName = userName ?? userEmail?.split('@')[0] ?? '?';
@@ -129,19 +48,11 @@ export default function MissionsScreen() {
   const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
 
   useEffect(() => {
-    if (!userId) return;
-    getTasks(userId)
-      .then((res) =>
-        setTasks(
-          res.tasks.map((t) => ({ ...t, category: t.category ?? 'task' })),
-        ),
-      )
-      .catch(() => {});
-  }, [userId]);
+    fetchTasks(userId).catch(() => {});
+  }, [userId, fetchTasks]);
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending');
   const tabTasks = pendingTasks.filter((t) => (t.category ?? 'task') === tab);
-  const currentQuests = questsState[tab];
 
   const buildSetup = (
     partial: Partial<FocusQuickSetupValue>,
@@ -149,7 +60,7 @@ export default function MissionsScreen() {
     taskMode: 'none',
     selectedTaskId: null,
     newIconType: 'emoji',
-    newIcon: '📚',
+    newIcon: '??',
     newTitle: '',
     newMemo: '',
     selectedPetId: activePet?.id ?? modalPets[0]?.id ?? null,
@@ -176,7 +87,7 @@ export default function MissionsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setTasks((prev) => prev.filter((t) => t.id !== taskId));
+            removeTask(taskId);
             deleteTask(taskId).catch(() => {
               Alert.alert('Delete failed', 'Network error. Please try again.');
             });
@@ -184,22 +95,6 @@ export default function MissionsScreen() {
         },
       ],
     );
-  };
-
-  const handleDeleteQuest = (questId: string, questTitle: string) => {
-    Alert.alert('Remove quest', `Remove "${questTitle}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          setQuestsState((prev) => ({
-            ...prev,
-            [tab]: prev[tab].filter((q) => q.id !== questId),
-          }));
-        },
-      },
-    ]);
   };
 
   return (
@@ -223,7 +118,9 @@ export default function MissionsScreen() {
             }}
             activeOpacity={0.75}
           >
-            <Text style={styles.addBtnText}>+ Task</Text>
+            <Text style={styles.addBtnText}>
+              {tab === 'task' ? '+ Deadline' : '+ Daily'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -241,71 +138,9 @@ export default function MissionsScreen() {
               <Text
                 style={[styles.tabLabel, tab === t && styles.tabLabelActive]}
               >
-                {t === 'task' ? 'Task' : 'Daily'}
+                {t === 'task' ? 'Deadline' : 'Daily'}
               </Text>
             </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.list}>
-          {currentQuests.length === 0 && (
-            <FrostCard radius={20} padded={false}>
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>
-                  No quests in this category.
-                </Text>
-              </View>
-            </FrostCard>
-          )}
-
-          {currentQuests.map((q) => (
-            <View key={q.id} style={styles.myTaskWrap}>
-              <FrostCard radius={20} padded={false}>
-                <View style={styles.myTaskCard}>
-                  <View style={styles.taskEmojiWrap}>
-                    <Text style={styles.taskEmoji}>{q.emoji}</Text>
-                  </View>
-                  <View style={styles.myTaskInfo}>
-                    <Text style={styles.myTaskTitle}>{q.title}</Text>
-                    <Text style={styles.myTaskSub}>{q.sub}</Text>
-                    <View style={styles.progressBg}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${q.progress * 100}%` as `${number}%` },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.questReward}>{q.duration_min} min</Text>
-                  </View>
-                  <View style={styles.taskActions}>
-                    <TouchableOpacity
-                      style={styles.myTaskStartBtn}
-                      onPress={() =>
-                        startFocus(
-                          { taskMode: 'none' },
-                          { fallbackTitle: `${q.emoji} ${q.title}` },
-                        )
-                      }
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.myTaskStartIcon}>▶</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteBtn}
-                      onPress={() => {
-                        play('tap');
-                        handleDeleteQuest(q.id, q.title);
-                      }}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Trash2 size={16} color={colors.inkFaint} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </FrostCard>
-            </View>
           ))}
         </View>
 
@@ -315,13 +150,15 @@ export default function MissionsScreen() {
           {tabTasks.length === 0 && (
             <FrostCard radius={20} padded={false}>
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No tasks in this category.</Text>
+                <Text style={styles.emptyText}>
+                  No {tab === 'task' ? 'deadline' : 'daily'} tasks yet.
+                </Text>
               </View>
             </FrostCard>
           )}
 
           <View style={styles.taskList}>
-            {tabTasks.map((task) => (
+            {tabTasks.map((task: Task) => (
               <View key={task.id} style={styles.myTaskWrap}>
                 <FrostCard radius={20} padded={false}>
                   <View style={styles.myTaskCard}>
@@ -350,7 +187,7 @@ export default function MissionsScreen() {
                         }
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.myTaskStartIcon}>▶</Text>
+                        <Text style={styles.myTaskStartIcon}>→</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.deleteBtn}
@@ -379,7 +216,7 @@ export default function MissionsScreen() {
         userId={userId}
         onClose={() => setAddTaskOpen(false)}
         onCreated={(task) =>
-          setTasks((prev) => [{ ...task, category: tab }, ...prev])
+          addTask({ ...task, category: tab })
         }
       />
     </View>
