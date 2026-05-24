@@ -16,8 +16,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { useRouter } from 'expo-router';
-import { AppBackground } from '@/components/ui/AppBackground';
-import { FrostCard } from '@/components/ui/FrostCard';
+// AppBackground and FrostCard replaced with flat #EFE8E0 / #E6E6E6 styling
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
@@ -789,16 +788,14 @@ export default function StatsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { backgroundColor: screenBg }]}>
-        <AppBackground />
+      <View style={styles.root}>
         <FocoBar avatar={settingsAvatar} avatarUri={avatarUri} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: screenBg }]}>
-      <AppBackground />
+    <View style={styles.root}>
       <FocoBar avatar={settingsAvatar} avatarUri={avatarUri} />
 
       <ScrollView
@@ -817,12 +814,12 @@ export default function StatsScreen() {
             { v: `${summary.streak_days}d`, l: 'Streak' },
           ].map((s, i) => (
             <View key={i} style={styles.summaryCard}>
-              <FrostCard radius={20} padded={false}>
+              <View style={styles.flatCard}>
                 <View style={styles.summaryInner}>
                   <Text style={styles.summaryVal}>{s.v}</Text>
                   <Text style={styles.summaryLabel}>{s.l}</Text>
                 </View>
-              </FrostCard>
+              </View>
             </View>
           ))}
         </View>
@@ -830,7 +827,7 @@ export default function StatsScreen() {
         {/* ── Focus Calendar (from Home) ─────────────── */}
         <View style={styles.section}>
           <Text style={styles.calEyebrow}>FOCUS HISTORY</Text>
-          <FrostCard radius={24} padded={false}>
+          <View style={styles.flatCard}>
             <View style={styles.calInner}>
               <FocusCalendar
                 year={calYear}
@@ -839,12 +836,12 @@ export default function StatsScreen() {
                 onMonthChange={handleMonthChange}
               />
             </View>
-          </FrostCard>
+          </View>
         </View>
 
         {/* ── Line chart ─────────────────────────────── */}
         <View style={styles.section}>
-          <FrostCard radius={28} padded={false}>
+          <View style={styles.flatCard}>
             <View style={styles.chartCard}>
               <Text style={styles.chartTitle}>Daily Focus Time</Text>
 
@@ -914,12 +911,12 @@ export default function StatsScreen() {
                 </View>
               )}
             </View>
-          </FrostCard>
+          </View>
         </View>
 
         {/* ── Focus by task category ─────────────────── */}
         <View style={styles.section}>
-          <FrostCard radius={24} padded={false}>
+          <View style={styles.flatCard}>
             <View style={[styles.breakdownCard, styles.breakdownCardStretch]}>
               <Text style={[styles.chartTitle, styles.chartTitleLeft]}>
                 Focus Breakdown
@@ -955,7 +952,7 @@ export default function StatsScreen() {
                 emptyText="No focus data yet"
               />
             </View>
-          </FrostCard>
+          </View>
         </View>
 
         {/* ── Focus type breakdown ────────────────────── */}
@@ -970,7 +967,7 @@ export default function StatsScreen() {
               });
             }}
           >
-            <FrostCard radius={24} padded={false}>
+            <View style={styles.flatCard}>
               <View style={styles.breakdownCard}>
                 <View style={styles.chartTitleRow}>
                   <Text style={styles.chartTitle}>Focus type breakdown</Text>
@@ -1020,14 +1017,14 @@ export default function StatsScreen() {
                   <RadarChart data={discData} />
                 </View>
               </View>
-            </FrostCard>
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* ── Recent sessions ─────────────────────────── */}
         {sessions.length > 0 && (
           <View style={styles.section}>
-            <FrostCard radius={24} padded={false}>
+            <View style={styles.flatCard}>
               <View style={styles.recentCard}>
                 <Text style={styles.chartTitle}>Recent sessions</Text>
                 {sessions.slice(0, 5).map((s) => {
@@ -1061,7 +1058,7 @@ export default function StatsScreen() {
                   );
                 })}
               </View>
-            </FrostCard>
+            </View>
           </View>
         )}
 
