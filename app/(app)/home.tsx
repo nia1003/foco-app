@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   NativeScrollEvent,
@@ -28,6 +29,7 @@ import Reanimated, {
   useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Check, Plus, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -36,8 +38,9 @@ import { TimerGauge } from '@/components/home/TimerGauge';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { chatWithPet, getPets, getTasks } from '@/services/focoService';
-import { mockPets, mockTasks } from '@/data/mockData';
+import { useTaskStore } from '@/stores/taskStore';
+import { chatWithPet, createTask, getPets } from '@/services/focoService';
+import { mockPets } from '@/data/mockData';
 import type { Task } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -100,6 +103,60 @@ function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
   );
 }
 
+function AddDailyTaskCard({
+  value,
+  error,
+  loading,
+  onChange,
+  onCancel,
+  onSubmit,
+}: {
+  value: string;
+  error: string | null;
+  loading: boolean;
+  onChange: (value: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <View style={[taskStyles.card, taskStyles.addCard]}>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder="New daily task"
+        placeholderTextColor="rgba(26,22,34,0.38)"
+        style={taskStyles.addInput}
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={onSubmit}
+      />
+      {error && <Text style={taskStyles.addError} numberOfLines={1}>{error}</Text>}
+      <View style={taskStyles.addActions}>
+        <TouchableOpacity
+          style={[taskStyles.iconBtn, taskStyles.cancelBtn]}
+          onPress={onCancel}
+          activeOpacity={0.75}
+          disabled={loading}
+        >
+          <X size={16} color={INK} strokeWidth={2.6} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[taskStyles.iconBtn, taskStyles.confirmBtn]}
+          onPress={onSubmit}
+          activeOpacity={0.75}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={INK} />
+          ) : (
+            <Check size={17} color={INK} strokeWidth={2.8} />
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 const taskStyles = StyleSheet.create({
   card: {
     width: 137,
@@ -134,6 +191,42 @@ const taskStyles = StyleSheet.create({
     color: INK,
     fontWeight: '700',
     letterSpacing: 2,
+  },
+  addCard: {
+    gap: 6,
+  },
+  addInput: {
+    width: '100%',
+    minHeight: 44,
+    padding: 0,
+    color: INK,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 17,
+  },
+  addError: {
+    color: '#9d3354',
+    fontSize: 10,
+    lineHeight: 12,
+  },
+  addActions: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: 'rgba(26,22,34,0.08)',
+  },
+  confirmBtn: {
+    backgroundColor: PINK,
   },
 });
 
@@ -237,13 +330,21 @@ export default function HomeScreen() {
   const { play } = useSound();
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
+  const { tasks, addTask, fetchTasks } = useTaskStore();
 
   const storePool = pets.length > 0 ? pets : mockPets;
 
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
-  const [pendingTasks, setPendingTasks]               = useState<Task[]>([]);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
+  const [isAddingDailyTask, setIsAddingDailyTask]     = useState(false);
+  const [dailyTaskTitle, setDailyTaskTitle]           = useState('');
+  const [dailyTaskError, setDailyTaskError]           = useState<string | null>(null);
+  const [dailyTaskSaving, setDailyTaskSaving]         = useState(false);
+  const [isAddingDeadlineTask, setIsAddingDeadlineTask] = useState(false);
+  const [deadlineTaskTitle, setDeadlineTaskTitle]       = useState('');
+  const [deadlineTaskError, setDeadlineTaskError]       = useState<string | null>(null);
+  const [deadlineTaskSaving, setDeadlineTaskSaving]     = useState(false);
 
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -346,9 +447,6 @@ export default function HomeScreen() {
   }, [page]);
 
   // ── Staleness guard ─────────────────────────────────────────────
-  const tasksLastFetchedAt = useRef<number | null>(null);
-  const TASKS_STALE_MS = 5 * 60 * 1000;
-
   // ── Data fetching ───────────────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
@@ -361,21 +459,8 @@ export default function HomeScreen() {
   }, [userId]);
 
   useEffect(() => {
-    if (!userId) {
-      setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending'));
-      tasksLastFetchedAt.current = null;
-      return;
-    }
-    const isStale = !tasksLastFetchedAt.current ||
-      Date.now() - tasksLastFetchedAt.current > TASKS_STALE_MS;
-    if (!isStale) return;
-    getTasks(userId)
-      .then((res) => {
-        setPendingTasks(res.tasks.filter((t) => t.status === 'pending'));
-        tasksLastFetchedAt.current = Date.now();
-      })
-      .catch(() => setPendingTasks(mockTasks.tasks.filter((t) => t.status === 'pending')));
-  }, [userId]);
+    fetchTasks(userId).catch(() => {});
+  }, [userId, fetchTasks]);
 
   // Reset chat when user swipes to a different pet
   useEffect(() => {
@@ -398,8 +483,9 @@ export default function HomeScreen() {
     (p) => p.name.toLowerCase() === activePetDef?.id,
   ) ?? storePool[0];
 
-  const deadlineTasks = pendingTasks.filter((t) => t.taskType === 'deadline');
-  const dailyTasks    = pendingTasks.filter((t) => t.taskType === 'daily' || !t.taskType);
+  const pendingTasks  = tasks.filter((t) => t.status === 'pending');
+  const deadlineTasks = pendingTasks.filter((t) => (t.category ?? 'task') === 'task');
+  const dailyTasks    = pendingTasks.filter((t) => (t.category ?? 'task') === 'daily');
 
   // ── Handlers ────────────────────────────────────────────────────
   const goFocus = (task?: Task) => {
@@ -414,6 +500,120 @@ export default function HomeScreen() {
       },
     });
   };
+
+  const openDailyTaskComposer = useCallback(() => {
+    play('tap');
+    setDailyTaskError(null);
+    setIsAddingDailyTask(true);
+  }, [play]);
+
+  const cancelDailyTaskComposer = useCallback(() => {
+    play('tap');
+    setDailyTaskTitle('');
+    setDailyTaskError(null);
+    setIsAddingDailyTask(false);
+  }, [play]);
+
+  const handleCreateDailyTask = useCallback(async () => {
+    const title = dailyTaskTitle.trim();
+    if (!title) {
+      setDailyTaskError('Add a title');
+      return;
+    }
+    if (dailyTaskSaving) return;
+
+    setDailyTaskSaving(true);
+    setDailyTaskError(null);
+    try {
+      let task: Task;
+      if (userId) {
+        const created = await createTask(userId, title, durationMin, { category: 'daily' });
+        task = {
+          ...created,
+          status: created.status ?? 'pending',
+          category: 'daily',
+          taskType: 'daily',
+        };
+      } else {
+        task = {
+          id: `local-daily-${Date.now()}`,
+          user_id: 'mock-user-001',
+          title,
+          duration_min: durationMin,
+          status: 'pending',
+          category: 'daily',
+          created_at: new Date().toISOString(),
+          taskType: 'daily',
+        };
+      }
+
+      addTask(task);
+      setDailyTaskTitle('');
+      setIsAddingDailyTask(false);
+      play('toggle_on');
+    } catch {
+      setDailyTaskError('Could not save');
+    } finally {
+      setDailyTaskSaving(false);
+    }
+  }, [dailyTaskTitle, dailyTaskSaving, userId, durationMin, addTask, play]);
+
+  const openDeadlineTaskComposer = useCallback(() => {
+    play('tap');
+    setDeadlineTaskError(null);
+    setIsAddingDeadlineTask(true);
+  }, [play]);
+
+  const cancelDeadlineTaskComposer = useCallback(() => {
+    play('tap');
+    setDeadlineTaskTitle('');
+    setDeadlineTaskError(null);
+    setIsAddingDeadlineTask(false);
+  }, [play]);
+
+  const handleCreateDeadlineTask = useCallback(async () => {
+    const title = deadlineTaskTitle.trim();
+    if (!title) {
+      setDeadlineTaskError('Add a title');
+      return;
+    }
+    if (deadlineTaskSaving) return;
+
+    setDeadlineTaskSaving(true);
+    setDeadlineTaskError(null);
+    try {
+      let task: Task;
+      if (userId) {
+        const created = await createTask(userId, title, durationMin, { category: 'task' });
+        task = {
+          ...created,
+          status: created.status ?? 'pending',
+          category: 'task',
+          taskType: 'deadline',
+        };
+      } else {
+        task = {
+          id: `local-deadline-${Date.now()}`,
+          user_id: 'mock-user-001',
+          title,
+          duration_min: durationMin,
+          status: 'pending',
+          category: 'task',
+          created_at: new Date().toISOString(),
+          taskType: 'deadline',
+        };
+      }
+
+      addTask(task);
+      setDeadlineTaskTitle('');
+      setIsAddingDeadlineTask(false);
+      play('toggle_on');
+    } catch {
+      setDeadlineTaskError('Could not save');
+    } finally {
+      setDeadlineTaskSaving(false);
+    }
+  }, [deadlineTaskTitle, deadlineTaskSaving, userId, durationMin, addTask, play]);
 
   const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const xOffset = e.nativeEvent.contentOffset.x;
@@ -618,40 +818,84 @@ export default function HomeScreen() {
                   </View>
 
                   {/* Daily tasks preview */}
-                  {dailyTasks.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>daily tasks</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.taskRow}
-                        nestedScrollEnabled
-                      >
-                        {dailyTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                        ))}
-                      </ScrollView>
-                    </>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabelInHeader}>daily tasks</Text>
+                    <TouchableOpacity
+                      style={styles.addTaskBtn}
+                      onPress={openDailyTaskComposer}
+                      activeOpacity={0.75}
+                      disabled={isAddingDailyTask}
+                    >
+                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                    </TouchableOpacity>
+                  </View>
+                  {(dailyTasks.length > 0 || isAddingDailyTask) && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {isAddingDailyTask && (
+                        <AddDailyTaskCard
+                          value={dailyTaskTitle}
+                          error={dailyTaskError}
+                          loading={dailyTaskSaving}
+                          onChange={(value) => {
+                            setDailyTaskTitle(value);
+                            if (dailyTaskError) setDailyTaskError(null);
+                          }}
+                          onCancel={cancelDailyTaskComposer}
+                          onSubmit={handleCreateDailyTask}
+                        />
+                      )}
+                      {dailyTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
                   )}
 
                   {/* Deadline tasks preview */}
-                  {deadlineTasks.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>deadlines</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.taskRow}
-                        nestedScrollEnabled
-                      >
-                        {deadlineTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                        ))}
-                      </ScrollView>
-                    </>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabelInHeader}>deadlines</Text>
+                    <TouchableOpacity
+                      style={styles.addTaskBtn}
+                      onPress={openDeadlineTaskComposer}
+                      activeOpacity={0.75}
+                      disabled={isAddingDeadlineTask}
+                    >
+                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                    </TouchableOpacity>
+                  </View>
+                  {(deadlineTasks.length > 0 || isAddingDeadlineTask) && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {isAddingDeadlineTask && (
+                        <AddDailyTaskCard
+                          value={deadlineTaskTitle}
+                          error={deadlineTaskError}
+                          loading={deadlineTaskSaving}
+                          onChange={(value) => {
+                            setDeadlineTaskTitle(value);
+                            if (deadlineTaskError) setDeadlineTaskError(null);
+                          }}
+                          onCancel={cancelDeadlineTaskComposer}
+                          onSubmit={handleCreateDeadlineTask}
+                        />
+                      )}
+                      {deadlineTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
                   )}
 
-                  {dailyTasks.length === 0 && deadlineTasks.length === 0 && (
+                  {dailyTasks.length === 0 && deadlineTasks.length === 0 && !isAddingDailyTask && !isAddingDeadlineTask && (
                     <Text style={styles.emptyTasks}>No pending tasks — you're all clear 🎉</Text>
                   )}
 
@@ -891,6 +1135,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     marginTop: 24,
     marginBottom: 12,
+  },
+  sectionHeader: {
+    marginTop: 24,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 10,
+  },
+  sectionLabelInHeader: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.71)',
+    letterSpacing: 0.2,
+    lineHeight: 18,
+  },
+  addTaskBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: PINK,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.95,
   },
 
   gaugeCard: {
