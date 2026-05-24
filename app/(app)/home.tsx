@@ -248,6 +248,7 @@ export default function HomeScreen() {
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
   const [addTaskCategory, setAddTaskCategory]         = useState<TaskCategory | null>(null);
+  const [page2ScrollEnabled, setPage2ScrollEnabled]   = useState(true);
 
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -581,6 +582,7 @@ export default function HomeScreen() {
               contentContainerStyle={styles.page2Content}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={page2ScrollEnabled}
             >
               {/* ── Home tab: Dashboard ─────────────────────── */}
               {activePage2Tab === 'home' && (
@@ -658,7 +660,12 @@ export default function HomeScreen() {
 
                   {/* Timer */}
                   <Text style={styles.sectionLabel}>timer</Text>
-                  <TimerGauge value={durationMin} onChange={setDurationMin} />
+                  <TimerGauge
+                    value={durationMin}
+                    onChange={setDurationMin}
+                    onDragStart={() => setPage2ScrollEnabled(false)}
+                    onDragEnd={() => setPage2ScrollEnabled(true)}
+                  />
                 </>
               )}
 

@@ -41,11 +41,17 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const CHART_W = SCREEN_W - 80;
 
 // ── DISC config ──────────────────────────────────────────────────
+// ── Brand palette ─────────────────────────────────────────────
+const C_BLUE   = '#B5E0FF';
+const C_PURPLE = '#ECC5FE';
+const C_LIME   = '#E6FF97';
+const C_PINK   = '#FFC9EF';
+
 const DISC_COLOR: Record<string, string> = {
-  conscientiousness: '#4A90E2',
-  dominance: Colors.pinkText,
-  steadiness: '#5BAD6F',
-  influence: '#F5A623',
+  conscientiousness: C_BLUE,
+  dominance:         C_PURPLE,
+  steadiness:        C_LIME,
+  influence:         C_PINK,
 };
 
 const DISC_ICON: Record<string, string> = {
@@ -281,14 +287,8 @@ type CategoryStat = {
 type FocusGroupMode = 'category' | 'task';
 
 const TASK_NAME_COLORS = [
-  Colors.pinkText,
-  '#5BAD6F',
-  '#4E7CB2',
-  '#F5A623',
-  Colors.pinkSoft,
-  '#94C2DA',
-  '#c98fa8',
-  Colors.inkFaint,
+  C_PURPLE, C_BLUE, C_LIME, C_PINK,
+  '#D4AAFE', '#91CFFF', '#CFFF6E', '#FFAADE',
 ];
 
 function resolveSessionTaskLabel(
@@ -339,21 +339,21 @@ function buildCategoryFocusStats(
       label: 'Task',
       hours: taskSec / 3600,
       pct: taskSec / total,
-      color: Colors.pinkText,
+      color: C_BLUE,
     },
     {
       key: 'daily',
       label: 'Daily',
       hours: dailySec / 3600,
       pct: dailySec / total,
-      color: '#5BAD6F',
+      color: C_PURPLE,
     },
     {
       key: 'free',
       label: 'Free focus',
       hours: freeSec / 3600,
       pct: freeSec / total,
-      color: Colors.inkFaint,
+      color: C_LIME,
     },
   ];
 }
@@ -501,13 +501,13 @@ function LineChart({
         {/* Gradient-like area fill */}
         <Polygon
           points={areaStr}
-          fill={isDark ? 'rgba(201,143,168,0.22)' : 'rgba(242,206,220,0.30)'}
+          fill="rgba(236,197,254,0.25)"
         />
 
         <Polyline
           points={polylineStr}
           fill="none"
-          stroke={colors.pinkHot}
+          stroke={C_PURPLE}
           strokeWidth={2.5}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -516,15 +516,8 @@ function LineChart({
         {pts.map((p, i) =>
           i === selectedIndex ? (
             <React.Fragment key={i}>
-              <Circle
-                cx={p.x}
-                cy={p.y}
-                r={12}
-                fill={
-                  isDark ? 'rgba(201,143,168,0.15)' : 'rgba(232,120,90,0.12)'
-                }
-              />
-              <Circle cx={p.x} cy={p.y} r={5.5} fill={colors.pinkHot} />
+              <Circle cx={p.x} cy={p.y} r={12} fill="rgba(236,197,254,0.20)" />
+              <Circle cx={p.x} cy={p.y} r={5.5} fill={C_PURPLE} />
             </React.Fragment>
           ) : (
             <Circle
@@ -532,7 +525,7 @@ function LineChart({
               cx={p.x}
               cy={p.y}
               r={3.5}
-              fill={isDark ? 'rgba(201,143,168,0.45)' : 'rgba(232,120,90,0.45)'}
+              fill="rgba(236,197,254,0.60)"
             />
           ),
         )}
@@ -620,14 +613,14 @@ function RadarChart({ data }: { data: Record<string, number> }) {
       {/* Data fill */}
       <Polygon
         points={polygonPoints}
-        fill="rgba(242,140,100,0.20)"
-        stroke={Colors.pinkHot}
+        fill="rgba(236,197,254,0.30)"
+        stroke={C_PURPLE}
         strokeWidth={2}
       />
 
       {/* Data dots */}
       {dataPoints.map((p, i) => (
-        <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill={Colors.pinkHot} />
+        <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill={C_PURPLE} />
       ))}
 
       {/* Icon labels */}
@@ -997,14 +990,14 @@ export default function StatsScreen() {
                       styles.dominantBadge,
                       {
                         backgroundColor:
-                          (DISC_COLOR[dominant] ?? Colors.pinkHot) + '22',
+                          (DISC_COLOR[dominant] ?? C_PURPLE) + '22',
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.dominantBadgeText,
-                        { color: DISC_COLOR[dominant] ?? Colors.pinkHot },
+                        { color: DISC_COLOR[dominant] ?? C_PURPLE },
                       ]}
                     >
                       {Math.round((discData[dominant] ?? 0) * 100)}%
