@@ -41,12 +41,14 @@ export function AddTaskModal({
   const styles = useThemedStyles(createStyles);
 
   const [title, setTitle] = useState('');
+  const [memo, setMemo] = useState('');
   const [icon, setIcon] = useState<TaskIconValue>(DEFAULT_TASK_ICON);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const resetForm = useCallback(() => {
     setTitle('');
+    setMemo('');
     setIcon(DEFAULT_TASK_ICON);
     setIconPickerOpen(false);
     setSaving(false);
@@ -71,6 +73,7 @@ export function AddTaskModal({
       Alert.alert('Title required', 'Enter a task name to continue.');
       return;
     }
+    const trimmedMemo = memo.trim();
     setSaving(true);
     try {
       if (!userId) {
@@ -84,6 +87,7 @@ export function AddTaskModal({
           created_at: new Date().toISOString(),
           icon_type: icon.type,
           icon_value: icon.value,
+          ...(trimmedMemo ? { memo: trimmedMemo } : {}),
         };
         play('tap');
         onCreated(local);
@@ -95,6 +99,7 @@ export function AddTaskModal({
         category,
         icon_type: icon.type,
         icon_value: icon.value,
+        ...(trimmedMemo ? { memo: trimmedMemo } : {}),
       });
       play('tap');
       onCreated(created);
@@ -169,6 +174,16 @@ export function AddTaskModal({
                 placeholder="What do you want to focus on?"
                 placeholderTextColor={colors.inkFaint}
                 autoFocus
+              />
+
+              <TextInput
+                style={[styles.input, styles.memoInput]}
+                value={memo}
+                onChangeText={setMemo}
+                placeholder="Memo"
+                placeholderTextColor={colors.inkFaint}
+                multiline
+                textAlignVertical="top"
               />
 
               <Text style={styles.durationHint}>
@@ -270,6 +285,11 @@ function createStyles({ colors, surfaces }: AppTheme) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: surfaces.divider,
       marginBottom: 10,
+    },
+    memoInput: {
+      minHeight: 72,
+      fontSize: 14,
+      lineHeight: 19,
     },
     durationHint: {
       fontSize: 12,

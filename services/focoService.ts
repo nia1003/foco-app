@@ -128,12 +128,24 @@ function calcStreak(endedAtList: string[]): number {
 
 // ── getTasks ──────────────────────────────────
 export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
-  const { data, error } = await supabase
+  const baseSelect = 'id, user_id, title, duration_min, status, category, created_at, icon_type, icon_value, completion_percent';
+  let { data, error }: { data: unknown[] | null; error: any } = await supabase
     .from('tasks')
-    .select('id, user_id, title, duration_min, status, category, created_at, icon_type, icon_value, completion_percent')
+    .select(`${baseSelect}, memo`)
     .eq('user_id', userId)
     .neq('status', 'deleted')        // 軟刪除：status='deleted' 的不顯示
     .order('created_at', { ascending: false });
+
+  if (error) {
+    const fallback = await supabase
+      .from('tasks')
+      .select(baseSelect)
+      .eq('user_id', userId)
+      .neq('status', 'deleted')
+      .order('created_at', { ascending: false });
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   return {
@@ -153,6 +165,7 @@ export async function createTask(
     category?: 'task' | 'daily';
     icon_type?: 'emoji' | 'svg';
     icon_value?: string;
+    memo?: string;
   },
 ): Promise<Task> {
   const category = options?.category ?? 'task';
@@ -166,12 +179,26 @@ export async function createTask(
     row.icon_type = options.icon_type;
     row.icon_value = options.icon_value;
   }
+  if (options?.memo) {
+    row.memo = options.memo;
+  }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('tasks')
     .insert(row)
     .select()
     .single();
+
+  if (error && options?.memo) {
+    delete row.memo;
+    const fallback = await supabase
+      .from('tasks')
+      .insert(row)
+      .select()
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   return data as Task;
