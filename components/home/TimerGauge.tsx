@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Dimensions, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, PanResponder, StyleSheet, Text, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 
 const MIN_VAL = 5;
@@ -97,16 +97,11 @@ export function TimerGauge({ value, onChange }: Props) {
         />
       </Svg>
 
-      {/* Value display */}
-      <View style={styles.numWrap} pointerEvents="none">
+      {/* Number centred inside arc bowl */}
+      <View style={styles.numOverlay} pointerEvents="none">
         <Text style={styles.num}>{value}</Text>
         <Text style={styles.unit}>MIN</Text>
       </View>
-
-      {/* BEFORE pill */}
-      <TouchableOpacity style={styles.beforeBtn} activeOpacity={0.7}>
-        <Text style={styles.beforeText}>BEFORE</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -116,7 +111,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 22,
     paddingTop: 18,
-    paddingBottom: 20,
+    paddingBottom: 18,
     paddingHorizontal: 16,
     alignItems: 'center',
     width: '100%',
@@ -126,10 +121,12 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
-  numWrap: {
+  numOverlay: {
+    position: 'absolute',
+    top: SVG_H * 0.38,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginTop: 2,
-    marginBottom: 14,
   },
   num: {
     fontSize: 54,
@@ -144,17 +141,5 @@ const styles = StyleSheet.create({
     color: '#aaaaaa',
     letterSpacing: 3,
     marginTop: 1,
-  },
-  beforeBtn: {
-    backgroundColor: '#f2f2f2',
-    borderRadius: 20,
-    paddingHorizontal: 22,
-    paddingVertical: 7,
-  },
-  beforeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#888888',
-    letterSpacing: 2.5,
   },
 });
