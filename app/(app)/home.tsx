@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -36,12 +37,13 @@ import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { TimerGauge } from '@/components/home/TimerGauge';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useTaskStore } from '@/stores/taskStore';
-import { chatWithPet, getPets } from '@/services/focoService';
+import { chatWithPet, getPets, deleteTask } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
 import type { Task, TaskCategory } from '@/types';
 
@@ -89,9 +91,37 @@ const PET_GREETINGS: Record<string, string[]> = {
 };
 
 // ── TaskCard ──────────────────────────────────────────────────────────────────
-function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
+function TaskCard({
+  task,
+  onPress,
+  onEdit,
+  onDelete,
+}: {
+  task: Task;
+  onPress: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const handleMenu = () => {
+    Alert.alert(task.title, undefined, [
+      { text: 'Edit', onPress: onEdit },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <View style={taskStyles.card}>
+      {/* ⋮ menu — top right */}
+      <TouchableOpacity
+        style={taskStyles.menuBtn}
+        onPress={handleMenu}
+        activeOpacity={0.6}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        <Text style={taskStyles.menuDots}>⋮</Text>
+      </TouchableOpacity>
+
       <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
       <TouchableOpacity
         style={taskStyles.btn}
@@ -116,12 +146,25 @@ const taskStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  menuBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    padding: 4,
+  },
+  menuDots: {
+    fontSize: 18,
+    color: 'rgba(26,22,34,0.45)',
+    fontWeight: '700',
+    lineHeight: 20,
+  },
   title: {
     fontSize: 12,
     fontWeight: '600',
     color: INK,
     lineHeight: 16,
     alignSelf: 'flex-start',
+    marginTop: 18,
   },
   btn: {
     width: 36,
@@ -239,7 +282,7 @@ export default function HomeScreen() {
   const { play } = useSound();
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
-  const { tasks, addTask, fetchTasks } = useTaskStore();
+  const { tasks, addTask, removeTask, fetchTasks } = useTaskStore();
   const avatarUri = usePreferencesStore((s) => s.avatarUri);
 
   const storePool = pets.length > 0 ? pets : mockPets;
@@ -249,6 +292,7 @@ export default function HomeScreen() {
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
   const [addTaskCategory, setAddTaskCategory]         = useState<TaskCategory | null>(null);
   const [page2ScrollEnabled, setPage2ScrollEnabled]   = useState(true);
+  const [editTaskId, setEditTaskId]                   = useState<string | null>(null);
 
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -433,6 +477,25 @@ export default function HomeScreen() {
       setChat((p) => ({ ...p, loading: false, err: friendly }));
     }
   }, [chat.text, chat.loading, activePetDef]);
+
+  const confirmDeleteTask = useCallback((task: Task) => {
+    Alert.alert(
+      'Delete task',
+      `Delete "${task.title}"?\nFocus sessions will stay in history.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: () => {
+            removeTask(task.id);
+            deleteTask(task.id).catch(() =>
+              Alert.alert('Delete failed', 'Network error. Please try again.'),
+            );
+          },
+        },
+      ],
+    );
+  }, [removeTask]);
 
   // ── Render ──────────────────────────────────────────────────────
   return (
@@ -624,7 +687,13 @@ export default function HomeScreen() {
                       keyboardShouldPersistTaps="handled"
                     >
                       {dailyTasks.map((task) => (
-                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onPress={() => goFocus(task)}
+                          onEdit={() => setEditTaskId(task.id)}
+                          onDelete={() => confirmDeleteTask(task)}
+                        />
                       ))}
                     </ScrollView>
                   )}
@@ -649,7 +718,13 @@ export default function HomeScreen() {
                       keyboardShouldPersistTaps="handled"
                     >
                       {deadlineTasks.map((task) => (
-                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onPress={() => goFocus(task)}
+                          onEdit={() => setEditTaskId(task.id)}
+                          onDelete={() => confirmDeleteTask(task)}
+                        />
                       ))}
                     </ScrollView>
                   )}
@@ -701,6 +776,12 @@ export default function HomeScreen() {
           addTask({ ...task, category });
           setAddTaskCategory(null);
         }}
+      />
+
+      <TaskDetailModal
+        visible={editTaskId !== null}
+        taskId={editTaskId}
+        onClose={() => setEditTaskId(null)}
       />
     </View>
   );
