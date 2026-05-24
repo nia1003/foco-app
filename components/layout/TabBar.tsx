@@ -96,12 +96,12 @@ export function TabBar() {
   const isHome = pathname === '/home' || pathname.endsWith('/home');
   if (isHome) return null;
 
-  const fg = colors.ink;
   const muted = colors.inkSoft;
   const glassColor = surfaces.pillBg;
   const glassBorder = surfaces.pillBorder;
-  const activeBg = surfaces.pillActiveBg;
-  const activeBorder = surfaces.pillActiveBorder;
+  const ACTIVE_COLOR = '#9B59D0';
+  const activeBg = 'rgba(155,89,208,0.15)';
+  const activeBorder = 'rgba(155,89,208,0.28)';
 
   return (
     <View style={styles.wrapper}>
@@ -121,7 +121,7 @@ export function TabBar() {
             tab.id === 'home'
               ? pathname === '/home' || pathname.endsWith('/home')
               : pathname.includes(tab.id);
-          const color = isActive ? fg : muted;
+          const color = isActive ? ACTIVE_COLOR : muted;
 
           return (
             <TouchableOpacity
@@ -136,7 +136,7 @@ export function TabBar() {
                   borderColor: activeBorder,
                 }]} />
               )}
-              {tab.icon(isActive ? fg : muted)}
+              {tab.icon(isActive ? ACTIVE_COLOR : muted)}
               <Text style={[styles.label, { color, fontWeight: isActive ? '600' : '500' }]}>
                 {tab.label}
               </Text>

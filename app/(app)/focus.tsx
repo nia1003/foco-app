@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AppBackground } from '@/components/ui/AppBackground';
+import { FocoBar } from '@/components/layout/FocoBar';
 import { WavyTimer } from '@/components/ui/WavyTimer';
 import { Colors } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
@@ -52,7 +52,7 @@ export default function FocusScreen() {
       : PETS.find((p) => p.id === 'xingwang')) ?? PETS[0];
 
   const { play, playToggle } = useSound();
-  const { surfaces, screenBg } = useAppTheme();
+  const { surfaces } = useAppTheme();
   const [showQuitModal, setShowQuitModal] = React.useState(false);
 
   // Use a ref so handleEnd always reads the latest value and stale closures can't freeze the screen
@@ -193,8 +193,8 @@ export default function FocusScreen() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: screenBg }]}>
-      <AppBackground />
+    <View style={styles.root}>
+      <FocoBar />
 
       <View style={styles.content}>
         {/* Header */}
@@ -318,13 +318,13 @@ export default function FocusScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fbfaf7' },
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
   content: { flex: 1, paddingBottom: 90 },
 
   header: {
     alignItems: 'center',
     paddingHorizontal: 22,
-    paddingTop: 60,
+    paddingTop: 8,
     paddingBottom: 10,
     gap: 6,
   },
@@ -406,11 +406,11 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 14,
     borderRadius: 9999,
-    backgroundColor: '#F2CEDC',
+    backgroundColor: 'rgba(236,197,254,0.40)',
     alignItems: 'center',
     marginBottom: 10,
   },
-  modalQuitText: { fontSize: 14, fontWeight: '700', color: '#b5607a' },
+  modalQuitText: { fontSize: 14, fontWeight: '700', color: '#7B5EA7' },
   modalKeepBtn: {
     width: '100%',
     paddingVertical: 14,

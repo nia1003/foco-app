@@ -11,6 +11,8 @@ import { useAppTheme } from '@/hooks/useAppTheme';
 
 interface FocoBarProps {
   back?: boolean;
+  /** When true, back button shows ↑ (up chevron) instead of ← */
+  backUp?: boolean;
   /** Override the back action (default: router.back()) */
   onBack?: () => void;
   /** Initial letter — opens Settings (same as Home) */
@@ -20,6 +22,7 @@ interface FocoBarProps {
 
 export function FocoBar({
   back = false,
+  backUp = false,
   onBack,
   avatar = null,
   avatarUri = null,
@@ -50,11 +53,19 @@ export function FocoBar({
           onPress={() => { play('transition_down'); onBack ? onBack() : router.back(); }}
           activeOpacity={0.7}
         >
-          {/* Chevron left */}
-          <View style={styles.chevronLeft}>
-            <View style={[styles.chevronArm, { borderColor: mutedColor, transform: [{ rotate: '45deg' }, { translateY: 3 }] }]} />
-            <View style={[styles.chevronArm, { borderColor: mutedColor, transform: [{ rotate: '-45deg' }, { translateY: -3 }] }]} />
-          </View>
+          {backUp ? (
+            /* Chevron up */
+            <View style={styles.chevronLeft}>
+              <View style={[styles.chevronArm, { borderColor: mutedColor, transform: [{ rotate: '-45deg' }, { translateX: 3 }] }]} />
+              <View style={[styles.chevronArm, { borderColor: mutedColor, transform: [{ rotate: '45deg' }, { translateX: -3 }] }]} />
+            </View>
+          ) : (
+            /* Chevron left */
+            <View style={styles.chevronLeft}>
+              <View style={[styles.chevronArm, { borderColor: mutedColor, transform: [{ rotate: '45deg' }, { translateY: 3 }] }]} />
+              <View style={[styles.chevronArm, { borderColor: mutedColor, transform: [{ rotate: '-45deg' }, { translateY: -3 }] }]} />
+            </View>
+          )}
         </TouchableOpacity>
       )}
 

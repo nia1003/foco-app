@@ -32,12 +32,12 @@ function getDotBgFromFocusLevel(level: number, isDark: boolean): string {
   if (level <= 0) {
     return isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,22,34,0.07)';
   }
-  const minOp = isDark ? 0.28 : 0.3;
-  const maxOp = isDark ? 0.92 : 0.9;
+  const minOp = isDark ? 0.28 : 0.30;
+  const maxOp = isDark ? 0.92 : 0.90;
   const op = minOp + Math.min(Math.max(level, 0), 1) * (maxOp - minOp);
   return isDark
-    ? `rgba(201,143,168,${op.toFixed(2)})`
-    : `rgba(181,96,122,${op.toFixed(2)})`;
+    ? `rgba(90,160,220,${op.toFixed(2)})`
+    : `rgba(60,140,200,${op.toFixed(2)})`;
 }
 
 function formatFocusMinutes(sec: number): string {

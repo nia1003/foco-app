@@ -49,7 +49,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PET_CARD_W    = Math.round(SCREEN_W * 0.72);
 const PET_SECTION_H = 440;
 const HERO_SECTION_H = SCREEN_H - PET_SECTION_H; // fills rest of page 1
-const EMBEDDED_TAB_RESERVED = 96;
+const EMBEDDED_TAB_RESERVED = 140;
 
 const LIGHT_BG = '#EFE8E0';
 const DARK_BG  = 'rgba(255,255,255,0.98)';
@@ -299,16 +299,16 @@ const etbStyles = StyleSheet.create({
     position: 'absolute',
     top: 2, bottom: 2, left: 8, right: 8,
     borderRadius: 9999,
-    backgroundColor: 'rgba(26,22,34,0.07)',
+    backgroundColor: 'rgba(155,89,208,0.15)',
     borderWidth: 0.5,
-    borderColor: 'rgba(26,22,34,0.12)',
+    borderColor: 'rgba(155,89,208,0.28)',
   },
   icon: {
     fontSize: 16,
     color: 'rgba(26,22,34,0.35)',
   },
   iconActive: {
-    color: '#1a1622',
+    color: '#9B59D0',
   },
   label: {
     fontSize: 10.5,
@@ -317,7 +317,7 @@ const etbStyles = StyleSheet.create({
     fontWeight: '500',
   },
   labelActive: {
-    color: '#1a1622',
+    color: '#9B59D0',
     fontWeight: '600',
   },
 });
@@ -660,6 +660,7 @@ export default function HomeScreen() {
             {/* Page 2 top bar — reuse FocoBar so safe-area + style match Tasks/Stats */}
             <FocoBar
               back
+              backUp
               onBack={goToPage1}
               avatar={displayName[0]?.toUpperCase() ?? '?'}
               avatarUri={avatarUri}

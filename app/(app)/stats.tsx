@@ -801,13 +801,13 @@ export default function StatsScreen() {
 
         {/* ── Summary row ────────────────────────────── */}
         <View style={styles.summaryRow}>
-          {[
-            { v: `${totalHours}h`, l: 'Total' },
-            { v: String(summary.total_sessions), l: 'Sessions' },
-            { v: `${summary.streak_days}d`, l: 'Streak' },
-          ].map((s, i) => (
+          {([
+            { v: `${totalHours}h`, l: 'Total',    bg: 'rgba(236,197,254,0.40)' },
+            { v: String(summary.total_sessions), l: 'Sessions', bg: 'rgba(181,224,255,0.40)' },
+            { v: `${summary.streak_days}d`, l: 'Streak',   bg: 'rgba(230,255,151,0.40)' },
+          ] as const).map((s, i) => (
             <View key={i} style={styles.summaryCard}>
-              <View style={styles.flatCard}>
+              <View style={[styles.flatCard, { backgroundColor: s.bg }]}>
                 <View style={styles.summaryInner}>
                   <Text style={styles.summaryVal}>{s.v}</Text>
                   <Text style={styles.summaryLabel}>{s.l}</Text>

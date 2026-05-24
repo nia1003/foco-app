@@ -1,69 +1,34 @@
 import React from 'react';
 import {
   Dimensions,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Line as SvgLine, Polygon, Rect } from 'react-native-svg';
 import type { SessionEvent } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const DEFAULT_CARD_W = SCREEN_W - 64;
-const OVERLAY_H = 52;
+
+const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
+const RULE = '- - - - - - - - - - - - - - - - - -';
 
 const QUALITY_LEVELS = [
-  {
-    min: 85,
-    gradient: ['#0f1923', '#162538', '#0c2040'] as const,
-    accent: '#4A8FD4',
-    tagline: 'Exceptional. Every second earned.',
-  },
-  {
-    min: 65,
-    gradient: ['#0a1a10', '#112b18', '#0d3320'] as const,
-    accent: '#5BAD6F',
-    tagline: 'Strong session. Momentum building.',
-  },
-  {
-    min: 40,
-    gradient: ['#1a1500', '#2d2500', '#3c2f00'] as const,
-    accent: '#C9961A',
-    tagline: 'Steady progress. Keep the streak.',
-  },
-  {
-    min: 0,
-    gradient: ['#141218', '#1e1a24', '#18151e'] as const,
-    accent: '#8B8BAE',
-    tagline: 'Every session shapes the habit.',
-  },
+  { min: 85, tag: 'EXCEPTIONAL',  color: '#9B59D0' },
+  { min: 65, tag: 'STRONG',       color: '#4A8FD4' },
+  { min: 40, tag: 'STEADY',       color: '#68A86B' },
+  { min: 0,  tag: 'BUILDING',     color: '#8B8BAE' },
 ] as const;
 
 function getLevel(score: number) {
-  return (
-    QUALITY_LEVELS.find((l) => score >= l.min) ??
-    QUALITY_LEVELS[QUALITY_LEVELS.length - 1]
-  );
+  return QUALITY_LEVELS.find((l) => score >= l.min) ?? QUALITY_LEVELS[QUALITY_LEVELS.length - 1];
 }
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const h = d.getHours().toString().padStart(2, '0');
   const m = d.getMinutes().toString().padStart(2, '0');
   return `${months[d.getMonth()]} ${d.getDate()} · ${h}:${m}`;
@@ -77,25 +42,14 @@ function formatDuration(sec: number): string {
 }
 
 type SegmentType = 'focus' | 'pause' | 'left_app';
+interface Segment { type: SegmentType; widthPct: number }
 
-interface Segment {
-  type: SegmentType;
-  widthPct: number;
-}
-
-function buildSegments(
-  events: SessionEvent[],
-  startedAt: string,
-  totalSec: number,
-): Segment[] {
-  if (!events?.length || totalSec <= 0)
-    return [{ type: 'focus', widthPct: 100 }];
+function buildSegments(events: SessionEvent[], startedAt: string, totalSec: number): Segment[] {
+  if (!events?.length || totalSec <= 0) return [{ type: 'focus', widthPct: 100 }];
   const startMs = new Date(startedAt).getTime();
   const totalMs = totalSec * 1000;
   const endMs = startMs + totalMs;
-  const filtered = events
-    .filter((e) => e.at >= startMs && e.at <= endMs)
-    .sort((a, b) => a.at - b.at);
+  const filtered = events.filter((e) => e.at >= startMs && e.at <= endMs).sort((a, b) => a.at - b.at);
   const segs: Segment[] = [];
   let cursor = startMs;
   let cur: SegmentType = 'focus';
@@ -115,129 +69,8 @@ function buildSegments(
 
 function segColor(type: SegmentType, accent: string): string {
   if (type === 'focus') return accent;
-  if (type === 'pause') return 'rgba(0,0,0,0.12)';
-  return 'rgba(220,50,50,0.40)';
-}
-
-function ClockIcon({
-  size = 15,
-  color = '#333',
-}: {
-  size?: number;
-  color?: string;
-}) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size / 2 - 1.5;
-  return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Circle
-        cx={cx}
-        cy={cy}
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.3}
-      />
-      <SvgLine
-        x1={cx}
-        y1={cy}
-        x2={cx}
-        y2={cy - r * 0.55}
-        stroke={color}
-        strokeWidth={1.3}
-        strokeLinecap="round"
-      />
-      <SvgLine
-        x1={cx}
-        y1={cy}
-        x2={cx + r * 0.45}
-        y2={cy}
-        stroke={color}
-        strokeWidth={1.3}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-function BarsIcon({
-  size = 15,
-  color = '#333',
-}: {
-  size?: number;
-  color?: string;
-}) {
-  const bw = size * 0.18;
-  const gap = size * 0.1;
-  const hs = [size * 0.38, size * 0.58, size * 0.76];
-  const total = 3 * bw + 2 * gap;
-  const sx = (size - total) / 2;
-  const base = size * 0.86;
-  return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {hs.map((h, i) => (
-        <Rect
-          key={i}
-          x={sx + i * (bw + gap)}
-          y={base - h}
-          width={bw}
-          height={h}
-          rx={0.6}
-          fill={color}
-          opacity={0.35 + i * 0.28}
-        />
-      ))}
-    </Svg>
-  );
-}
-
-function DiamondIcon({
-  size = 15,
-  color = '#333',
-}: {
-  size?: number;
-  color?: string;
-}) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const hw = size * 0.38;
-  const hh = size * 0.44;
-  return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Polygon
-        points={`${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${
-          cx - hw
-        },${cy}`}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.3}
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function StatCol({
-  icon,
-  value,
-  label,
-  accent,
-}: {
-  icon: 'clock' | 'bars' | 'diamond';
-  value: string;
-  label: string;
-  accent: string;
-}) {
-  return (
-    <View style={colStyles.col}>
-      {icon === 'clock' && <ClockIcon size={14} color={accent} />}
-      {icon === 'bars' && <BarsIcon size={14} color={accent} />}
-      {icon === 'diamond' && <DiamondIcon size={14} color={accent} />}
-      <Text style={colStyles.value}>{value}</Text>
-      <Text style={colStyles.label}>{label}</Text>
-    </View>
-  );
+  if (type === 'pause') return 'rgba(0,0,0,0.10)';
+  return 'rgba(200,60,60,0.35)';
 }
 
 export interface SessionShareCardProps {
@@ -268,275 +101,190 @@ export function SessionShareCard({
   const level = getLevel(qualityScore);
   const dateTime = formatDateTime(startedAt);
   const segments = buildSegments(events, startedAt, duration);
-  const hasTimeline = events.length > 0;
-  const heroH = Math.round(cardWidth * 0.58);
 
   return (
     <View style={[styles.card, { width: cardWidth }]}>
-      <LinearGradient
-        colors={level.gradient}
-        start={{ x: 0.15, y: 0 }}
-        end={{ x: 0.85, y: 1 }}
-        style={[styles.hero, { height: heroH }]}
-      >
-        <View style={[styles.heroCenter, { bottom: OVERLAY_H }]}>
-          <Text style={[styles.heroScore, { color: level.accent }]}>
-            {qualityScore}
-          </Text>
-          <Text style={styles.heroScoreSub}>/100</Text>
+      {/* Header */}
+      <Text style={styles.brand}>FOCO</Text>
+      <Text style={styles.brandSub}>FOCUS RECEIPT</Text>
+
+      <Text style={styles.rule}>{RULE}</Text>
+
+      {/* Quality score */}
+      <View style={styles.scoreRow}>
+        <Text style={[styles.scoreNum, { color: level.color }]}>{qualityScore}</Text>
+        <View style={styles.scoreRight}>
+          <Text style={[styles.scoreTag, { color: level.color }]}>{level.tag}</Text>
+          <Text style={styles.scoreSub}>/100 · 專注品質</Text>
         </View>
-
-        <View style={styles.heroTop}>
-          <Text style={styles.heroBrand}>FOCO</Text>
-          <View style={[styles.timeChip, { borderColor: level.accent + '40' }]}>
-            <Text style={[styles.timeChipText, { color: level.accent }]}>
-              {dateTime}
-            </Text>
-          </View>
-        </View>
-
-        <View style={[styles.overlayStrip, { height: OVERLAY_H }]}>
-          <Text style={styles.overlayTitle}>Focus Complete</Text>
-          {showOverlayShare && onOverlayShare ? (
-            <TouchableOpacity
-              style={styles.overlayPill}
-              onPress={onOverlayShare}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.overlayPillText}>Share ↗</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.overlayPillPlaceholder} />
-          )}
-        </View>
-      </LinearGradient>
-
-      <View style={styles.dataSection}>
-        <View style={styles.qualityBlock}>
-          <View style={styles.qualityTrack}>
-            <View
-              style={[
-                styles.qualityFill,
-                {
-                  width: `${qualityScore}%` as any,
-                  backgroundColor: level.accent,
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.qualityCaption}>專注品質</Text>
-        </View>
-
-        <View style={styles.hairline} />
-        <Text style={styles.tagline}>{level.tagline}</Text>
-
-        {taskTitle ? (
-          <View style={styles.taskRow}>
-            <Text style={[styles.taskCheck, { color: level.accent }]}>✓</Text>
-            <Text style={styles.taskTitle} numberOfLines={1}>
-              {taskTitle}
-            </Text>
-          </View>
-        ) : null}
-
-        {hasTimeline && (
-          <View style={styles.timelineBlock}>
-            <View style={styles.timelineBar}>
-              {segments.map((seg, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.timelineSeg,
-                    {
-                      width: `${seg.widthPct}%` as any,
-                      backgroundColor: segColor(seg.type, level.accent),
-                      borderRadius:
-                        i === 0 || i === segments.length - 1 ? 3 : 0,
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.hairline} />
-
-        <View style={styles.statsRow}>
-          <StatCol
-            icon="clock"
-            value={formatDuration(duration)}
-            label="Duration"
-            accent={level.accent}
-          />
-          <View style={styles.colDivider} />
-          <StatCol
-            icon="bars"
-            value={`${pauses}`}
-            label="Pauses"
-            accent={level.accent}
-          />
-          <View style={styles.colDivider} />
-          <StatCol
-            icon="diamond"
-            value={`${leftApp}`}
-            label="Left App"
-            accent={level.accent}
-          />
-        </View>
-
-        <Text style={styles.cardFooter}>foco.app</Text>
       </View>
+
+      {/* Quality bar */}
+      <View style={styles.qualityTrack}>
+        <View style={[styles.qualityFill, { width: `${qualityScore}%` as any, backgroundColor: level.color }]} />
+      </View>
+
+      <Text style={styles.rule}>{RULE}</Text>
+
+      {/* Data rows */}
+      <View style={styles.dataRow}>
+        <Text style={styles.dataLeft}>DATE</Text>
+        <Text style={styles.dataRight}>{dateTime}</Text>
+      </View>
+      <View style={styles.dataRow}>
+        <Text style={styles.dataLeft}>DURATION</Text>
+        <Text style={styles.dataRight}>{formatDuration(duration)}</Text>
+      </View>
+      {taskTitle ? (
+        <View style={styles.dataRow}>
+          <Text style={styles.dataLeft}>TASK</Text>
+          <Text style={[styles.dataRight, { flex: 1 }]} numberOfLines={1}>{taskTitle}</Text>
+        </View>
+      ) : null}
+      <View style={styles.dataRow}>
+        <Text style={styles.dataLeft}>PAUSES</Text>
+        <Text style={styles.dataRight}>{String(pauses).padStart(2, '0')}</Text>
+      </View>
+      <View style={styles.dataRow}>
+        <Text style={styles.dataLeft}>LEFT APP</Text>
+        <Text style={styles.dataRight}>{String(leftApp).padStart(2, '0')}</Text>
+      </View>
+
+      {events.length > 0 && (
+        <>
+          <Text style={styles.rule}>{RULE}</Text>
+          <Text style={styles.timelineLabel}>SESSION TIMELINE</Text>
+          <View style={styles.timelineBar}>
+            {segments.map((seg, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.timelineSeg,
+                  {
+                    width: `${seg.widthPct}%` as any,
+                    backgroundColor: segColor(seg.type, level.color),
+                    borderRadius: i === 0 || i === segments.length - 1 ? 3 : 0,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        </>
+      )}
+
+      <Text style={styles.rule}>{RULE}</Text>
+
+      {showOverlayShare && onOverlayShare ? (
+        <TouchableOpacity style={[styles.shareBtn, { borderColor: level.color }]} onPress={onOverlayShare} activeOpacity={0.8}>
+          <Text style={[styles.shareBtnText, { color: level.color }]}>Share ↗</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      <Text style={styles.footer}>foco.app</Text>
     </View>
   );
 }
 
-const colStyles = StyleSheet.create({
-  col: { flex: 1, alignItems: 'center', gap: 4 },
-  value: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: 'rgba(0,0,0,0.80)',
-    letterSpacing: -0.3,
-  },
-  label: {
-    fontSize: 9,
-    color: 'rgba(0,0,0,0.35)',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-});
-
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 22,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  hero: { paddingHorizontal: 20, paddingTop: 18 },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  heroBrand: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.60)',
-    letterSpacing: 2.5,
-  },
-  timeChip: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  timeChipText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
-  heroCenter: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroScore: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 72,
-    letterSpacing: -3,
-    lineHeight: 80,
-    includeFontPadding: false,
-  },
-  heroScoreSub: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.38)',
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    marginTop: -4,
-  },
-  overlayStrip: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.40)',
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  overlayTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.3,
-  },
-  overlayPill: {
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  overlayPillPlaceholder: { width: 56 },
-  overlayPillText: {
-    fontSize: 11,
+  brand: {
+    fontFamily: MONO,
+    fontSize: 20,
     fontWeight: '700',
     color: '#111',
-    letterSpacing: 0.2,
+    letterSpacing: 6,
+    textAlign: 'center',
+    marginBottom: 2,
   },
-  dataSection: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 22,
-    paddingTop: 16,
-    paddingBottom: 14,
+  brandSub: {
+    fontFamily: MONO,
+    fontSize: 10,
+    color: 'rgba(20,16,28,0.40)',
+    letterSpacing: 3,
+    textAlign: 'center',
+    marginBottom: 10,
   },
-  qualityBlock: { marginBottom: 10 },
+  rule: {
+    fontFamily: MONO,
+    fontSize: 10,
+    color: 'rgba(20,16,28,0.25)',
+    textAlign: 'center',
+    marginVertical: 8,
+    letterSpacing: 1,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 8,
+  },
+  scoreNum: {
+    fontFamily: MONO,
+    fontSize: 52,
+    fontWeight: '700',
+    letterSpacing: -2,
+    lineHeight: 58,
+    includeFontPadding: false,
+  },
+  scoreRight: { flex: 1 },
+  scoreTag: {
+    fontFamily: MONO,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  scoreSub: {
+    fontFamily: MONO,
+    fontSize: 10,
+    color: 'rgba(20,16,28,0.40)',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
   qualityTrack: {
     height: 3,
     borderRadius: 3,
     backgroundColor: 'rgba(0,0,0,0.07)',
     overflow: 'hidden',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   qualityFill: { height: 3, borderRadius: 3 },
-  qualityCaption: {
-    fontSize: 9,
-    color: 'rgba(0,0,0,0.32)',
-    letterSpacing: 1.0,
-    textTransform: 'uppercase',
-  },
-  hairline: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    marginVertical: 12,
-  },
-  tagline: {
-    fontSize: 13,
-    color: 'rgba(0,0,0,0.46)',
-    letterSpacing: 0.1,
-    fontStyle: 'italic',
-    marginBottom: 10,
-  },
-  taskRow: {
+  dataRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginVertical: 3,
+    gap: 8,
   },
-  taskCheck: { fontSize: 13, fontWeight: '700' },
-  taskTitle: {
-    fontSize: 13,
+  dataLeft: {
+    fontFamily: MONO,
+    fontSize: 10,
+    color: 'rgba(20,16,28,0.40)',
+    letterSpacing: 1.5,
+    flexShrink: 0,
+  },
+  dataRight: {
+    fontFamily: MONO,
+    fontSize: 11,
+    color: '#111',
     fontWeight: '600',
-    color: 'rgba(0,0,0,0.65)',
-    flex: 1,
+    textAlign: 'right',
   },
-  timelineBlock: { marginBottom: 10 },
+  timelineLabel: {
+    fontFamily: MONO,
+    fontSize: 9,
+    color: 'rgba(20,16,28,0.35)',
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
   timelineBar: {
     height: 5,
     borderRadius: 3,
@@ -546,18 +294,25 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   timelineSeg: { height: 5 },
-  statsRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 },
-  colDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 34,
-    backgroundColor: 'rgba(0,0,0,0.08)',
+  shareBtn: {
+    borderWidth: 1,
+    borderRadius: 9999,
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  cardFooter: {
-    marginTop: 14,
-    fontSize: 10,
-    color: 'rgba(0,0,0,0.20)',
-    letterSpacing: 1.4,
+  shareBtnText: {
+    fontFamily: MONO,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  footer: {
+    fontFamily: MONO,
+    fontSize: 9,
+    color: 'rgba(20,16,28,0.20)',
+    letterSpacing: 2,
     textAlign: 'center',
-    fontFamily: 'Fraunces_500Medium',
+    marginTop: 4,
   },
 });
