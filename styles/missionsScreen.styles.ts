@@ -65,6 +65,12 @@ export function createMissionsStyles({ colors, surfaces }: AppTheme) {
       padding: 14,
       gap: 12,
     },
+    taskInfoPressable: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
     taskEmojiWrap: {
       width: 42,
       height: 42,

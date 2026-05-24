@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
@@ -31,6 +32,7 @@ type TabType = 'task' | 'daily';
 
 export default function MissionsScreen() {
   const [tab, setTab] = useState<TabType>('task');
+  const router = useRouter();
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet } = usePetStore();
   const { play } = useSound();
@@ -162,20 +164,26 @@ export default function MissionsScreen() {
               <View key={task.id} style={styles.myTaskWrap}>
                 <FrostCard radius={20} padded={false}>
                   <View style={styles.myTaskCard}>
-                    <View style={styles.taskEmojiWrap}>
-                      <TaskIcon icon={resolveTaskIcon(task)} size={20} />
-                    </View>
-                    <View style={styles.myTaskInfo}>
-                      <Text style={styles.myTaskTitle}>{task.title}</Text>
-                      <Text style={styles.myTaskSub}>
-                        {task.duration_min} min
-                      </Text>
-                      {task.memo ? (
-                        <Text style={styles.myTaskMemo} numberOfLines={1}>
-                          {task.memo}
+                    <TouchableOpacity
+                      style={styles.taskInfoPressable}
+                      onPress={() => router.push({ pathname: '/(app)/missions/[id]', params: { id: task.id } })}
+                      activeOpacity={0.78}
+                    >
+                      <View style={styles.taskEmojiWrap}>
+                        <TaskIcon icon={resolveTaskIcon(task)} size={20} />
+                      </View>
+                      <View style={styles.myTaskInfo}>
+                        <Text style={styles.myTaskTitle}>{task.title}</Text>
+                        <Text style={styles.myTaskSub}>
+                          {task.duration_min} min
                         </Text>
-                      ) : null}
-                    </View>
+                        {task.memo ? (
+                          <Text style={styles.myTaskMemo} numberOfLines={1}>
+                            {task.memo}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
                     <View style={styles.taskActions}>
                       <TouchableOpacity
                         style={styles.myTaskStartBtn}

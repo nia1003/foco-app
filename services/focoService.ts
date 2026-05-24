@@ -3,7 +3,7 @@
 // 全部走 Supabase（DB + Edge Function）
 // ─────────────────────────────────────────────
 import { supabase } from '@/lib/supabase';
-import type { SessionPayload, SessionResult, FocoPet, Task, SessionRecord, DayData, SessionSummary } from '@/types';
+import type { SessionPayload, SessionResult, FocoPet, Task, SessionRecord, DayData, SessionSummary, TaskCategory } from '@/types';
 
 // ── 等級門檻（index = level - 1）────────────────
 const XP_THRESHOLDS = [0, 100, 250, 500, 900];
@@ -194,6 +194,51 @@ export async function createTask(
     const fallback = await supabase
       .from('tasks')
       .insert(row)
+      .select()
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error) throw error;
+  return data as Task;
+}
+
+// ── updateTask ────────────────────────────────
+export async function updateTask(
+  taskId: string,
+  updates: {
+    title?: string;
+    durationMin?: number;
+    category?: TaskCategory;
+    icon_type?: 'emoji' | 'svg' | null;
+    icon_value?: string | null;
+    memo?: string | null;
+  },
+): Promise<Task> {
+  const row: Record<string, unknown> = {};
+
+  if (updates.title !== undefined) row.title = updates.title;
+  if (updates.durationMin !== undefined) row.duration_min = updates.durationMin;
+  if (updates.category !== undefined) row.category = updates.category;
+  if (updates.icon_type !== undefined) row.icon_type = updates.icon_type;
+  if (updates.icon_value !== undefined) row.icon_value = updates.icon_value;
+  if (updates.memo !== undefined) row.memo = updates.memo;
+
+  let { data, error } = await supabase
+    .from('tasks')
+    .update(row)
+    .eq('id', taskId)
+    .select()
+    .single();
+
+  if (error && Object.prototype.hasOwnProperty.call(row, 'memo')) {
+    const fallbackRow = { ...row };
+    delete (fallbackRow as { memo?: unknown }).memo;
+    const fallback = await supabase
+      .from('tasks')
+      .update(fallbackRow)
+      .eq('id', taskId)
       .select()
       .single();
     data = fallback.data;
