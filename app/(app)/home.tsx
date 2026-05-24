@@ -26,7 +26,6 @@ import Reanimated, {
   useAnimatedStyle,
   withSpring,
   runOnJS,
-  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Plus } from 'lucide-react-native';
@@ -267,35 +266,20 @@ export default function HomeScreen() {
   const curPage  = useSharedValue<0 | 1>(0); // worklet-readable page index
   const [page, setPage] = useState<0 | 1>(0);  // React-side mirror for effects
 
-  // Tracks Page 2 inner scroll position; used to block pan-to-page1 when scrolled
-  const page2AtTop = useSharedValue(1); // 1 = at top, 0 = scrolled down
-
-  const page2ScrollHandler = useAnimatedScrollHandler((event) => {
-    page2AtTop.value = event.contentOffset.y < 8 ? 1 : 0;
-  });
-
-  // ── Pan gesture: vertical-only, rubber-band resistance, spring snap ──
-  // Page1→Page2 (swipe up): 28% threshold — easy to enter dashboard
-  // Page2→Page1 (swipe down): 60% threshold — requires deliberate long drag
-  const SNAP_THRESHOLD    = SCREEN_H * 0.28;
-  const RETURN_THRESHOLD  = SCREEN_H * 0.60;
+  // ── Pan gesture: Page 1 → Page 2 swipe-up only ────────────────
+  // Page 2 is locked — no drag-back; use the ↑ button in top-right corner instead.
+  const SNAP_THRESHOLD     = SCREEN_H * 0.28;
   const VELOCITY_THRESHOLD = 600;
   const RESISTANCE = 0.12;
 
   const panGesture = Gesture.Pan()
-    .activeOffsetY([-14, 14])   // activate after 14px vertical
-    .failOffsetX([-22, 22])     // fail if >22px horizontal (lets carousel take over)
+    .activeOffsetY([-14, 14])
+    .failOffsetX([-22, 22])
     .onUpdate((e) => {
-      const isPage2 = curPage.value === 1;
-      const base = isPage2 ? -SCREEN_H : 0;
-      const candidate = base + e.translationY;
-
-      // On page 2 scrolled down: ignore upward drag (inner scroll handles it)
-      if (isPage2 && e.translationY < 0 && page2AtTop.value < 0.5) return;
-
-      // Rubber-band resistance beyond snap bounds
+      if (curPage.value === 1) return; // Page 2 is locked — no drag
+      const candidate = e.translationY;
       if (candidate > 0) {
-        offset.value = candidate * RESISTANCE;
+        offset.value = candidate * RESISTANCE; // rubber-band downward
       } else if (candidate < -SCREEN_H) {
         offset.value = -SCREEN_H + (candidate + SCREEN_H) * RESISTANCE;
       } else {
@@ -303,26 +287,11 @@ export default function HomeScreen() {
       }
     })
     .onEnd((e) => {
-      const isPage2 = curPage.value === 1;
-      const drag = e.translationY;
-      const vel  = e.velocityY;
-
-      let next: 0 | 1;
-      if (!isPage2) {
-        // On page 1: drag up enough or fast → go to page 2
-        next = (drag < -SNAP_THRESHOLD || vel < -VELOCITY_THRESHOLD) ? 1 : 0;
-      } else {
-        // On page 2 at top: must drag down 60% of screen or very fast → back to page 1
-        next = (drag > RETURN_THRESHOLD || vel > VELOCITY_THRESHOLD) ? 0 : 1;
-      }
-
+      if (curPage.value === 1) return; // locked on page 2
+      const next: 0 | 1 =
+        (e.translationY < -SNAP_THRESHOLD || e.velocityY < -VELOCITY_THRESHOLD) ? 1 : 0;
       const target = next === 0 ? 0 : -SCREEN_H;
-      offset.value = withSpring(target, {
-        damping: 28,
-        stiffness: 85,
-        mass: 1.4,
-        overshootClamping: false,
-      });
+      offset.value = withSpring(target, { damping: 28, stiffness: 85, mass: 1.4 });
       curPage.value = next;
       runOnJS(setPage)(next);
     });
@@ -331,14 +300,12 @@ export default function HomeScreen() {
     transform: [{ translateY: offset.value }],
   }));
 
-  // Pink return-arrow fades in as the user drags Page 2 down toward Page 1.
-  // pulled=0 when Page 2 is at rest; grows positive as user drags toward page 1.
-  const page2ArrowStyle = useAnimatedStyle(() => {
-    const pulled  = offset.value + SCREEN_H;                    // 0 at rest
-    const opacity = Math.min(1, Math.max(0, pulled / (SCREEN_H * 0.12)));
-    const translateY = -(pulled * 0.25);                        // arrow rises with drag
-    return { opacity, transform: [{ translateY }] };
-  });
+  // ── Back to Page 1 (called from button) ────────────────────────
+  const goToPage1 = () => {
+    offset.value = withSpring(0, { damping: 28, stiffness: 85, mass: 1.4 });
+    curPage.value = 0;
+    setPage(0);
+  };
 
   // ── Dismiss chat when transitioning to Page 2 ──────────────────
   useEffect(() => {
@@ -571,21 +538,24 @@ export default function HomeScreen() {
 
           </View>{/* /PAGE 1 */}
 
-          {/* ═══════════════ PAGE 2: dark dashboard ════════════════ */}
+          {/* ═══════════════ PAGE 2: light dashboard ═══════════════ */}
           <View style={styles.page2}>
 
-            {/* Pink return-arrow — appears as user drags Page 2 down to return to Page 1 */}
-            <Reanimated.View style={[styles.page2ReturnArrow, page2ArrowStyle]} pointerEvents="none">
-              <Text style={styles.page2ReturnArrowIcon}>↑</Text>
-            </Reanimated.View>
+            {/* Back to Page 1 button — top-right corner */}
+            <TouchableOpacity
+              style={styles.page2BackBtn}
+              onPress={goToPage1}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.page2BackIcon}>↑</Text>
+            </TouchableOpacity>
 
             <Reanimated.ScrollView
               style={styles.page2Scroll}
               contentContainerStyle={styles.page2Content}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              scrollEventThrottle={16}
-              onScroll={page2ScrollHandler}
             >
               {/* ── Home tab: Dashboard ─────────────────────── */}
               {activePage2Tab === 'home' && (
@@ -958,18 +928,22 @@ const styles = StyleSheet.create({
   },
 
   // ── Pink return-arrow on Page 2 ──────────────────────────────
-  page2ReturnArrow: {
+  page2BackBtn: {
     position: 'absolute',
-    top: 14,
-    left: 0,
-    right: 0,
+    top: 18,
+    right: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#E6E6E6',
     alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 50,
   },
-  page2ReturnArrowIcon: {
-    fontSize: 22,
+  page2BackIcon: {
+    fontSize: 16,
     color: INK,
-    fontWeight: '700',
-    lineHeight: 26,
+    fontWeight: '600',
+    lineHeight: 18,
   },
 });
