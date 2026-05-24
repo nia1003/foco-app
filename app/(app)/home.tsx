@@ -9,8 +9,10 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Dimensions,
+  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
@@ -35,11 +37,13 @@ import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { TimerGauge } from '@/components/home/TimerGauge';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useTaskStore } from '@/stores/taskStore';
-import { chatWithPet, getPets } from '@/services/focoService';
+import { chatWithPet, getPets, deleteTask } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
 import type { Task, TaskCategory } from '@/types';
 
@@ -87,9 +91,37 @@ const PET_GREETINGS: Record<string, string[]> = {
 };
 
 // ── TaskCard ──────────────────────────────────────────────────────────────────
-function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
+function TaskCard({
+  task,
+  onPress,
+  onEdit,
+  onDelete,
+}: {
+  task: Task;
+  onPress: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const handleMenu = () => {
+    Alert.alert(task.title, undefined, [
+      { text: 'Edit', onPress: onEdit },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <View style={taskStyles.card}>
+      {/* ⋮ menu — top right */}
+      <TouchableOpacity
+        style={taskStyles.menuBtn}
+        onPress={handleMenu}
+        activeOpacity={0.6}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        <Text style={taskStyles.menuDots}>⋮</Text>
+      </TouchableOpacity>
+
       <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
       <TouchableOpacity
         style={taskStyles.btn}
@@ -114,12 +146,25 @@ const taskStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  menuBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    padding: 4,
+  },
+  menuDots: {
+    fontSize: 18,
+    color: 'rgba(26,22,34,0.45)',
+    fontWeight: '700',
+    lineHeight: 20,
+  },
   title: {
     fontSize: 12,
     fontWeight: '600',
     color: INK,
     lineHeight: 16,
     alignSelf: 'flex-start',
+    marginTop: 18,
   },
   btn: {
     width: 36,
@@ -237,7 +282,8 @@ export default function HomeScreen() {
   const { play } = useSound();
   const { userId, userName, userEmail } = useAuthStore();
   const { pets, activePet, setPets, restoreActivePet, petsLastFetchedAt } = usePetStore();
-  const { tasks, addTask, fetchTasks } = useTaskStore();
+  const { tasks, addTask, removeTask, fetchTasks } = useTaskStore();
+  const avatarUri = usePreferencesStore((s) => s.avatarUri);
 
   const storePool = pets.length > 0 ? pets : mockPets;
 
@@ -245,14 +291,16 @@ export default function HomeScreen() {
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
   const [addTaskCategory, setAddTaskCategory]         = useState<TaskCategory | null>(null);
+  const [page2ScrollEnabled, setPage2ScrollEnabled]   = useState(true);
+  const [editTaskId, setEditTaskId]                   = useState<string | null>(null);
 
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const carouselRef = useRef<any>(null);
 
   // Pet chat state
-  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string; loading: boolean }>({
-    visible: false, msg: '', text: '', loading: false,
+  const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string; loading: boolean; err: string }>({
+    visible: false, msg: '', text: '', loading: false, err: '',
   });
   const chatInputRef = useRef<TextInput>(null);
 
@@ -332,7 +380,7 @@ export default function HomeScreen() {
 
   // Reset chat when user swipes to a different pet
   useEffect(() => {
-    setChat({ visible: false, msg: '', text: '', loading: false });
+    setChat({ visible: false, msg: '', text: '', loading: false, err: '' });
   }, [activeCarouselIndex]);
 
   // Sync carousel to stored active pet on mount
@@ -407,6 +455,7 @@ export default function HomeScreen() {
       msg: pool[Math.floor(Math.random() * pool.length)],
       text: '',
       loading: false,
+      err: '',
     });
     setTimeout(() => chatInputRef.current?.focus(), 50);
   }, [play, activePetDef]);
@@ -415,14 +464,38 @@ export default function HomeScreen() {
   const handleChatSubmit = useCallback(async () => {
     const text = chat.text.trim();
     if (!text || chat.loading) return;
-    setChat((p) => ({ ...p, text: '', loading: true }));
+    setChat((p) => ({ ...p, text: '', loading: true, err: '' }));
     try {
       const reply = await chatWithPet(activePetDef.id, text);
       setChat((p) => ({ ...p, msg: reply, loading: false }));
-    } catch {
-      setChat((p) => ({ ...p, loading: false }));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'error';
+      const friendly =
+        msg === 'rate_limited' ? '請稍等一下再聊～' :
+        msg === 'Not authenticated' ? '請先登入再和我說話！' :
+        '嗚…我現在說不出話來 (´；ω；`)';
+      setChat((p) => ({ ...p, loading: false, err: friendly }));
     }
   }, [chat.text, chat.loading, activePetDef]);
+
+  const confirmDeleteTask = useCallback((task: Task) => {
+    Alert.alert(
+      'Delete task',
+      `Delete "${task.title}"?\nFocus sessions will stay in history.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: () => {
+            removeTask(task.id);
+            deleteTask(task.id).catch(() =>
+              Alert.alert('Delete failed', 'Network error. Please try again.'),
+            );
+          },
+        },
+      ],
+    );
+  }, [removeTask]);
 
   // ── Render ──────────────────────────────────────────────────────
   return (
@@ -508,7 +581,7 @@ export default function HomeScreen() {
               {chat.visible && (
                 <View style={styles.chatOverlay} pointerEvents="box-none">
                   <Text style={styles.chatReplyText}>
-                    {chat.loading ? '···' : chat.msg}
+                    {chat.loading ? '···' : chat.err ? chat.err : chat.msg}
                   </Text>
                   <TextInput
                     ref={chatInputRef}
@@ -541,21 +614,38 @@ export default function HomeScreen() {
           {/* ═══════════════ PAGE 2: light dashboard ═══════════════ */}
           <View style={styles.page2}>
 
-            {/* Back to Page 1 button — top-right corner */}
-            <TouchableOpacity
-              style={styles.page2BackBtn}
-              onPress={goToPage1}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.page2BackIcon}>↑</Text>
-            </TouchableOpacity>
+            {/* Page 2 top bar: ↑ back + FOCO wordmark + avatar */}
+            <View style={styles.page2Bar}>
+              <TouchableOpacity
+                style={styles.page2BarBtn}
+                onPress={goToPage1}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.page2BarBtnIcon}>↑</Text>
+              </TouchableOpacity>
+              <Text style={styles.page2BarWordmark}>FOCO</Text>
+              <TouchableOpacity
+                style={styles.page2BarAvatar}
+                onPress={() => { play('tap'); router.push('/(app)/settings'); }}
+                activeOpacity={0.75}
+              >
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.page2BarAvatarImg} />
+                ) : (
+                  <Text style={styles.page2BarAvatarText}>
+                    {displayName[0]?.toUpperCase() ?? '?'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
             <Reanimated.ScrollView
               style={styles.page2Scroll}
               contentContainerStyle={styles.page2Content}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={page2ScrollEnabled}
             >
               {/* ── Home tab: Dashboard ─────────────────────── */}
               {activePage2Tab === 'home' && (
@@ -597,7 +687,13 @@ export default function HomeScreen() {
                       keyboardShouldPersistTaps="handled"
                     >
                       {dailyTasks.map((task) => (
-                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onPress={() => goFocus(task)}
+                          onEdit={() => setEditTaskId(task.id)}
+                          onDelete={() => confirmDeleteTask(task)}
+                        />
                       ))}
                     </ScrollView>
                   )}
@@ -622,7 +718,13 @@ export default function HomeScreen() {
                       keyboardShouldPersistTaps="handled"
                     >
                       {deadlineTasks.map((task) => (
-                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onPress={() => goFocus(task)}
+                          onEdit={() => setEditTaskId(task.id)}
+                          onDelete={() => confirmDeleteTask(task)}
+                        />
                       ))}
                     </ScrollView>
                   )}
@@ -633,7 +735,12 @@ export default function HomeScreen() {
 
                   {/* Timer */}
                   <Text style={styles.sectionLabel}>timer</Text>
-                  <TimerGauge value={durationMin} onChange={setDurationMin} />
+                  <TimerGauge
+                    value={durationMin}
+                    onChange={setDurationMin}
+                    onDragStart={() => setPage2ScrollEnabled(false)}
+                    onDragEnd={() => setPage2ScrollEnabled(true)}
+                  />
                 </>
               )}
 
@@ -669,6 +776,12 @@ export default function HomeScreen() {
           addTask({ ...task, category });
           setAddTaskCategory(null);
         }}
+      />
+
+      <TaskDetailModal
+        visible={editTaskId !== null}
+        taskId={editTaskId}
+        onClose={() => setEditTaskId(null)}
       />
     </View>
   );
@@ -821,7 +934,7 @@ const styles = StyleSheet.create({
     backgroundColor: DARK_BG,   // prevents white flash on iOS over-scroll bounce
   },
   page2Content: {
-    paddingTop: 52,
+    paddingTop: 16,
     paddingHorizontal: 29,
     paddingBottom: EMBEDDED_TAB_RESERVED,
   },
@@ -926,23 +1039,57 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // ── Pink return-arrow on Page 2 ──────────────────────────────
-  page2BackBtn: {
+  // ── Page 2 top bar (replaces absolute back button) ───────────
+  page2Bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    height: 56,
+    flexShrink: 0,
+  },
+  page2BarWordmark: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 6,
+    color: INK,
+    paddingLeft: 6,
+  },
+  page2BarBtn: {
     position: 'absolute',
-    top: 62,
-    right: 18,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    left: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#E6E6E6',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 50,
   },
-  page2BackIcon: {
+  page2BarBtnIcon: {
     fontSize: 16,
     color: INK,
     fontWeight: '600',
     lineHeight: 18,
+  },
+  page2BarAvatar: {
+    position: 'absolute',
+    right: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#c4b5d6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  page2BarAvatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  page2BarAvatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
 });

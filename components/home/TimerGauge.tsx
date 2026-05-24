@@ -25,14 +25,20 @@ function pt(rad: number, r: number) {
 interface Props {
   value: number;
   onChange: (v: number) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
-export function TimerGauge({ value, onChange }: Props) {
-  const valueRef     = useRef(value);
-  valueRef.current   = value;
-  const onChangeRef  = useRef(onChange);
+export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
+  const valueRef      = useRef(value);
+  valueRef.current    = value;
+  const onChangeRef   = useRef(onChange);
   onChangeRef.current = onChange;
-  const dragStart    = useRef({ x: 0, val: value });
+  const onStartRef    = useRef(onDragStart);
+  onStartRef.current  = onDragStart;
+  const onEndRef      = useRef(onDragEnd);
+  onEndRef.current    = onDragEnd;
+  const dragStart     = useRef({ x: 0, val: value });
 
   const pan = useRef(
     PanResponder.create({
@@ -40,6 +46,7 @@ export function TimerGauge({ value, onChange }: Props) {
       onMoveShouldSetPanResponder:  () => true,
       onPanResponderGrant: (_, gs) => {
         dragStart.current = { x: gs.x0, val: valueRef.current };
+        onStartRef.current?.();
       },
       onPanResponderMove: (_, gs) => {
         const dx    = gs.moveX - dragStart.current.x;
@@ -49,6 +56,8 @@ export function TimerGauge({ value, onChange }: Props) {
         const snap  = Math.max(MIN_VAL, Math.min(MAX_VAL, Math.round(raw / STEP) * STEP));
         if (snap !== valueRef.current) onChangeRef.current(snap);
       },
+      onPanResponderRelease: () => { onEndRef.current?.(); },
+      onPanResponderTerminate: () => { onEndRef.current?.(); },
     }),
   ).current;
 
@@ -83,7 +92,7 @@ export function TimerGauge({ value, onChange }: Props) {
   const pInner = pt(pRad, R - 9);
 
   return (
-    <View style={styles.card} {...pan.panHandlers}>
+    <View style={styles.container} {...pan.panHandlers}>
       {/* Semicircular dial */}
       <Svg width={SVG_W} height={SVG_H}>
         <Path d={arcPath} fill="none" stroke="#e4e4e4" strokeWidth={1.5} />
@@ -97,7 +106,7 @@ export function TimerGauge({ value, onChange }: Props) {
         />
       </Svg>
 
-      {/* Number centred inside arc bowl */}
+      {/* Number centred lower inside arc bowl */}
       <View style={styles.numOverlay} pointerEvents="none">
         <Text style={styles.num}>{value}</Text>
         <Text style={styles.unit}>MIN</Text>
@@ -107,23 +116,14 @@ export function TimerGauge({ value, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 22,
-    paddingTop: 18,
-    paddingBottom: 18,
-    paddingHorizontal: 16,
+  container: {
+    backgroundColor: 'transparent',
     alignItems: 'center',
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
   },
   numOverlay: {
     position: 'absolute',
-    top: SVG_H * 0.38,
+    top: SVG_H * 0.55,
     left: 0,
     right: 0,
     alignItems: 'center',

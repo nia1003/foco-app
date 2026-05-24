@@ -71,24 +71,28 @@ serve(async (req: Request) => {
       })
     }
 
-    // ── Backend rate limit: 1 req / 10s per user ──────────────
-    const { data: rateRow } = await supabase
-      .from('pet_chat_rate_limit')
-      .select('last_at')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
+    // ── Backend rate limit: 1 req / 10s per user (graceful — skipped if table missing) ──
     const now = Date.now()
-    if (rateRow?.last_at && now - new Date(rateRow.last_at).getTime() < 10_000) {
-      return new Response(JSON.stringify({ error: 'rate_limited' }), {
-        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    try {
+      const { data: rateRow } = await supabase
+        .from('pet_chat_rate_limit')
+        .select('last_at')
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-    await supabase.from('pet_chat_rate_limit').upsert({
-      user_id: user.id,
-      last_at: new Date(now).toISOString(),
-    })
+      if (rateRow?.last_at && now - new Date(rateRow.last_at).getTime() < 10_000) {
+        return new Response(JSON.stringify({ error: 'rate_limited' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      await supabase.from('pet_chat_rate_limit').upsert({
+        user_id: user.id,
+        last_at: new Date(now).toISOString(),
+      })
+    } catch (_rateErr) {
+      // rate-limit table unavailable — allow request through
+    }
 
     // ── Call Together AI ───────────────────────────────────────
     const togetherKey = Deno.env.get('TOGETHER_API_KEY') ?? ''

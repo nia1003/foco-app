@@ -1,8 +1,8 @@
 import { Platform, StyleSheet } from 'react-native';
 import type { AppTheme } from '@/hooks/useAppTheme';
 
-const BG   = '#EFE8E0';
-const CARD = '#E6E6E6';
+const BG   = '#FFFFFF';
+const CARD = '#F2F2F2';
 const INK  = '#1a1622';
 
 export function createStatsStyles({ colors }: AppTheme) {
@@ -74,7 +74,7 @@ export function createStatsStyles({ colors }: AppTheme) {
       fontWeight: '600',
       color: 'rgba(26,22,34,0.40)',
     },
-    periodModeLabelActive: { color: INK },
+    periodModeLabelActive: { color: '#9B59D0' },
     chartNav: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -139,7 +139,7 @@ export function createStatsStyles({ colors }: AppTheme) {
       height: 7,
       borderRadius: 4,
       flexShrink: 0,
-      backgroundColor: INK,
+      backgroundColor: '#ECC5FE',
     },
     sessionInfo: { flex: 1 },
     sessionTitle: {

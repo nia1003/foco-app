@@ -22,9 +22,9 @@ import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { TaskDetailModal } from '../../../components/tasks/TaskDetailModal';
 import type { Task } from '@/types';
 
-const BG   = '#EFE8E0';
+const BG   = '#FFFFFF';
 const INK  = '#1a1622';
-const CARD = '#E6E6E6';
+const CARD = '#F2F2F2';
 const BTN_SIZE = 36;
 
 type TabType = 'task' | 'daily';
