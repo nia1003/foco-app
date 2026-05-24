@@ -122,15 +122,15 @@ const taskStyles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   btn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
   },
   arrow: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#ffffff',
     fontWeight: '700',
     letterSpacing: 2,
@@ -895,13 +895,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   addTaskBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.90,
   },
 
 
