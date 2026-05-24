@@ -11,6 +11,8 @@ import { useAppTheme } from '@/hooks/useAppTheme';
 
 interface FocoBarProps {
   back?: boolean;
+  /** Override the back action (default: router.back()) */
+  onBack?: () => void;
   /** Initial letter — opens Settings (same as Home) */
   avatar?: string | null;
   avatarUri?: string | null;
@@ -18,6 +20,7 @@ interface FocoBarProps {
 
 export function FocoBar({
   back = false,
+  onBack,
   avatar = null,
   avatarUri = null,
 }: FocoBarProps) {
@@ -44,7 +47,7 @@ export function FocoBar({
             styles.iconBtn,
             { backgroundColor: btnBg, borderColor: btnBorder, top: btnTop },
           ]}
-          onPress={() => { play('transition_down'); router.back(); }}
+          onPress={() => { play('transition_down'); onBack ? onBack() : router.back(); }}
           activeOpacity={0.7}
         >
           {/* Chevron left */}

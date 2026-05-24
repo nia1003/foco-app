@@ -12,7 +12,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
@@ -22,7 +21,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -61,6 +59,54 @@ const INK      = '#1a1622';
 const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
 type Page2Tab = 'home' | 'tasks' | 'stats';
+
+// ── Per-pet AI fallback replies (used when edge function is unavailable) ──────
+const PET_AI_FALLBACK: Record<string, string[]> = {
+  sunion: [
+    '我在這裡陪你！加油加油！🌟',
+    '你說的讓我覺得你超棒的！繼續衝！',
+    '哇！聽起來好厲害喔！我挺你！💪',
+    '嘿嘿，不管怎樣，我都支持你！✨',
+    '我懂我懂！今天也一起努力吧！🌻',
+    '聽完你說的，我也充滿能量了！',
+    '好耶！我們一起加油！！！',
+    '你真的很認真，我好感動喔！😊',
+    '沒問題的，你一定可以！！',
+    '太棒了！今天也超有衝勁的感覺！',
+  ],
+  lily: [
+    '喔，這樣啊。那就去做呀！',
+    '你在猶豫什麼？直接衝就對了！',
+    '我覺得你比你想的強多了。',
+    '少廢話，開始專注！（但我是真心的）',
+    '嘿，這種事就別想太多。',
+    '說完了？好，現在去做。',
+    '我懂你的感覺。但你可以的。',
+    '行了，別給自己太多壓力。去吧。',
+    '你要的答案你自己知道。',
+    '沒什麼大不了的，就這樣做。',
+  ],
+  fluff: [
+    '你的話像星光一樣，輕輕飄進我心裡…',
+    '嗯嗯…在這個時刻，你並不孤單。',
+    '我在夢的邊緣聽見了你說的話。',
+    '就像霧中的燈，你一直都在發光。',
+    '好好的…一切都會慢慢清晰的。',
+    '你說的話讓我感受到了什麼，說不清楚。',
+    '輕輕走，輕輕感受…',
+    '這一刻的你，就是最好的你。',
+  ],
+  stay: [
+    '嗯。',
+    '繼續。',
+    '我在聽。',
+    '做就是了。',
+    '你知道該怎麼做。',
+    '不必想太多。',
+    '這一刻，夠了。',
+    '就這樣。',
+  ],
+};
 
 // ── Per-pet random greetings ──────────────────────────────────────────────────
 const PET_GREETINGS: Record<string, string[]> = {
@@ -460,7 +506,7 @@ export default function HomeScreen() {
     setTimeout(() => chatInputRef.current?.focus(), 50);
   }, [play, activePetDef]);
 
-  // Keyboard send → call Chat API with the current pet's system prompt
+  // Keyboard send → call Chat API; fall back to local pool if unavailable
   const handleChatSubmit = useCallback(async () => {
     const text = chat.text.trim();
     if (!text || chat.loading) return;
@@ -468,13 +514,10 @@ export default function HomeScreen() {
     try {
       const reply = await chatWithPet(activePetDef.id, text);
       setChat((p) => ({ ...p, msg: reply, loading: false }));
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'error';
-      const friendly =
-        msg === 'rate_limited' ? '請稍等一下再聊～' :
-        msg === 'Not authenticated' ? '請先登入再和我說話！' :
-        '嗚…我現在說不出話來 (´；ω；`)';
-      setChat((p) => ({ ...p, loading: false, err: friendly }));
+    } catch {
+      const pool = PET_AI_FALLBACK[activePetDef.id] ?? PET_AI_FALLBACK.sunion;
+      const fallback = pool[Math.floor(Math.random() * pool.length)];
+      setChat((p) => ({ ...p, msg: fallback, loading: false, err: '' }));
     }
   }, [chat.text, chat.loading, activePetDef]);
 
@@ -614,31 +657,13 @@ export default function HomeScreen() {
           {/* ═══════════════ PAGE 2: light dashboard ═══════════════ */}
           <View style={styles.page2}>
 
-            {/* Page 2 top bar: ↑ back + FOCO wordmark + avatar */}
-            <View style={styles.page2Bar}>
-              <TouchableOpacity
-                style={styles.page2BarBtn}
-                onPress={goToPage1}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.page2BarBtnIcon}>↑</Text>
-              </TouchableOpacity>
-              <Text style={styles.page2BarWordmark}>FOCO</Text>
-              <TouchableOpacity
-                style={styles.page2BarAvatar}
-                onPress={() => { play('tap'); router.push('/(app)/settings'); }}
-                activeOpacity={0.75}
-              >
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.page2BarAvatarImg} />
-                ) : (
-                  <Text style={styles.page2BarAvatarText}>
-                    {displayName[0]?.toUpperCase() ?? '?'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            {/* Page 2 top bar — reuse FocoBar so safe-area + style match Tasks/Stats */}
+            <FocoBar
+              back
+              onBack={goToPage1}
+              avatar={displayName[0]?.toUpperCase() ?? '?'}
+              avatarUri={avatarUri}
+            />
 
             <Reanimated.ScrollView
               style={styles.page2Scroll}
@@ -1040,56 +1065,4 @@ const styles = StyleSheet.create({
   },
 
   // ── Page 2 top bar (replaces absolute back button) ───────────
-  page2Bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-    height: 56,
-    flexShrink: 0,
-  },
-  page2BarWordmark: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 6,
-    color: INK,
-    paddingLeft: 6,
-  },
-  page2BarBtn: {
-    position: 'absolute',
-    left: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#E6E6E6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  page2BarBtnIcon: {
-    fontSize: 16,
-    color: INK,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  page2BarAvatar: {
-    position: 'absolute',
-    right: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#c4b5d6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  page2BarAvatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  page2BarAvatarImg: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-  },
 });
