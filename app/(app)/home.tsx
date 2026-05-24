@@ -9,7 +9,6 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   NativeScrollEvent,
@@ -29,6 +28,7 @@ import Reanimated, {
   useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -38,9 +38,10 @@ import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
-import { chatWithPet, getPets, getTasks } from '@/services/focoService';
-import { mockPets, mockTasks } from '@/data/mockData';
-import type { Task } from '@/types';
+import { useTaskStore } from '@/stores/taskStore';
+import { chatWithPet, getPets } from '@/services/focoService';
+import { mockPets } from '@/data/mockData';
+import type { Task, TaskCategory } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PET_CARD_W    = Math.round(SCREEN_W * 0.72);
@@ -102,60 +103,6 @@ function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
   );
 }
 
-function AddDailyTaskCard({
-  value,
-  error,
-  loading,
-  onChange,
-  onCancel,
-  onSubmit,
-}: {
-  value: string;
-  error: string | null;
-  loading: boolean;
-  onChange: (value: string) => void;
-  onCancel: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <View style={[taskStyles.card, taskStyles.addCard]}>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder="New daily task"
-        placeholderTextColor="rgba(26,22,34,0.38)"
-        style={taskStyles.addInput}
-        autoFocus
-        returnKeyType="done"
-        onSubmitEditing={onSubmit}
-      />
-      {error && <Text style={taskStyles.addError} numberOfLines={1}>{error}</Text>}
-      <View style={taskStyles.addActions}>
-        <TouchableOpacity
-          style={[taskStyles.iconBtn, taskStyles.cancelBtn]}
-          onPress={onCancel}
-          activeOpacity={0.75}
-          disabled={loading}
-        >
-          <X size={16} color={INK} strokeWidth={2.6} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[taskStyles.iconBtn, taskStyles.confirmBtn]}
-          onPress={onSubmit}
-          activeOpacity={0.75}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={INK} />
-          ) : (
-            <Check size={17} color={INK} strokeWidth={2.8} />
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 const taskStyles = StyleSheet.create({
   card: {
     width: 137,
@@ -190,42 +137,6 @@ const taskStyles = StyleSheet.create({
     color: INK,
     fontWeight: '700',
     letterSpacing: 2,
-  },
-  addCard: {
-    gap: 6,
-  },
-  addInput: {
-    width: '100%',
-    minHeight: 44,
-    padding: 0,
-    color: INK,
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 17,
-  },
-  addError: {
-    color: '#9d3354',
-    fontSize: 10,
-    lineHeight: 12,
-  },
-  addActions: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtn: {
-    backgroundColor: 'rgba(26,22,34,0.08)',
-  },
-  confirmBtn: {
-    backgroundColor: PINK,
   },
 });
 
@@ -336,6 +247,7 @@ export default function HomeScreen() {
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
+  const [addTaskCategory, setAddTaskCategory]         = useState<TaskCategory | null>(null);
 
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -491,6 +403,11 @@ export default function HomeScreen() {
       },
     });
   };
+
+  const openHomeTaskModal = useCallback((category: TaskCategory) => {
+    play('tap');
+    setAddTaskCategory(category);
+  }, [play]);
 
   const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const xOffset = e.nativeEvent.contentOffset.x;
@@ -695,40 +612,56 @@ export default function HomeScreen() {
                   </View>
 
                   {/* Daily tasks preview */}
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabelInHeader}>daily tasks</Text>
+                    <TouchableOpacity
+                      style={styles.addTaskBtn}
+                      onPress={() => openHomeTaskModal('daily')}
+                      activeOpacity={0.75}
+                    >
+                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                    </TouchableOpacity>
+                  </View>
                   {dailyTasks.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>daily tasks</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.taskRow}
-                        nestedScrollEnabled
-                      >
-                        {dailyTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                        ))}
-                      </ScrollView>
-                    </>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {dailyTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
                   )}
 
                   {/* Deadline tasks preview */}
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionLabelInHeader}>deadlines</Text>
+                    <TouchableOpacity
+                      style={styles.addTaskBtn}
+                      onPress={() => openHomeTaskModal('task')}
+                      activeOpacity={0.75}
+                    >
+                      <Plus size={16} color={INK} strokeWidth={2.8} />
+                    </TouchableOpacity>
+                  </View>
                   {deadlineTasks.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>deadlines</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.taskRow}
-                        nestedScrollEnabled
-                      >
-                        {deadlineTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
-                        ))}
-                      </ScrollView>
-                    </>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.taskRow}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {deadlineTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} onPress={() => goFocus(task)} />
+                      ))}
+                    </ScrollView>
                   )}
 
-                  {dailyTasks.length === 0 && deadlineTasks.length === 0 && !isAddingDailyTask && !isAddingDeadlineTask && (
+                  {dailyTasks.length === 0 && deadlineTasks.length === 0 && (
                     <Text style={styles.emptyTasks}>No pending tasks — you're all clear 🎉</Text>
                   )}
 
