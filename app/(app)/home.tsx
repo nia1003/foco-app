@@ -91,8 +91,9 @@ const PET_GREETINGS: Record<string, string[]> = {
 function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
   return (
     <View style={taskStyles.card}>
-      <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <BlurView intensity={32} tint="default" style={StyleSheet.absoluteFillObject} />
       <View style={[StyleSheet.absoluteFillObject, taskStyles.glassOverlay]} pointerEvents="none" />
+      <View style={taskStyles.glassSheen} pointerEvents="none" />
       <View style={[StyleSheet.absoluteFillObject, taskStyles.glassBorder]} pointerEvents="none" />
       <View style={taskStyles.inner}>
         <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
@@ -117,12 +118,20 @@ const taskStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   glassOverlay: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.13)',
     borderRadius: 16,
+  },
+  glassSheen: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: '52%',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   glassBorder: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.30)',
     borderRadius: 16,
   },
   inner: {
@@ -618,8 +627,9 @@ export default function HomeScreen() {
                       { val: '—', lbl: 'streak\ndays' },
                     ].map((item) => (
                       <View key={item.lbl} style={styles.statsTile}>
-                        <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFillObject} />
+                        <BlurView intensity={32} tint="default" style={StyleSheet.absoluteFillObject} />
                         <View style={[StyleSheet.absoluteFillObject, styles.statsTileOverlay]} pointerEvents="none" />
+                        <View style={styles.statsTileSheen} pointerEvents="none" />
                         <View style={[StyleSheet.absoluteFillObject, styles.statsTileBorder]} pointerEvents="none" />
                         <Text style={styles.statsTileVal}>{item.val}</Text>
                         <Text style={styles.statsTileLbl}>{item.lbl}</Text>
@@ -684,8 +694,9 @@ export default function HomeScreen() {
                   {/* Timer */}
                   <Text style={styles.sectionLabel}>timer</Text>
                   <View style={styles.gaugeCard}>
-                    <BlurView intensity={48} tint="dark" style={StyleSheet.absoluteFillObject} />
+                    <BlurView intensity={32} tint="default" style={StyleSheet.absoluteFillObject} />
                     <View style={[StyleSheet.absoluteFillObject, styles.gaugeGlassOverlay]} pointerEvents="none" />
+                    <View style={styles.gaugeGlassSheen} pointerEvents="none" />
                     <View style={[StyleSheet.absoluteFillObject, styles.gaugeGlassBorder]} pointerEvents="none" />
                     <View style={styles.gaugeInner}>
                       <TimerGauge value={durationMin} onChange={setDurationMin} />
@@ -918,12 +929,20 @@ const styles = StyleSheet.create({
     minHeight: 72,
   },
   statsTileOverlay: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.13)',
     borderRadius: 16,
+  },
+  statsTileSheen: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: '52%',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   statsTileBorder: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.30)',
     borderRadius: 16,
   },
   statsTileVal: {
@@ -975,12 +994,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   gaugeGlassOverlay: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.13)',
     borderRadius: 20,
+  },
+  gaugeGlassSheen: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: '45%',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   gaugeGlassBorder: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.30)',
     borderRadius: 20,
   },
   gaugeInner: {
