@@ -693,15 +693,7 @@ export default function HomeScreen() {
 
                   {/* Timer */}
                   <Text style={styles.sectionLabel}>timer</Text>
-                  <View style={styles.gaugeCard}>
-                    <BlurView intensity={32} tint="default" style={StyleSheet.absoluteFillObject} />
-                    <View style={[StyleSheet.absoluteFillObject, styles.gaugeGlassOverlay]} pointerEvents="none" />
-                    <View style={styles.gaugeGlassSheen} pointerEvents="none" />
-                    <View style={[StyleSheet.absoluteFillObject, styles.gaugeGlassBorder]} pointerEvents="none" />
-                    <View style={styles.gaugeInner}>
-                      <TimerGauge value={durationMin} onChange={setDurationMin} />
-                    </View>
-                  </View>
+                  <TimerGauge value={durationMin} onChange={setDurationMin} />
                 </>
               )}
 
@@ -989,31 +981,6 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
 
-  gaugeCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  gaugeGlassOverlay: {
-    backgroundColor: 'rgba(255,255,255,0.13)',
-    borderRadius: 20,
-  },
-  gaugeGlassSheen: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: '45%',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  gaugeGlassBorder: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.30)',
-    borderRadius: 20,
-  },
-  gaugeInner: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
 
   taskRow: {
     gap: 12,
