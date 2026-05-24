@@ -1,11 +1,11 @@
 // ================================================================
 // FOCO — Edge Function: pet-chat
-// Calls Google Gemini 1.5 Flash (free tier) with a per-pet system prompt.
+// Calls Together AI (free tier) with a per-pet system prompt.
 // Rate-limit: 1 request per 10 seconds per user (pet_chat_rate_limit table).
 // Runtime: Deno (Supabase Edge Functions)
 //
-// Setup: add GEMINI_API_KEY secret in Supabase Dashboard → Settings → Secrets
-//   Get a free key at: https://aistudio.google.com/
+// Setup: add TOGETHER_API_KEY secret in Supabase Dashboard → Settings → Secrets
+//   Get a free key at: https://api.together.ai/
 // ================================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -34,8 +34,8 @@ const PET_PROMPTS: Record<string, string> = {
 禁止：廢話、感嘆號、超過 20 字。`,
 }
 
-const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+const TOGETHER_API_URL = 'https://api.together.xyz/v1/chat/completions'
+const TOGETHER_MODEL   = 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free'
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -90,10 +90,10 @@ serve(async (req: Request) => {
       last_at: new Date(now).toISOString(),
     })
 
-    // ── Call Google Gemini 1.5 Flash ───────────────────────────
-    const geminiKey = Deno.env.get('GEMINI_API_KEY') ?? ''
-    if (!geminiKey) {
-      console.error('GEMINI_API_KEY not set')
+    // ── Call Together AI ───────────────────────────────────────
+    const togetherKey = Deno.env.get('TOGETHER_API_KEY') ?? ''
+    if (!togetherKey) {
+      console.error('TOGETHER_API_KEY not set')
       return new Response(JSON.stringify({ error: 'ai_error' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -101,31 +101,34 @@ serve(async (req: Request) => {
 
     const systemPrompt = PET_PROMPTS[petId] ?? PET_PROMPTS['sunion']
 
-    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${geminiKey}`, {
+    const togetherRes = await fetch(TOGETHER_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${togetherKey}`,
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts: [{ text: message }] }],
-        generationConfig: {
-          maxOutputTokens: 80,
-          temperature: 0.9,
-          topP: 0.95,
-        },
+        model: TOGETHER_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: message },
+        ],
+        max_tokens: 80,
+        temperature: 0.9,
+        top_p: 0.95,
       }),
     })
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text()
-      console.error('Gemini API error:', geminiRes.status, err)
+    if (!togetherRes.ok) {
+      const err = await togetherRes.text()
+      console.error('Together AI error:', togetherRes.status, err)
       return new Response(JSON.stringify({ error: 'ai_error' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const geminiData = await geminiRes.json()
-    const reply: string =
-      geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '...'
+    const togetherData = await togetherRes.json()
+    const reply: string = togetherData.choices?.[0]?.message?.content?.trim() ?? '...'
 
     return new Response(JSON.stringify({ reply }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
