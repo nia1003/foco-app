@@ -19,10 +19,16 @@ export async function chatWithPet(petId: string, message: string): Promise<strin
   });
 
   if (error) {
-    // FunctionsHttpError has a context.status; extract it when available
-    const status = (error as { context?: { status?: number } }).context?.status;
-    if (status === 429) throw new Error('rate_limited');
-    throw new Error(error.message ?? 'ai_error');
+    const ctx = (error as { context?: { status?: number; json?: () => Promise<any> } }).context;
+    if (ctx?.status === 429) throw new Error('rate_limited');
+    try {
+      const body = await ctx?.json?.();
+      if (body?.error === 'rate_limited') throw new Error('rate_limited');
+      if (body?.detail) console.error('[chat] ai detail:', body.detail);
+    } catch (inner) {
+      if (inner instanceof Error && inner.message === 'rate_limited') throw inner;
+    }
+    throw new Error('ai_error');
   }
 
   const reply = data?.reply as string | undefined;

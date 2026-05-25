@@ -242,7 +242,9 @@ serve(async (req) => {
     )
 
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = err instanceof Error
+      ? err.message
+      : (err as any)?.message ?? JSON.stringify(err)
     return new Response(
       JSON.stringify({ error: message }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

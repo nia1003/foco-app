@@ -1,11 +1,10 @@
 // ================================================================
-// FOCO — Edge Function: pet-chat  [v3]
-// Calls Together AI (free tier) with a per-pet system prompt.
+// FOCO — Edge Function: pet-chat  [v4]
+// Calls Together AI with a per-pet system prompt.
 // Rate-limit: 1 request per 10 seconds per user (pet_chat_rate_limit table).
 // Runtime: Deno (Supabase Edge Functions)
 //
-// Setup: add TOGETHER_API_KEY secret in Supabase Dashboard → Settings → Secrets
-//   Get a free key at: https://api.together.ai/
+// Setup: TOGETHER_API_KEY secret in Supabase Dashboard → Settings → Secrets
 // ================================================================
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -17,17 +16,17 @@ const corsHeaders = {
 }
 
 const PET_PROMPTS: Record<string, string> = {
-  sunion: `你是 Sunion，一隻圓滾滾、樂天派的寵物夥伴。用繁體中文回覆，不超過 30 字，個性熱情鼓勵、帶點傻氣，可加語助詞（哇、欸、嘿嘿）。禁止說教、說英文。`,
+  sunion: `You are Sunion, a chubby, cheerful pet companion. Reply in English only, under 30 words. Be enthusiastic, encouraging, and a little goofy. No lecturing.`,
 
-  lily: `你是 Lily，一隻充滿活力、直接又調皮的寵物夥伴。用繁體中文回覆，不超過 30 字，語氣爽朗直接、有點嗆但不失溫暖。禁止囉嗦、說教、說英文。`,
+  lily: `You are Lily, an energetic, blunt, and playful pet companion. Reply in English only, under 30 words. Be direct and a little cheeky but warm. No rambling or lecturing.`,
 
-  fluff: `你是 Fluff，一隻夢幻、溫柔、說話像詩的寵物夥伴。用繁體中文回覆，不超過 30 字，語句有意境、像在做夢。禁止直白務實、說英文。`,
+  fluff: `You are Fluff, a dreamy, gentle pet companion who speaks like poetry. Reply in English only, under 30 words. Be lyrical and wistful. No blunt or practical talk.`,
 
-  stay: `你是 Stay，一隻冷靜、深邃、話少但有份量的寵物夥伴。用繁體中文回覆，不超過 30 字，極簡有力。禁止廢話、感嘆號、說英文。`,
+  stay: `You are Stay, a calm, deep, quietly powerful pet companion. Reply in English only, under 30 words. Be minimal and impactful. No filler words or exclamation marks.`,
 }
 
 const TOGETHER_API_URL = 'https://api.together.ai/v1/chat/completions'
-const TOGETHER_MODEL   = 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free'
+const TOGETHER_MODEL   = 'meta-llama/Meta-Llama-3-8B-Instruct-Lite'
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -63,16 +62,21 @@ serve(async (req: Request) => {
       })
     }
 
-    // ── Backend rate limit: 1 req / 10s per user (graceful — skipped if table missing) ──
+    // ── Backend rate limit: 3 req / 10s per user (graceful — skipped if table missing) ──
+    const RATE_WINDOW_MS = 10_000
+    const RATE_MAX       = 3
     const now = Date.now()
     try {
       const { data: rateRow } = await supabase
         .from('pet_chat_rate_limit')
-        .select('last_at')
+        .select('last_at, count')
         .eq('user_id', user.id)
         .maybeSingle()
 
-      if (rateRow?.last_at && now - new Date(rateRow.last_at).getTime() < 10_000) {
+      const withinWindow = rateRow?.last_at &&
+        now - new Date(rateRow.last_at).getTime() < RATE_WINDOW_MS
+
+      if (withinWindow && (rateRow.count ?? 0) >= RATE_MAX) {
         return new Response(JSON.stringify({ error: 'rate_limited' }), {
           status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -80,7 +84,8 @@ serve(async (req: Request) => {
 
       await supabase.from('pet_chat_rate_limit').upsert({
         user_id: user.id,
-        last_at: new Date(now).toISOString(),
+        last_at: withinWindow ? rateRow!.last_at : new Date(now).toISOString(),
+        count:   withinWindow ? (rateRow!.count ?? 0) + 1 : 1,
       })
     } catch (_rateErr) {
       // rate-limit table unavailable — allow request through
@@ -94,9 +99,9 @@ serve(async (req: Request) => {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    console.log('[pet-chat] calling Together AI, petId:', petId)
 
     const systemPrompt = PET_PROMPTS[petId] ?? PET_PROMPTS['sunion']
+    console.log('[pet-chat] calling Together AI, petId:', petId)
 
     const togetherRes = await fetch(TOGETHER_API_URL, {
       method: 'POST',
@@ -119,15 +124,15 @@ serve(async (req: Request) => {
     if (!togetherRes.ok) {
       const err = await togetherRes.text()
       console.error('[pet-chat] Together AI error:', togetherRes.status, err)
-      return new Response(JSON.stringify({ error: 'ai_error', detail: togetherRes.status }), {
+      return new Response(JSON.stringify({ error: 'ai_error', detail: `${togetherRes.status}: ${err}` }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    console.log('[pet-chat] Together AI success')
 
     const togetherData = await togetherRes.json()
     const reply: string = togetherData.choices?.[0]?.message?.content?.trim() ?? '...'
 
+    console.log('[pet-chat] Together AI success')
     return new Response(JSON.stringify({ reply }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
