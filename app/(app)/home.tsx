@@ -439,8 +439,11 @@ export default function HomeScreen() {
     try {
       const reply = await chatWithPet(activePetDef.id, text);
       setChat((p) => ({ ...p, msg: reply, loading: false }));
-    } catch {
-      setChat((p) => ({ ...p, msg: '', loading: false, err: '網路不穩，請再試一次' }));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[chat] error:', msg);
+      const display = msg === 'rate_limited' ? '請稍等 10 秒再試' : msg;
+      setChat((p) => ({ ...p, msg: '', loading: false, err: display }));
     }
   }, [chat.text, chat.loading, activePetDef]);
 
