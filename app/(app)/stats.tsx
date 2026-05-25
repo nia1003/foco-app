@@ -258,6 +258,69 @@ function isAnchorInFuture(anchor: Date, mode: PeriodMode): boolean {
   return startOfDay(shifted) > today;
 }
 
+// ── History-tab helpers ───────────────────────────────────────────
+type HistoryTab = 'daily' | 'weekly' | 'monthly';
+
+const HOUR_SLOTS = [0, 3, 6, 9, 12, 15, 18, 21];
+const WEEK_DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function buildHourlyStats(sessions: SessionRecord[], anchor: Date): DayStat[] {
+  const dayStart = startOfDay(anchor);
+  return HOUR_SLOTS.map((h) => {
+    const slotStart = dayStart.getTime() + h * 3_600_000;
+    const agg = aggregateSessions(sessions, slotStart, slotStart + 3 * 3_600_000);
+    return { date: new Date(slotStart), day: String(h).padStart(2, '0'), ...agg };
+  });
+}
+
+function getMondayOf(d: Date): Date {
+  const dow = d.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  const mon = new Date(d);
+  mon.setDate(mon.getDate() + diff);
+  return startOfDay(mon);
+}
+
+function buildThisWeekStats(sessions: SessionRecord[], anchor: Date): DayStat[] {
+  const mon = getMondayOf(anchor);
+  return WEEK_DAY_LABELS.map((label, i) => {
+    const dayStart = new Date(mon);
+    dayStart.setDate(mon.getDate() + i);
+    const agg = aggregateSessions(
+      sessions,
+      dayStart.getTime(),
+      dayStart.getTime() + 86_400_000,
+    );
+    return { date: dayStart, day: label, ...agg };
+  });
+}
+
+function formatHistoryPeriod(tab: HistoryTab, anchor: Date): string {
+  if (tab === 'daily') {
+    return `${MONTHS[anchor.getMonth()]} ${anchor.getDate()}, ${anchor.getFullYear()}`;
+  }
+  if (tab === 'weekly') {
+    const mon = getMondayOf(anchor);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    return `${MONTHS[mon.getMonth()]} ${mon.getDate()} – ${sun.getDate()}, ${sun.getFullYear()}`;
+  }
+  return `${MONTHS[anchor.getMonth()]} ${anchor.getFullYear()}`;
+}
+
+function shiftHistoryAnchor(anchor: Date, tab: HistoryTab, dir: -1 | 1): Date {
+  const d = new Date(anchor);
+  if (tab === 'daily') d.setDate(d.getDate() + dir);
+  else if (tab === 'weekly') d.setDate(d.getDate() + dir * 7);
+  else d.setMonth(d.getMonth() + dir);
+  return d;
+}
+
+function isHistoryAnchorFuture(anchor: Date, tab: HistoryTab): boolean {
+  const today = startOfDay(new Date());
+  return startOfDay(shiftHistoryAnchor(anchor, tab, 1)) > today;
+}
+
 // Returns fraction (0–1) for each DISC type across all sessions
 function buildDiscData(sessions: SessionRecord[]): Record<string, number> {
   const counts: Record<string, number> = {
@@ -665,9 +728,6 @@ export default function StatsScreen() {
     streak_days: 0,
     total_sessions: 0,
   });
-  const [periodMode, setPeriodMode] = useState<PeriodMode>('day');
-  const [chartAnchor, setChartAnchor] = useState(() => new Date());
-  const [selectedDay, setSelectedDay] = useState(6);
   const [shareOpen, setShareOpen] = useState(false);
   const [focusGroupMode, setFocusGroupMode] =
     useState<FocusGroupMode>('category');
@@ -676,6 +736,9 @@ export default function StatsScreen() {
   const [calYear, setCalYear] = useState(nowDate.getFullYear());
   const [calMonth, setCalMonth] = useState(nowDate.getMonth() + 1);
   const [calData, setCalData] = useState<DayData[]>([]);
+  const [historyTab, setHistoryTab] = useState<HistoryTab>('weekly');
+  const [historyAnchor, setHistoryAnchor] = useState(() => new Date());
+  const [historySelectedIdx, setHistorySelectedIdx] = useState(6);
 
   useEffect(() => {
     if (!userId) {
@@ -725,9 +788,26 @@ export default function StatsScreen() {
     setCalMonth(m);
   };
 
-  const chartStats = buildChartStats(sessions, periodMode, chartAnchor);
-  const chartPeriodLabel = formatChartPeriod(periodMode, chartAnchor);
-  const chartForwardDisabled = isAnchorInFuture(chartAnchor, periodMode);
+  const historyForwardDisabled =
+    historyTab !== 'monthly' && isHistoryAnchorFuture(historyAnchor, historyTab);
+  const historyPeriodLabel = formatHistoryPeriod(historyTab, historyAnchor);
+  const historyStats = useMemo<DayStat[]>(() => {
+    if (historyTab === 'daily') return buildHourlyStats(sessions, historyAnchor);
+    if (historyTab === 'weekly') return buildThisWeekStats(sessions, historyAnchor);
+    return [];
+  }, [historyTab, historyAnchor, sessions]);
+
+  const handleHistoryTabChange = (tab: HistoryTab) => {
+    setHistoryTab(tab);
+    setHistoryAnchor(new Date());
+    setHistorySelectedIdx(tab === 'daily' ? HOUR_SLOTS.length - 1 : 6);
+  };
+  const handleHistoryBack = () =>
+    setHistoryAnchor((prev) => shiftHistoryAnchor(prev, historyTab, -1));
+  const handleHistoryForward = () => {
+    if (!historyForwardDisabled)
+      setHistoryAnchor((prev) => shiftHistoryAnchor(prev, historyTab, 1));
+  };
 
   const discData = buildDiscData(sessions);
   const dominant = getDominantType(discData);
@@ -740,44 +820,6 @@ export default function StatsScreen() {
   );
 
   const totalHours = Math.round((summary.total_focus_sec / 3600) * 10) / 10;
-  const selected = chartStats[selectedDay];
-
-  const handlePeriodMode = (mode: PeriodMode) => {
-    setPeriodMode(mode);
-    setChartAnchor(new Date());
-    const pointCount =
-      mode === 'day' ? 7 : mode === 'week' ? WEEKLY_POINTS : MONTHLY_POINTS;
-    setSelectedDay(pointCount - 1);
-  };
-
-  const handleChartBack = () => {
-    setChartAnchor((prev) => shiftChartAnchor(prev, periodMode, -1));
-    setSelectedDay((prev) =>
-      Math.min(
-        prev,
-        (periodMode === 'day'
-          ? 7
-          : periodMode === 'week'
-          ? WEEKLY_POINTS
-          : MONTHLY_POINTS) - 1,
-      ),
-    );
-  };
-
-  const handleChartForward = () => {
-    if (chartForwardDisabled) return;
-    setChartAnchor((prev) => shiftChartAnchor(prev, periodMode, 1));
-    setSelectedDay((prev) =>
-      Math.min(
-        prev,
-        (periodMode === 'day'
-          ? 7
-          : periodMode === 'week'
-          ? WEEKLY_POINTS
-          : MONTHLY_POINTS) - 1,
-      ),
-    );
-  };
 
   if (loading) {
     return (
@@ -797,7 +839,7 @@ export default function StatsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Stats</Text>
-        <Text style={styles.sub}>{chartPeriodLabel}</Text>
+        <Text style={styles.sub}>{historyPeriodLabel}</Text>
 
         {/* ── Summary row ────────────────────────────── */}
         <View style={styles.summaryRow}>
@@ -817,44 +859,29 @@ export default function StatsScreen() {
           ))}
         </View>
 
-        {/* ── Focus Calendar (from Home) ─────────────── */}
-        <View style={styles.section}>
-          <Text style={styles.calEyebrow}>FOCUS HISTORY</Text>
-          <View style={styles.flatCard}>
-            <View style={styles.calInner}>
-              <FocusCalendar
-                year={calYear}
-                month={calMonth}
-                data={calData}
-                onMonthChange={handleMonthChange}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* ── Line chart ─────────────────────────────── */}
+        {/* ── Focus History (Daily / Weekly / Monthly) ─── */}
         <View style={styles.section}>
           <View style={styles.flatCard}>
             <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Daily Focus Time</Text>
+              <Text style={styles.chartTitle}>Focus History</Text>
 
               <View style={styles.periodModes}>
                 {(
                   [
-                    { key: 'day' as const, label: 'Daily' },
-                    { key: 'week' as const, label: 'Weekly' },
-                    { key: 'month' as const, label: 'Monthly' },
+                    { key: 'daily'   as const, label: 'Daily'   },
+                    { key: 'weekly'  as const, label: 'Weekly'  },
+                    { key: 'monthly' as const, label: 'Monthly' },
                   ] as const
                 ).map(({ key, label }) => (
                   <TouchableOpacity
                     key={key}
-                    onPress={() => handlePeriodMode(key)}
+                    onPress={() => handleHistoryTabChange(key)}
                     activeOpacity={0.7}
                   >
                     <Text
                       style={[
                         styles.periodModeLabel,
-                        periodMode === key && styles.periodModeLabelActive,
+                        historyTab === key && styles.periodModeLabelActive,
                       ]}
                     >
                       {label}
@@ -863,45 +890,62 @@ export default function StatsScreen() {
                 ))}
               </View>
 
-              <View style={styles.chartNav}>
-                <TouchableOpacity
-                  onPress={handleChartBack}
-                  style={styles.chartNavBtn}
-                  activeOpacity={0.6}
-                >
-                  <Text style={styles.chartNavArrow}>‹</Text>
-                </TouchableOpacity>
-                <Text style={styles.chartPeriodLabel}>{chartPeriodLabel}</Text>
-                <TouchableOpacity
-                  onPress={handleChartForward}
-                  style={styles.chartNavBtn}
-                  activeOpacity={0.6}
-                  disabled={chartForwardDisabled}
-                >
-                  <Text
-                    style={[
-                      styles.chartNavArrow,
-                      chartForwardDisabled && styles.chartNavArrowDisabled,
-                    ]}
+              {historyTab !== 'monthly' && (
+                <View style={styles.chartNav}>
+                  <TouchableOpacity
+                    onPress={handleHistoryBack}
+                    style={styles.chartNavBtn}
+                    activeOpacity={0.6}
                   >
-                    ›
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <LineChart
-                chartStats={chartStats}
-                selectedIndex={selectedDay}
-                onSelect={setSelectedDay}
-              />
-              {selected && (
-                <View style={styles.selectedDetail}>
-                  <Text style={styles.selectedDetailText}>
-                    {selected.sessions} session
-                    {selected.sessions !== 1 ? 's' : ''} · {selected.hours}h
-                    focused
-                  </Text>
+                    <Text style={styles.chartNavArrow}>‹</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.chartPeriodLabel}>{historyPeriodLabel}</Text>
+                  <TouchableOpacity
+                    onPress={handleHistoryForward}
+                    style={styles.chartNavBtn}
+                    activeOpacity={0.6}
+                    disabled={historyForwardDisabled}
+                  >
+                    <Text
+                      style={[
+                        styles.chartNavArrow,
+                        historyForwardDisabled && styles.chartNavArrowDisabled,
+                      ]}
+                    >
+                      ›
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+              )}
+
+              {historyTab === 'monthly' ? (
+                <View style={styles.calInner}>
+                  <FocusCalendar
+                    year={calYear}
+                    month={calMonth}
+                    data={calData}
+                    onMonthChange={handleMonthChange}
+                  />
+                </View>
+              ) : (
+                <>
+                  <LineChart
+                    chartStats={historyStats}
+                    selectedIndex={historySelectedIdx}
+                    onSelect={setHistorySelectedIdx}
+                  />
+                  {historyStats[historySelectedIdx] && (
+                    <View style={styles.selectedDetail}>
+                      <Text style={styles.selectedDetailText}>
+                        {historyStats[historySelectedIdx].sessions} session
+                        {historyStats[historySelectedIdx].sessions !== 1
+                          ? 's'
+                          : ''}{' '}
+                        · {historyStats[historySelectedIdx].hours}h focused
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           </View>
