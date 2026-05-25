@@ -1,5 +1,5 @@
 // ================================================================
-// FOCO — Edge Function: pet-chat
+// FOCO — Edge Function: pet-chat  [v3]
 // Calls Together AI (free tier) with a per-pet system prompt.
 // Rate-limit: 1 request per 10 seconds per user (pet_chat_rate_limit table).
 // Runtime: Deno (Supabase Edge Functions)
