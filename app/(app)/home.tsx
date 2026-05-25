@@ -60,53 +60,6 @@ const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
 type Page2Tab = 'home' | 'tasks' | 'stats';
 
-// ── Per-pet AI fallback replies (used when edge function is unavailable) ──────
-const PET_AI_FALLBACK: Record<string, string[]> = {
-  sunion: [
-    '我在這裡陪你！加油加油！🌟',
-    '你說的讓我覺得你超棒的！繼續衝！',
-    '哇！聽起來好厲害喔！我挺你！💪',
-    '嘿嘿，不管怎樣，我都支持你！✨',
-    '我懂我懂！今天也一起努力吧！🌻',
-    '聽完你說的，我也充滿能量了！',
-    '好耶！我們一起加油！！！',
-    '你真的很認真，我好感動喔！😊',
-    '沒問題的，你一定可以！！',
-    '太棒了！今天也超有衝勁的感覺！',
-  ],
-  lily: [
-    '喔，這樣啊。那就去做呀！',
-    '你在猶豫什麼？直接衝就對了！',
-    '我覺得你比你想的強多了。',
-    '少廢話，開始專注！（但我是真心的）',
-    '嘿，這種事就別想太多。',
-    '說完了？好，現在去做。',
-    '我懂你的感覺。但你可以的。',
-    '行了，別給自己太多壓力。去吧。',
-    '你要的答案你自己知道。',
-    '沒什麼大不了的，就這樣做。',
-  ],
-  fluff: [
-    '你的話像星光一樣，輕輕飄進我心裡…',
-    '嗯嗯…在這個時刻，你並不孤單。',
-    '我在夢的邊緣聽見了你說的話。',
-    '就像霧中的燈，你一直都在發光。',
-    '好好的…一切都會慢慢清晰的。',
-    '你說的話讓我感受到了什麼，說不清楚。',
-    '輕輕走，輕輕感受…',
-    '這一刻的你，就是最好的你。',
-  ],
-  stay: [
-    '嗯。',
-    '繼續。',
-    '我在聽。',
-    '做就是了。',
-    '你知道該怎麼做。',
-    '不必想太多。',
-    '這一刻，夠了。',
-    '就這樣。',
-  ],
-};
 
 
 // ── TaskCard ──────────────────────────────────────────────────────────────────
@@ -487,9 +440,7 @@ export default function HomeScreen() {
       const reply = await chatWithPet(activePetDef.id, text);
       setChat((p) => ({ ...p, msg: reply, loading: false }));
     } catch {
-      const pool = PET_AI_FALLBACK[activePetDef.id] ?? PET_AI_FALLBACK.sunion;
-      const fallback = pool[Math.floor(Math.random() * pool.length)];
-      setChat((p) => ({ ...p, msg: fallback, loading: false, err: '' }));
+      setChat((p) => ({ ...p, msg: '', loading: false, err: '網路不穩，請再試一次' }));
     }
   }, [chat.text, chat.loading, activePetDef]);
 
