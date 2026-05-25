@@ -108,33 +108,6 @@ const PET_AI_FALLBACK: Record<string, string[]> = {
   ],
 };
 
-// ── Per-pet random greetings ──────────────────────────────────────────────────
-const PET_GREETINGS: Record<string, string[]> = {
-  sunion: [
-    "Ready to focus? Let's go! 🌟",
-    "You've got this! I believe in you 💪",
-    "One focused session at a time ✨",
-    "Today is a great day to start 🌻",
-  ],
-  lily: [
-    "Bloom where you're planted 🌸",
-    "Growth takes patience — you're doing great!",
-    "Let's make today count 🌺",
-    "Every step forward matters 🌿",
-  ],
-  fluff: [
-    "Poof! Let's make magic happen ✨",
-    "Soft focus, big results 🌙",
-    "I'm here with you every step 💙",
-    "Float into your flow state 🫧",
-  ],
-  stay: [
-    "Reaching for the stars ⭐",
-    "You shine brightest when you focus 🌟",
-    "Let's conquer today! 💫",
-    "Starry focus coming right up ✦",
-  ],
-};
 
 // ── TaskCard ──────────────────────────────────────────────────────────────────
 function TaskCard({
@@ -479,32 +452,31 @@ export default function HomeScreen() {
     carouselRef.current?.scrollTo({ x: idx * PET_CARD_W, animated: true });
   };
 
-  // Tap pet → show random greeting (no keyboard)
-  const handlePetPress = useCallback((petId: string) => {
+  // Tap pet → open chat input (no greeting)
+  const handlePetPress = useCallback((_petId: string) => {
     play('tap');
-    const pool = PET_GREETINGS[petId] ?? PET_GREETINGS.sunion;
     setChat((prev) => ({
       ...prev,
       visible: true,
-      msg: pool[Math.floor(Math.random() * pool.length)],
+      msg: '',
       text: '',
       loading: false,
     }));
+    setTimeout(() => chatInputRef.current?.focus(), 50);
   }, [play]);
 
-  // "···" button → show greeting + open keyboard immediately
+  // "···" button → open chat input (no greeting)
   const handleChatBtnPress = useCallback(() => {
     play('tap');
-    const pool = PET_GREETINGS[activePetDef.id] ?? PET_GREETINGS.sunion;
     setChat({
       visible: true,
-      msg: pool[Math.floor(Math.random() * pool.length)],
+      msg: '',
       text: '',
       loading: false,
       err: '',
     });
     setTimeout(() => chatInputRef.current?.focus(), 50);
-  }, [play, activePetDef]);
+  }, [play]);
 
   // Keyboard send → call Chat API; fall back to local pool if unavailable
   const handleChatSubmit = useCallback(async () => {
@@ -623,9 +595,11 @@ export default function HomeScreen() {
               {/* ── Chat overlay — pure text, no bg/border ─── */}
               {chat.visible && (
                 <View style={styles.chatOverlay} pointerEvents="box-none">
-                  <Text style={styles.chatReplyText}>
-                    {chat.loading ? '···' : chat.err ? chat.err : chat.msg}
-                  </Text>
+                  {(chat.loading || chat.msg || chat.err) ? (
+                    <Text style={styles.chatReplyText}>
+                      {chat.loading ? '···' : chat.err ? chat.err : chat.msg}
+                    </Text>
+                  ) : null}
                   <TextInput
                     ref={chatInputRef}
                     style={styles.chatInputText}
