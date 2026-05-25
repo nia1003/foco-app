@@ -26,6 +26,7 @@ export default function AppLayout() {
       <Tabs.Screen name="settings"       options={{ href: null }} />
       <Tabs.Screen name="day-log"        options={{ href: null }} />
       <Tabs.Screen name="reflection"     options={{ href: null }} />
+      <Tabs.Screen name="disc-detail"    options={{ href: null }} />
     </Tabs>
   );
 }
