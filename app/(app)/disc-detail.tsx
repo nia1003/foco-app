@@ -97,7 +97,7 @@ export default function DiscDetailScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => { play('tap'); router.back(); }} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => { play('tap'); router.replace('/(app)/stats'); }} activeOpacity={0.7}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Focus Styles</Text>
