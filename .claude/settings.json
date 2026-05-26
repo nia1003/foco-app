@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ipconfig)",
+      "Bash(findstr \"IPv4\")",
+      "Bash(npm install *)",
+      "Bash(findstr \"8081\")"
+    ]
+  }
+}
