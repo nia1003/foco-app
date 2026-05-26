@@ -129,4 +129,4 @@ npx expo start --clear
 
 ## CI/CD
 
-詳見 [CI-CD.md](./CI-CD.md)。
+詳見 [CI-CD.md](./docs/CI-CD.md)。
