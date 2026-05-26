@@ -41,6 +41,9 @@ export async function completeSession(payload: SessionPayload): Promise<SessionR
   const session = await getCurrentSession();
   if (!session) throw new Error('Not authenticated');
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+
   const res = await fetch(
     `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/session-complete`,
     {
@@ -50,8 +53,9 @@ export async function completeSession(payload: SessionPayload): Promise<SessionR
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     },
-  );
+  ).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const msg = await res.text();

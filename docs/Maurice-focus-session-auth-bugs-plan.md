@@ -209,8 +209,36 @@ npm.cmd test -- --runInBand
 - [x] 已新增本實作計畫文件。
 - [x] Phase 0 已實作。
 - [x] Phase 1 已實作。
-- [ ] Phase 2 已實作。
+- [x] Phase 2 已實作。
 - [ ] Phase 3 已實作。
 - [ ] Phase 4 已實作。
 - [ ] Phase 5 已實作。
 - [ ] Phase 6 已驗證。
+ 
+## Phase 7 - Reflection scoring / XP regression
+
+Scope:
+- Fix Reflection form state persistence across focus sessions.
+- Ensure Reflection submit does not hide real save failures behind mock reward data.
+- Ensure quality score uses reflection completion percent when present.
+- Ensure XP/session save still works if the remote DB has not yet deployed the reflection columns.
+
+Files:
+- `app/(app)/reflection.tsx`
+- `app/(app)/focus.tsx`
+- `services/focoService.ts`
+- `supabase/functions/session-complete/index.ts`
+
+Implementation:
+- Reset selected distraction tags, completion slider, mood score, and submitting state whenever the Reflection route is focused with a new payload.
+- Keep the user on Reflection and show an actionable alert when `completeSession()` fails instead of navigating to mock Reward data.
+- Use `completion_percent` as the quality-score completion ratio in the Edge Function.
+- Insert session rows with reflection columns first, then retry without those optional columns if the deployed DB schema is still behind.
+- Preserve the real focus pet's `old_xp` so Reward progress animates from the correct starting value.
+
+Verification:
+- `npm.cmd run typecheck`
+- Start a focus session, press Done, verify Reflection opens with fresh default values.
+- Submit with 100% completion and verify Reward/Analysis score is non-zero.
+- Submit a second session and verify Reflection does not retain previous tags/mood/slider value.
+- Verify pet XP increases after a successful remote `session-complete` call.

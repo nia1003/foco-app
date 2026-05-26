@@ -383,7 +383,7 @@ export default function HomeScreen() {
       params: {
         durationMin: String(durationMin),
         petId: activePetRecord?.id ?? '',
-        taskId: task?.id ?? '',
+        ...(task?.id ? { taskId: task.id } : {}),
         ...(task ? { taskTitle: task.title } : {}),
       },
     });

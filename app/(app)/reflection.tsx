@@ -3,8 +3,10 @@
  * 三個快問題：分心標籤 + 完成度 + 心情
  * 提交後呼叫 completeSession + updateTaskProgress → reward
  */
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
+  Alert,
   GestureResponderEvent,
   ScrollView,
   StyleSheet,
@@ -15,9 +17,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { Colors } from '@/constants/theme';
-import { usePetStore } from '@/stores/petStore';
 import { completeSession, updateTaskProgress } from '@/services/focoService';
-import { mockSessionResult } from '@/data/mockData';
 import type { SessionPayload } from '@/types';
 
 const PINK     = Colors.pinkText;
@@ -103,7 +103,6 @@ function CompletionSlider({
 // ── Main screen ───────────────────────────────
 export default function ReflectionScreen() {
   const router = useRouter();
-  const { pets: allPets } = usePetStore();
 
   const { payloadJson, localStatsJson, defaultCompletion } =
     useLocalSearchParams<{
@@ -120,6 +119,15 @@ export default function ReflectionScreen() {
   const [completionPct, setCompletionPct] = useState(initPct);
   const [moodScore, setMoodScore] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedTags([]);
+      setCompletionPct(initPct);
+      setMoodScore(null);
+      setSubmitting(false);
+    }, [payloadJson, localStatsJson, initPct]),
+  );
 
   const toggleTag = (id: string) =>
     setSelectedTags((prev) =>
@@ -153,8 +161,15 @@ export default function ReflectionScreen() {
       }
 
       goToReward(JSON.stringify({ ...result, ...localStats }));
-    } catch {
-      goToReward(JSON.stringify({ ...mockSessionResult, ...localStats }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[FOCO] reflection submit failed:', message);
+      Alert.alert(
+        'Could not save session',
+        message === 'Not authenticated'
+          ? 'Please sign in again before saving this focus session.'
+          : 'Please check your connection and try again.',
+      );
     } finally {
       setSubmitting(false);
     }
