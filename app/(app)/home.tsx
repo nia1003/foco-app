@@ -43,6 +43,7 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { chatWithPet, getPets, deleteTask } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
+import { isMockPetId, resolveLaunchPetId } from '@/lib/focusSession';
 import type { Task, TaskCategory } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -257,7 +258,8 @@ export default function HomeScreen() {
   const { tasks, addTask, removeTask, fetchTasks } = useTaskStore();
   const avatarUri = usePreferencesStore((s) => s.avatarUri);
 
-  const storePool = pets.length > 0 ? pets : mockPets;
+  const realPets = pets.filter((pet) => !isMockPetId(pet.id));
+  const storePool = realPets.length > 0 ? realPets : mockPets;
 
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
@@ -343,7 +345,7 @@ export default function HomeScreen() {
     if (pets.length && !isStale) { restoreActivePet(); return; }
     getPets(userId)
       .then((fetched) => { setPets(fetched); restoreActivePet(); })
-      .catch(() => { if (!pets.length) setPets(mockPets); });
+      .catch(() => {});
   }, [userId]);
 
   useEffect(() => {
@@ -377,12 +379,26 @@ export default function HomeScreen() {
 
   // ── Handlers ────────────────────────────────────────────────────
   const goFocus = (task?: Task) => {
+    const launchPetId = resolveLaunchPetId({
+      requestedPetId: activePetRecord?.id,
+      pets,
+      activePet,
+    });
+
+    if (!launchPetId) {
+      Alert.alert(
+        'Companion still loading',
+        'Please wait a moment for your pets to sync, then start focus again.',
+      );
+      return;
+    }
+
     play('transition_up');
     router.push({
       pathname: '/(app)/focus',
       params: {
         durationMin: String(durationMin),
-        petId: activePetRecord?.id ?? '',
+        petId: launchPetId,
         ...(task?.id ? { taskId: task.id } : {}),
         ...(task ? { taskTitle: task.title } : {}),
       },
@@ -400,7 +416,7 @@ export default function HomeScreen() {
     setActiveCarouselIndex(idx);
     const def    = UNLOCKED_DEFS[idx];
     const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
-    if (record?.id) usePetStore.getState().setActivePet(record.id);
+    if (record?.id && !isMockPetId(record.id)) usePetStore.getState().setActivePet(record.id);
     // Smooth-scroll to guarantee perfect horizontal centre after momentum ends
     carouselRef.current?.scrollTo({ x: idx * PET_CARD_W, animated: true });
   };

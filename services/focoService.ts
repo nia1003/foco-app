@@ -12,6 +12,33 @@ function xpNextLevel(level: number): number {
   return level < 5 ? XP_THRESHOLDS[level] : 900;
 }
 
+function assertValidSessionResult(payload: SessionPayload, result: SessionResult): void {
+  const highCompletion =
+    typeof payload.completion_percent === 'number' && payload.completion_percent >= 90;
+
+  if (!result.session_id) {
+    throw new Error('Session save returned an invalid result. Please try again.');
+  }
+
+  if (result.pet_id !== payload.pet_id) {
+    throw new Error('Session saved with a different companion. Please reload pets and try again.');
+  }
+
+  if (highCompletion && (!Number.isFinite(result.quality_score) || result.quality_score <= 0)) {
+    throw new Error('Session saved, but scoring is stale. Deploy the latest session-complete function and try again.');
+  }
+
+  if (
+    !Number.isFinite(result.xp_gained) ||
+    result.xp_gained <= 0 ||
+    !Number.isFinite(result.new_xp) ||
+    !Number.isFinite(result.new_level) ||
+    !Number.isFinite(result.xp_next_level)
+  ) {
+    throw new Error('Session saved, but reward data was invalid. Please reload pets and try again.');
+  }
+}
+
 // ── pet-chat（呼叫 Supabase Edge Function → Together AI）────
 export async function chatWithPet(petId: string, message: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke('pet-chat', {
@@ -66,7 +93,9 @@ export async function completeSession(payload: SessionPayload): Promise<SessionR
     throw new Error(msg || 'session-complete failed');
   }
 
-  return res.json() as Promise<SessionResult>;
+  const result = await res.json() as SessionResult;
+  assertValidSessionResult(payload, result);
+  return result;
 }
 
 // ── getPets — 取得 user 所有寵物（多寵物支援）──────

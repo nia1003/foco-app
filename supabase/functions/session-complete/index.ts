@@ -107,6 +107,19 @@ function calcLevel(totalXP: number): number {
   return level
 }
 
+function isMissingReflectionColumnError(error: unknown): boolean {
+  const record = error as Record<string, unknown> | null
+  const code = typeof record?.code === 'string' ? record.code : ''
+  const text = [record?.message, record?.details, record?.hint]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+
+  return (
+    code === 'PGRST204' ||
+    /distraction_reasons|completion_percent|mood_score|schema cache|column .* does not exist/i.test(text)
+  )
+}
+
 // ── 主函式 ───────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -161,6 +174,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
+    const { data: pet, error: petReadError } = await supabase
+      .from('pets')
+      .select('xp, level')
+      .eq('id', pet_id)
+      .eq('owner_id', user_id)
+      .maybeSingle()
+
+    if (petReadError) throw petReadError
+
+    if (!pet) {
+      return new Response(
+        JSON.stringify({ error: 'Selected companion was not found. Please reload pets and try again.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
     // ── 1. Quality Score → DISC → XP ─────────────────────────
     const qualityScore = calcQualityScore({
       actualDuration:  actual_duration,
@@ -210,7 +239,7 @@ serve(async (req) => {
       .select('id')
       .single()
 
-    if (sessionError && /distraction_reasons|completion_percent|mood_score|schema cache/i.test(sessionError.message ?? '')) {
+    if (sessionError && isMissingReflectionColumnError(sessionError)) {
       const fallbackInsert = { ...sessionInsert }
       delete (fallbackInsert as Record<string, unknown>).distraction_reasons
       delete (fallbackInsert as Record<string, unknown>).completion_percent
@@ -226,28 +255,21 @@ serve(async (req) => {
 
     if (sessionError) throw sessionError
 
-    // ── 3. 讀取目前 pet XP（找不到就跳過，不中斷 session 儲存）──
-    const { data: pet } = await supabase
+    // ── 3. Update the real pet XP; missing pets are fatal for reward integrity.
+    const newXP    = pet.xp + xpGained
+    const newLevel = Math.min(calcLevel(newXP), 5)
+    const levelUp  = newLevel > pet.level
+
+    // ── 4. 更新 pet ────────────────────────────────────────
+    const { error: petUpdateError } = await supabase
       .from('pets')
-      .select('xp, level')
+      .update({ xp: newXP, level: newLevel })
       .eq('id', pet_id)
-      .maybeSingle()
+      .eq('owner_id', user_id)
+      .select('id')
+      .single()
 
-    let newXP    = xpGained
-    let newLevel = 1
-    let levelUp  = false
-
-    if (pet) {
-      newXP    = pet.xp + xpGained
-      newLevel = Math.min(calcLevel(newXP), 5)
-      levelUp  = newLevel > pet.level
-
-      // ── 4. 更新 pet ────────────────────────────────────────
-      await supabase
-        .from('pets')
-        .update({ xp: newXP, level: newLevel })
-        .eq('id', pet_id)
-    }
+    if (petUpdateError) throw petUpdateError
 
     // ── 5. 完成任務標記 done ─────────────────────────────────
     if (normalizedTaskId && effectiveCompleted) {

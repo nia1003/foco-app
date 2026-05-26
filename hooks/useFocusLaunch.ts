@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 
 import { useSound } from '@/components/SoundProvider';
 
-import { navigateToFocus, resolveTaskTitle } from '@/lib/focusSession';
+import { navigateToFocus, resolveLaunchPetId, resolveTaskTitle } from '@/lib/focusSession';
 
 import { focusTitleWithIcon } from '@/lib/taskIcon';
 
@@ -29,7 +29,7 @@ export function useFocusLaunch() {
 
   const { userId } = useAuthStore();
 
-  const { setActivePet } = usePetStore();
+  const { activePet, pets, setActivePet } = usePetStore();
 
   const setFocusDurationMin = usePreferencesStore((s) => s.setFocusDurationMin);
 
@@ -50,8 +50,17 @@ export function useFocusLaunch() {
         return;
       }
 
-      if (!setup.selectedPetId) {
-        Alert.alert('Companion required', 'Select a pet to focus with.');
+      const launchPetId = resolveLaunchPetId({
+        requestedPetId: setup.selectedPetId,
+        pets,
+        activePet,
+      });
+
+      if (!launchPetId) {
+        Alert.alert(
+          'Companion still loading',
+          'Please wait a moment for your pets to sync, then start focus again.',
+        );
 
         return;
       }
@@ -60,8 +69,8 @@ export function useFocusLaunch() {
 
       await setFocusDurationMin(setup.durationMin);
 
-      if (setup.selectedPetId) {
-        await setActivePet(setup.selectedPetId);
+      if (launchPetId !== activePet?.id) {
+        await setActivePet(launchPetId);
       }
 
       const newIcon = { type: setup.newIconType, value: setup.newIcon };
@@ -108,7 +117,7 @@ export function useFocusLaunch() {
       navigateToFocus(router, {
         durationMin: setup.durationMin,
 
-        petId: setup.selectedPetId,
+        petId: launchPetId,
 
         taskId,
 
@@ -116,7 +125,7 @@ export function useFocusLaunch() {
       });
     },
 
-    [play, router, setActivePet, setFocusDurationMin, userId],
+    [activePet, pets, play, router, setActivePet, setFocusDurationMin, userId],
   );
 
   return { launchFocus };

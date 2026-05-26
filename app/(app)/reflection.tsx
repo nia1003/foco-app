@@ -23,6 +23,9 @@ import type { SessionPayload } from '@/types';
 const PINK     = Colors.pinkText;
 const PINK_BG  = '#F2CEDC';
 
+const waitForNextFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
 // ── Distraction tag definitions ───────────────
 const DISTRACTION_TAGS = [
   { id: 'phone',   label: '手機通知' },
@@ -144,6 +147,7 @@ export default function ReflectionScreen() {
   const submit = async () => {
     if (submitting) return;
     setSubmitting(true);
+    await waitForNextFrame();
 
     const payload: SessionPayload = {
       ...basePayload,
@@ -154,6 +158,10 @@ export default function ReflectionScreen() {
 
     try {
       const result = await completeSession(payload);
+      const oldXp = typeof localStats.old_xp === 'number' ? localStats.old_xp : null;
+      if (oldXp !== null && result.new_xp <= oldXp) {
+        throw new Error('Session saved, but companion XP did not increase. Please reload pets and try again.');
+      }
 
       // Update task progress (fire-and-forget — don't block reward)
       if (basePayload.task_id) {
@@ -168,7 +176,7 @@ export default function ReflectionScreen() {
         'Could not save session',
         message === 'Not authenticated'
           ? 'Please sign in again before saving this focus session.'
-          : 'Please check your connection and try again.',
+          : `${message}\n\nPlease fix the issue, then try submitting again.`,
       );
     } finally {
       setSubmitting(false);
@@ -255,7 +263,12 @@ export default function ReflectionScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.skipBtn} onPress={submit} activeOpacity={0.6}>
+        <TouchableOpacity
+          style={[styles.skipBtn, submitting && { opacity: 0.55 }]}
+          onPress={submit}
+          activeOpacity={0.6}
+          disabled={submitting}
+        >
           <Text style={styles.skipText}>跳過，直接看結果</Text>
         </TouchableOpacity>
       </ScrollView>

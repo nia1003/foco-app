@@ -19,6 +19,7 @@ import { useTimer } from '@/hooks/useTimer';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { useSound } from '@/components/SoundProvider';
+import { resolveLaunchPetId } from '@/lib/focusSession';
 import type { SessionPayload } from '@/types';
 
 export default function FocusScreen() {
@@ -36,8 +37,10 @@ export default function FocusScreen() {
   }>();
   const { userId } = useAuthStore();
   const { activePet: storePet, pets: allPets } = usePetStore();
-  // Use petId from nav params (set by FocusSetupModal) — falls back to store activePet
-  const resolvedPetId = paramPetId || storePet?.id || 'unknown';
+  // Saving requires a real Supabase pet id; display-only fallbacks must not reach the API.
+  const resolvedPetId =
+    resolveLaunchPetId({ requestedPetId: paramPetId, pets: allPets, activePet: storePet }) ??
+    'unknown';
   const resolvedTaskId = taskId?.trim() ? taskId : null;
   const durationSeconds = Number(durationMin) * 60;
 

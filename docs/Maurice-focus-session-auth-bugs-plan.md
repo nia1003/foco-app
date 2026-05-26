@@ -215,7 +215,7 @@ npm.cmd test -- --runInBand
 - [ ] Phase 5 已實作。
 - [ ] Phase 6 已驗證。
  
-## Phase 7 - Reflection scoring / XP regression
+## Phase 7a - Reflection scoring / XP regression
 
 Scope:
 - Fix Reflection form state persistence across focus sessions.
@@ -242,3 +242,28 @@ Verification:
 - Submit with 100% completion and verify Reward/Analysis score is non-zero.
 - Submit a second session and verify Reflection does not retain previous tags/mood/slider value.
 - Verify pet XP increases after a successful remote `session-complete` call.
+
+Status:
+- [x] Phase 7 implemented.
+
+## Phase 7b - Reflection submit / scoring / XP follow-up
+
+Diagnosis:
+- Reflection reset is fixed, but score/XP can still appear unchanged when focus is launched with a fallback mock pet id (`mock-pet-*`) instead of a real Supabase `pets.id`.
+- `session-complete` currently treats a missing pet as non-fatal: it can insert a session and return a result even though no real pet row was updated. The Reward screen then cannot match `result.pet_id` to the local pet store, so the XP progress bar/store update does not move.
+- The Reflection submit button waits for the remote `completeSession()` call before navigating. That is correct for avoiding fake reward data, but the UI should enter an immediate saving frame so the tap does not feel frozen.
+- If a deployed Edge Function is stale, completion-based scoring can still return `0` for short smoke tests even when the Reflection slider is `100%`. Client code should detect invalid/stale session-complete responses instead of silently showing a zero-score Reward/Analysis.
+
+Implementation:
+- Stop authenticated focus launches from using `mockPets` as session pet ids; require a real Supabase pet row before starting focus.
+- Centralize focus launch validation so Home, Missions, and task detail flows all pass a real pet id or show an actionable alert.
+- In `session-complete`, validate `pet_id` belongs to `user_id` before inserting the session, and fail loudly if the pet cannot be found or updated.
+- Keep the user on Reflection for invalid/stale save responses; do not navigate to Reward with unchanged XP or zero reflection score.
+- Let Reflection render a saving state before starting the network call, preserving real-save semantics while removing the apparent tap stall.
+
+Verification:
+- `npm.cmd run typecheck`
+- Start focus before pets finish loading; verify the app asks to wait/retry instead of saving with `mock-pet-*`.
+- Submit Reflection at 100%; verify `session-complete` returns a non-zero quality score and a result whose `pet_id` matches the store pet.
+- Verify Reward XP bar animates from `old_xp` to the returned `new_xp`, and Home pet state reflects the new XP after returning.
+
