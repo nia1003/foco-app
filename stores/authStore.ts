@@ -3,8 +3,10 @@
 // 取代原本的 SecureStore JWT 版本
 // ─────────────────────────────────────────────
 import { create } from 'zustand';
-import { supabase } from '@/lib/supabase';
+import { clearLocalSupabaseSession, getCurrentSession, isStaleAuthSessionError, supabase } from '@/lib/supabase';
 import { usePetStore } from '@/stores/petStore';
+
+let authStateSubscription: { unsubscribe: () => void } | null = null;
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -27,9 +29,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   restoreSession: async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getCurrentSession();
 
       set({
         isAuthenticated: !!session,
@@ -40,7 +40,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
 
       // 監聽後續的登入 / 登出事件
-      supabase.auth.onAuthStateChange((_event, session) => {
+      authStateSubscription?.unsubscribe();
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
         set({
           isAuthenticated: !!session,
           userId: session?.user.id ?? null,
@@ -50,8 +51,19 @@ export const useAuthStore = create<AuthState>((set) => ({
         // Clear pet cache on logout so a new user never sees the previous user's pets
         if (!session) usePetStore.getState().reset();
       });
-    } catch {
-      set({ isLoading: false });
+      authStateSubscription = data.subscription;
+    } catch (error) {
+      if (isStaleAuthSessionError(error)) {
+        await clearLocalSupabaseSession();
+      }
+      set({
+        isAuthenticated: false,
+        userId: null,
+        userEmail: null,
+        userName: null,
+        isLoading: false,
+      });
+      usePetStore.getState().reset();
     }
   },
 
@@ -82,7 +94,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut().catch(async (error) => {
+      if (isStaleAuthSessionError(error)) {
+        await clearLocalSupabaseSession();
+        return;
+      }
+      throw error;
+    });
     set({ isAuthenticated: false, userId: null, userEmail: null, userName: null });
     usePetStore.getState().reset();
   },

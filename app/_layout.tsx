@@ -16,6 +16,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { audioService } from '@/services/audioService';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SoundProvider } from '@/components/SoundProvider';
 
 SplashScreen.preventAutoHideAsync();
@@ -61,10 +62,12 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SoundProvider>
-        <StatusBar style={darkMode ? 'light' : 'dark'} />
-        <Stack screenOptions={{ headerShown: false }} />
-      </SoundProvider>
+      <SafeAreaProvider>
+        <SoundProvider>
+          <StatusBar style={darkMode ? 'light' : 'dark'} />
+          <Stack screenOptions={{ headerShown: false }} />
+        </SoundProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

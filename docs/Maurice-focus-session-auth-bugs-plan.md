@@ -208,7 +208,7 @@ npm.cmd test -- --runInBand
 - [x] 已建立分支 `fix/focus-session-auth-bugs`。
 - [x] 已新增本實作計畫文件。
 - [x] Phase 0 已實作。
-- [ ] Phase 1 已實作。
+- [x] Phase 1 已實作。
 - [ ] Phase 2 已實作。
 - [ ] Phase 3 已實作。
 - [ ] Phase 4 已實作。

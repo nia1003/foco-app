@@ -2,7 +2,7 @@
 // FOCO Service — Session / Pet / Task API
 // 全部走 Supabase（DB + Edge Function）
 // ─────────────────────────────────────────────
-import { supabase } from '@/lib/supabase';
+import { clearLocalSupabaseSession, getCurrentSession, supabase } from '@/lib/supabase';
 import type { SessionPayload, SessionResult, FocoPet, Task, SessionRecord, DayData, SessionSummary, TaskCategory } from '@/types';
 
 // ── 等級門檻（index = level - 1）────────────────
@@ -38,9 +38,7 @@ export async function chatWithPet(petId: string, message: string): Promise<strin
 
 // ── session-complete（呼叫 Supabase Edge Function）
 export async function completeSession(payload: SessionPayload): Promise<SessionResult> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const session = await getCurrentSession();
   if (!session) throw new Error('Not authenticated');
 
   const res = await fetch(
@@ -57,6 +55,10 @@ export async function completeSession(payload: SessionPayload): Promise<SessionR
 
   if (!res.ok) {
     const msg = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      await clearLocalSupabaseSession();
+      throw new Error('Not authenticated');
+    }
     throw new Error(msg || 'session-complete failed');
   }
 
