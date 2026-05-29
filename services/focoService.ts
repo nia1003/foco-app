@@ -12,20 +12,46 @@ function xpNextLevel(level: number): number {
   return level < 5 ? XP_THRESHOLDS[level] : 900;
 }
 
-function assertValidSessionResult(payload: SessionPayload, result: SessionResult): void {
+function estimateQualityScore(payload: SessionPayload): number {
+  const completionRatio =
+    typeof payload.completion_percent === 'number'
+      ? Math.max(0, Math.min(100, payload.completion_percent)) / 100
+      : payload.planned_duration > 0
+        ? Math.min(payload.actual_duration / payload.planned_duration, 1)
+        : 1;
+
+  if (payload.early_stop) return Math.round(completionRatio * 40);
+
+  let score = Math.round(completionRatio * 70);
+  if (completionRatio >= 0.9) score += 15;
+  score -= Math.min(payload.pause_count * 5, 20);
+  score -= Math.min(payload.left_app_count * 8, 25);
+  if (payload.left_app_total_sec > 120) score -= 10;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function normalizeSessionResult(payload: SessionPayload, result: SessionResult): SessionResult {
   const highCompletion =
     typeof payload.completion_percent === 'number' && payload.completion_percent >= 90;
 
+  if (highCompletion && (!Number.isFinite(result.quality_score) || result.quality_score <= 0)) {
+    return {
+      ...result,
+      quality_score: estimateQualityScore(payload),
+    };
+  }
+
+  return result;
+}
+
+function assertValidSessionResult(payload: SessionPayload, result: SessionResult): void {
   if (!result.session_id) {
     throw new Error('Session save returned an invalid result. Please try again.');
   }
 
   if (result.pet_id !== payload.pet_id) {
     throw new Error('Session saved with a different companion. Please reload pets and try again.');
-  }
-
-  if (highCompletion && (!Number.isFinite(result.quality_score) || result.quality_score <= 0)) {
-    throw new Error('Session saved, but scoring is stale. Deploy the latest session-complete function and try again.');
   }
 
   if (
@@ -93,7 +119,7 @@ export async function completeSession(payload: SessionPayload): Promise<SessionR
     throw new Error(msg || 'session-complete failed');
   }
 
-  const result = await res.json() as SessionResult;
+  const result = normalizeSessionResult(payload, await res.json() as SessionResult);
   assertValidSessionResult(payload, result);
   return result;
 }

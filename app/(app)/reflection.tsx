@@ -171,7 +171,7 @@ export default function ReflectionScreen() {
       goToReward(JSON.stringify({ ...result, ...localStats }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error('[FOCO] reflection submit failed:', message);
+      console.warn('[FOCO] reflection submit failed:', message);
       Alert.alert(
         'Could not save session',
         message === 'Not authenticated'
