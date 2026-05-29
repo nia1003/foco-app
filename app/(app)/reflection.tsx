@@ -171,7 +171,6 @@ export default function ReflectionScreen() {
       goToReward(JSON.stringify({ ...result, ...localStats }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn('[FOCO] reflection submit failed:', message);
       Alert.alert(
         'Could not save session',
         message === 'Not authenticated'
@@ -253,6 +252,7 @@ export default function ReflectionScreen() {
 
         {/* ── Actions ──────────────────────────── */}
         <TouchableOpacity
+          testID="reflection-submit-button"
           style={[styles.submitBtn, submitting && { opacity: 0.55 }]}
           onPress={submit}
           activeOpacity={0.85}
