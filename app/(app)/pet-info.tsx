@@ -205,13 +205,20 @@ export default function PetInfoScreen() {
       {/* Full-screen pet — no pointerEvents block so WebView can receive touch for 3D spin */}
       <View style={[styles.petBg, { top: 56 + insets.top }]}>
         <PetRenderer pet={petDef} size={380} />
+      </View>
 
-        {/* Speech bubble — typing or reply */}
-        {(chatLoading || !!petReply) && (
+      {/* Speech bubble — sits below the pet, tracks above the chat bar */}
+      {(chatLoading || !!petReply) && (
+        <Animated.View
+          style={[styles.speechPosWrap, { bottom: Animated.add(chatBarBottom, 90) }]}
+          pointerEvents="none"
+        >
           <Animated.View
             style={[styles.speechBubbleWrap, { opacity: chatLoading ? 1 : replyOpacity }]}
-            pointerEvents="none"
           >
+            {/* Tail — points UP toward the pet */}
+            <View style={styles.speechTailBorder} />
+            <View style={styles.speechTailFill} />
             {chatLoading ? (
               <View style={styles.speechDotsRow}>
                 <Text style={styles.speechDot}>●</Text>
@@ -221,12 +228,9 @@ export default function PetInfoScreen() {
             ) : (
               <Text style={styles.speechBubbleText}>{petReply}</Text>
             )}
-            {/* Tail — two layered triangles for border effect */}
-            <View style={styles.speechTailBorder} />
-            <View style={styles.speechTailFill} />
           </Animated.View>
-        )}
-      </View>
+        </Animated.View>
+      )}
 
       {/* ── Bottom Sheet ───────────────────────── */}
       <Animated.View
@@ -385,18 +389,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Speech bubble (wireframe outline style) ──
-  speechBubbleWrap: {
+  // ── Speech bubble (below-pet position wrapper) ──
+  // Outer: absolutely positioned, tracks chatBarBottom via Animated.add
+  speechPosWrap: {
     position: 'absolute',
-    top: 20,
     left: 20,
-    right: 80,          // not full-width; leaves space on right
+    right: 80,  // leave space on the right so it doesn't span full width
+    zIndex: 24,
+  },
+  // Inner: white card, no absolute positioning needed
+  speechBubbleWrap: {
     backgroundColor: '#fff',
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(20,16,28,0.18)',
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingTop: 20,     // extra top padding to clear the upward tail
+    paddingBottom: 14,
   },
   speechBubbleText: {
     fontFamily: 'Fraunces_500Medium',
@@ -412,33 +421,35 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.inkSoft,
   },
-  // Tail — outer (border colour)
+  // Tail pointing UP — outer triangle (border colour)
   speechTailBorder: {
     position: 'absolute',
-    bottom: -14,
-    left: 22,
+    top: -14,
+    left: 28,
     width: 0,
     height: 0,
     borderLeftWidth: 0,
     borderRightWidth: 14,
-    borderTopWidth: 14,
+    borderBottomWidth: 14,
+    borderTopWidth: 0,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: 'rgba(20,16,28,0.18)',
+    borderBottomColor: 'rgba(20,16,28,0.18)',
   },
-  // Tail — inner (fill colour, covers border to show only outline)
+  // Tail pointing UP — inner triangle (fill colour)
   speechTailFill: {
     position: 'absolute',
-    bottom: -11,
-    left: 23,
+    top: -11,
+    left: 29,
     width: 0,
     height: 0,
     borderLeftWidth: 0,
     borderRightWidth: 12,
-    borderTopWidth: 12,
+    borderBottomWidth: 12,
+    borderTopWidth: 0,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#fff',
+    borderBottomColor: '#fff',
   },
 
   // ── Sheet ─────────────────────────────────────
