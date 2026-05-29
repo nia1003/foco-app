@@ -212,8 +212,8 @@ npm.cmd test -- --runInBand
 - [x] Phase 2 已實作。
 - [ ] Phase 3 已實作。
 - [ ] Phase 4 已實作。
-- [ ] Phase 5 已實作。
-- [ ] Phase 6 已驗證。
+- [x] Phase 5 已實作。
+- [x] Phase 6 已驗證。
  
 ## Phase 7a - Reflection scoring / XP regression
 
@@ -266,4 +266,3 @@ Verification:
 - Start focus before pets finish loading; verify the app asks to wait/retry instead of saving with `mock-pet-*`.
 - Submit Reflection at 100%; verify `session-complete` returns a non-zero quality score and a result whose `pet_id` matches the store pet.
 - Verify Reward XP bar animates from `old_xp` to the returned `new_xp`, and Home pet state reflects the new XP after returning.
-

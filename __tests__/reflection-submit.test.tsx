@@ -111,4 +111,64 @@ describe('Reflection submit', () => {
 
     expect(completeSession).toHaveBeenCalledTimes(1);
   });
+
+  it('passes advanced XP to the reward route', async () => {
+    jest.mocked(completeSession).mockResolvedValueOnce({
+      session_id: 'session-1',
+      pet_id: 'pet-1',
+      xp_gained: 12,
+      new_xp: 12,
+      new_level: 1,
+      level_up: false,
+      focus_type: 'steadiness',
+      xp_next_level: 100,
+      quality_score: 85,
+      ended_at: '2026-05-29T00:01:00.000Z',
+    });
+
+    const { getByTestId } = render(<ReflectionScreen />);
+
+    fireEvent.press(getByTestId('reflection-submit-button'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+    });
+
+    const routeArg = mockReplace.mock.calls[0][0];
+    const result = JSON.parse(routeArg.params.result);
+    expect(result.old_xp).toBe(0);
+    expect(result.xp_gained).toBe(12);
+    expect(result.new_xp).toBe(12);
+    expect(result.new_xp).toBeGreaterThan(result.old_xp);
+  });
+
+  it('blocks reward navigation when companion XP does not advance', async () => {
+    jest.mocked(completeSession).mockResolvedValueOnce({
+      session_id: 'session-1',
+      pet_id: 'pet-1',
+      xp_gained: 12,
+      new_xp: 0,
+      new_level: 1,
+      level_up: false,
+      focus_type: 'steadiness',
+      xp_next_level: 100,
+      quality_score: 85,
+      ended_at: '2026-05-29T00:01:00.000Z',
+    });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    const { getByTestId } = render(<ReflectionScreen />);
+
+    fireEvent.press(getByTestId('reflection-submit-button'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Could not save session',
+        expect.stringContaining('companion XP did not increase'),
+      );
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
 });
