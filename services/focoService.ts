@@ -3,6 +3,7 @@
 // 全部走 Supabase（DB + Edge Function）
 // ─────────────────────────────────────────────
 import { clearLocalSupabaseSession, getCurrentSession, supabase } from '@/lib/supabase';
+import { calculateQualityScore } from '@/lib/sessionScoring';
 import type { SessionPayload, SessionResult, FocoPet, Task, SessionRecord, DayData, SessionSummary, TaskCategory } from '@/types';
 
 // ── 等級門檻（index = level - 1）────────────────
@@ -12,25 +13,6 @@ function xpNextLevel(level: number): number {
   return level < 5 ? XP_THRESHOLDS[level] : 900;
 }
 
-function estimateQualityScore(payload: SessionPayload): number {
-  const completionRatio =
-    typeof payload.completion_percent === 'number'
-      ? Math.max(0, Math.min(100, payload.completion_percent)) / 100
-      : payload.planned_duration > 0
-        ? Math.min(payload.actual_duration / payload.planned_duration, 1)
-        : 1;
-
-  if (payload.early_stop) return Math.round(completionRatio * 40);
-
-  let score = Math.round(completionRatio * 70);
-  if (completionRatio >= 0.9) score += 15;
-  score -= Math.min(payload.pause_count * 5, 20);
-  score -= Math.min(payload.left_app_count * 8, 25);
-  if (payload.left_app_total_sec > 120) score -= 10;
-
-  return Math.max(0, Math.min(100, score));
-}
-
 function normalizeSessionResult(payload: SessionPayload, result: SessionResult): SessionResult {
   const highCompletion =
     typeof payload.completion_percent === 'number' && payload.completion_percent >= 90;
@@ -38,7 +20,7 @@ function normalizeSessionResult(payload: SessionPayload, result: SessionResult):
   if (highCompletion && (!Number.isFinite(result.quality_score) || result.quality_score <= 0)) {
     return {
       ...result,
-      quality_score: estimateQualityScore(payload),
+      quality_score: calculateQualityScore({ ...payload, completed: true }),
     };
   }
 

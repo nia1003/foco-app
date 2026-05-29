@@ -58,4 +58,46 @@ describe('completeSession', () => {
     expect(result.quality_score).toBeGreaterThan(0);
     expect(result.quality_score).toBe(85);
   });
+
+  it('rejects reward results for a different pet', async () => {
+    jest.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          session_id: 'session-1',
+          pet_id: 'pet-2',
+          xp_gained: 10,
+          new_xp: 110,
+          new_level: 2,
+          level_up: false,
+          focus_type: 'steadiness',
+          xp_next_level: 250,
+          quality_score: 85,
+          ended_at: '2026-05-29T00:01:00.000Z',
+        }),
+    } as Response);
+
+    await expect(completeSession(payload)).rejects.toThrow('different companion');
+  });
+
+  it('rejects invalid reward data before the reward screen can use it', async () => {
+    jest.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          session_id: 'session-1',
+          pet_id: 'pet-1',
+          xp_gained: 0,
+          new_xp: 100,
+          new_level: 2,
+          level_up: false,
+          focus_type: 'steadiness',
+          xp_next_level: 250,
+          quality_score: 85,
+          ended_at: '2026-05-29T00:01:00.000Z',
+        }),
+    } as Response);
+
+    await expect(completeSession(payload)).rejects.toThrow('reward data was invalid');
+  });
 });

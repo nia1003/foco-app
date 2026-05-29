@@ -84,4 +84,31 @@ describe('Reflection submit', () => {
     warnSpy.mockRestore();
     errorSpy.mockRestore();
   });
+
+  it('sends only one completion request when submit is pressed twice quickly', async () => {
+    jest.mocked(completeSession).mockResolvedValueOnce({
+      session_id: 'session-1',
+      pet_id: 'pet-1',
+      xp_gained: 10,
+      new_xp: 10,
+      new_level: 1,
+      level_up: false,
+      focus_type: 'steadiness',
+      xp_next_level: 100,
+      quality_score: 85,
+      ended_at: '2026-05-29T00:01:00.000Z',
+    });
+
+    const { getByTestId } = render(<ReflectionScreen />);
+    const button = getByTestId('reflection-submit-button');
+
+    fireEvent.press(button);
+    fireEvent.press(button);
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+    });
+
+    expect(completeSession).toHaveBeenCalledTimes(1);
+  });
 });

@@ -122,6 +122,7 @@ export default function ReflectionScreen() {
   const [completionPct, setCompletionPct] = useState(initPct);
   const [moodScore, setMoodScore] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -129,6 +130,7 @@ export default function ReflectionScreen() {
       setCompletionPct(initPct);
       setMoodScore(null);
       setSubmitting(false);
+      submittingRef.current = false;
     }, [payloadJson, localStatsJson, initPct]),
   );
 
@@ -145,7 +147,8 @@ export default function ReflectionScreen() {
   };
 
   const submit = async () => {
-    if (submitting) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     await waitForNextFrame();
 
@@ -178,6 +181,7 @@ export default function ReflectionScreen() {
           : `${message}\n\nPlease fix the issue, then try submitting again.`,
       );
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
