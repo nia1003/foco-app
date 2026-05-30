@@ -3,9 +3,18 @@
 // ─────────────────────────────────────────────
 import '../global.css';
 import { useEffect, useRef } from 'react';
+import { LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+
+// Supabase SDK logs this internally before our handler clears the stale token.
+// The app already handles it correctly (clears AsyncStorage + redirects to login).
+LogBox.ignoreLogs([
+  'AuthApiError: Invalid Refresh Token',
+  'Invalid Refresh Token',
+  'Refresh Token Not Found',
+]);
 import { useFonts } from 'expo-font';
 import {
   Fraunces_400Regular,

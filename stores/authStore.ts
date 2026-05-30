@@ -41,7 +41,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       // 監聽後續的登入 / 登出事件
       authStateSubscription?.unsubscribe();
-      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        // When the SDK can't refresh the token it emits SIGNED_OUT with no session.
+        // Clear the stale AsyncStorage entry so the error doesn't repeat on restart.
+        if (!session && (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED')) {
+          clearLocalSupabaseSession().catch(() => {});
+        }
         set({
           isAuthenticated: !!session,
           userId: session?.user.id ?? null,
