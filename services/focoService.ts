@@ -171,7 +171,7 @@ function calcStreak(endedAtList: string[]): number {
 
 // ── getTasks ──────────────────────────────────
 export async function getTasks(userId: string): Promise<{ tasks: Task[] }> {
-  const baseSelect = 'id, user_id, title, duration_min, status, category, created_at, icon_type, icon_value, completion_percent';
+  const baseSelect = 'id, user_id, title, duration_min, status, category, created_at, icon_type, icon_value, completion_percent, deadline_at';
   let { data, error }: { data: unknown[] | null; error: any } = await supabase
     .from('tasks')
     .select(`${baseSelect}, memo`)
@@ -209,6 +209,7 @@ export async function createTask(
     icon_type?: 'emoji' | 'svg';
     icon_value?: string;
     memo?: string;
+    deadline_at?: string | null;
   },
 ): Promise<Task> {
   const category = options?.category ?? 'task';
@@ -224,6 +225,9 @@ export async function createTask(
   }
   if (options?.memo) {
     row.memo = options.memo;
+  }
+  if (options?.deadline_at !== undefined) {
+    row.deadline_at = options.deadline_at;
   }
 
   let { data, error } = await supabase
@@ -257,6 +261,7 @@ export async function updateTask(
     icon_type?: 'emoji' | 'svg' | null;
     icon_value?: string | null;
     memo?: string | null;
+    deadline_at?: string | null;
   },
 ): Promise<Task> {
   const row: Record<string, unknown> = {};
@@ -267,6 +272,7 @@ export async function updateTask(
   if (updates.icon_type !== undefined) row.icon_type = updates.icon_type;
   if (updates.icon_value !== undefined) row.icon_value = updates.icon_value;
   if (updates.memo !== undefined) row.memo = updates.memo;
+  if (updates.deadline_at !== undefined) row.deadline_at = updates.deadline_at;
 
   let { data, error } = await supabase
     .from('tasks')
@@ -314,6 +320,59 @@ export async function deleteTask(taskId: string): Promise<void> {
     .update({ status: 'deleted' })
     .eq('id', taskId);
   if (error) throw error;
+}
+
+// ── fetchHomeStats — Home 頁面三格統計數據 ──────────
+export interface HomeStats {
+  sessionsThisWeek: number;
+  focusTimeToday: number;  // minutes
+  streakDays: number;
+}
+
+export async function fetchHomeStats(userId: string): Promise<HomeStats> {
+  // Figure out this week's Monday (ISO week: Mon=0)
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun,1=Mon,...6=Sat
+  const daysFromMon = (dayOfWeek + 6) % 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysFromMon);
+  monday.setHours(0, 0, 0, 0);
+
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+
+  // Fetch all sessions since Monday (includes today)
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('actual_duration, ended_at')
+    .eq('user_id', userId)
+    .gte('ended_at', monday.toISOString())
+    .order('ended_at', { ascending: false });
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as { actual_duration: number; ended_at: string }[];
+
+  // Sessions this week
+  const sessionsThisWeek = rows.length;
+
+  // Focus time today (seconds → minutes)
+  const todayIso = todayStart.toISOString();
+  const focusTodaySec = rows
+    .filter((r) => r.ended_at >= todayIso)
+    .reduce((sum, r) => sum + (r.actual_duration ?? 0), 0);
+  const focusTimeToday = Math.round(focusTodaySec / 60);
+
+  // Streak days — fetch all sessions to calculate full streak
+  const { data: allData } = await supabase
+    .from('sessions')
+    .select('ended_at')
+    .eq('user_id', userId)
+    .order('ended_at', { ascending: false });
+
+  const streakDays = calcStreak(((allData ?? []) as { ended_at: string }[]).map((r) => r.ended_at));
+
+  return { sessionsThisWeek, focusTimeToday, streakDays };
 }
 
 // ── getCalendarData — 取得某月每天的 session 數量 ──

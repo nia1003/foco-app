@@ -39,14 +39,32 @@ export function AddTaskModal({
   const [title, setTitle]           = useState('');
   const [memo, setMemo]             = useState('');
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
+  const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
   const [saving, setSaving]         = useState(false);
 
   const resetForm = useCallback(() => {
     setTitle('');
     setMemo('');
     setDurationMin(defaultDurationMin);
+    setDeadlineAt(null);
     setSaving(false);
   }, [defaultDurationMin]);
+
+  // Quick-pick deadline helpers
+  const pickDeadline = (daysFromNow: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + daysFromNow);
+    d.setHours(23, 59, 59, 0);
+    setDeadlineAt(d.toISOString());
+  };
+
+  const deadlineLabel = (() => {
+    if (!deadlineAt) return null;
+    const diff = Math.ceil((new Date(deadlineAt).getTime() - Date.now()) / 86_400_000);
+    if (diff <= 0) return 'today';
+    if (diff === 1) return 'tomorrow';
+    return `${diff} days`;
+  })();
 
   useEffect(() => {
     if (visible) resetForm();
@@ -73,6 +91,7 @@ export function AddTaskModal({
           category,
           created_at: new Date().toISOString(),
           ...(trimmedMemo ? { memo: trimmedMemo } : {}),
+          ...(deadlineAt ? { deadline_at: deadlineAt } : {}),
         };
         play('tap');
         onCreated(local);
@@ -82,6 +101,7 @@ export function AddTaskModal({
       const created = await createTask(userId, trimmed, durationMin, {
         category,
         ...(trimmedMemo ? { memo: trimmedMemo } : {}),
+        ...(deadlineAt ? { deadline_at: deadlineAt } : {}),
       });
       play('tap');
       onCreated(created);
@@ -126,6 +146,38 @@ export function AddTaskModal({
               multiline
               textAlignVertical="top"
             />
+
+            {/* Deadline picker — only for one-time tasks */}
+            {category === 'task' && (
+              <>
+                <Text style={styles.timerLabel}>deadline (optional)</Text>
+                <View style={styles.deadlineRow}>
+                  {(['today', 'tomorrow', '3 days', '1 week'] as const).map((label, i) => {
+                    const days = [0, 1, 3, 7][i];
+                    const isActive = (() => {
+                      if (!deadlineAt) return false;
+                      const diff = Math.ceil((new Date(deadlineAt).getTime() - Date.now()) / 86_400_000);
+                      return diff === days || (days === 0 && diff <= 0);
+                    })();
+                    return (
+                      <TouchableOpacity
+                        key={label}
+                        style={[styles.deadlineChip, isActive && styles.deadlineChipActive]}
+                        onPress={() => isActive ? setDeadlineAt(null) : pickDeadline(days)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.deadlineChipText, isActive && styles.deadlineChipTextActive]}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {deadlineLabel && (
+                  <Text style={styles.deadlineSelected}>Due: {deadlineLabel}</Text>
+                )}
+              </>
+            )}
 
             {/* Timer */}
             <Text style={styles.timerLabel}>focus duration</Text>
@@ -199,6 +251,37 @@ const styles = StyleSheet.create({
     color: 'rgba(26,22,34,0.55)',
     letterSpacing: 0.2,
     marginBottom: 12,
+  },
+  deadlineRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 10,
+  },
+  deadlineChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 9999,
+    backgroundColor: '#F0EAF8',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.15)',
+  },
+  deadlineChipActive: {
+    backgroundColor: '#7C4DCC',
+    borderColor: '#7C4DCC',
+  },
+  deadlineChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#7C4DCC',
+  },
+  deadlineChipTextActive: {
+    color: '#ffffff',
+  },
+  deadlineSelected: {
+    fontSize: 12,
+    color: 'rgba(26,22,34,0.45)',
+    marginBottom: 20,
   },
   actions: {
     flexDirection: 'row',

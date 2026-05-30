@@ -144,6 +144,7 @@ export interface Task {
   emoji?: string;
   memo?: string;
   taskType?: 'daily' | 'deadline';
+  deadline_at?: string | null;  // ISO timestamptz — optional due date for 'task' category
 }
 
 // sessions table（歷史清單用）

@@ -41,7 +41,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useTaskStore } from '@/stores/taskStore';
-import { chatWithPet, getPets, deleteTask } from '@/services/focoService';
+import { chatWithPet, getPets, deleteTask, fetchHomeStats } from '@/services/focoService';
+import type { HomeStats } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
 import { isMockPetId, resolveLaunchPetId } from '@/lib/focusSession';
 import type { Task, TaskCategory } from '@/types';
@@ -61,7 +62,18 @@ const UNLOCKED_DEFS = PETS.filter((p) => !p.locked);
 
 type Page2Tab = 'home' | 'tasks' | 'stats';
 
-
+// ── deadline helper ───────────────────────────────────────────────────────────
+function formatDeadline(deadlineAt: string | null | undefined): { label: string; overdue: boolean } | null {
+  if (!deadlineAt) return null;
+  const now = Date.now();
+  const due = new Date(deadlineAt).getTime();
+  const diffMs = due - now;
+  const diffDays = Math.ceil(diffMs / 86_400_000);
+  if (diffDays < 0) return { label: 'overdue', overdue: true };
+  if (diffDays === 0) return { label: 'due today', overdue: false };
+  if (diffDays === 1) return { label: '1 day left', overdue: false };
+  return { label: `${diffDays} days left`, overdue: false };
+}
 
 // ── TaskCard ──────────────────────────────────────────────────────────────────
 function TaskCard({
@@ -75,6 +87,8 @@ function TaskCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const deadline = formatDeadline(task.deadline_at);
+
   const handleMenu = () => {
     Alert.alert(task.title, undefined, [
       { text: 'Edit', onPress: onEdit },
@@ -96,6 +110,14 @@ function TaskCard({
       </TouchableOpacity>
 
       <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
+
+      {/* Deadline badge */}
+      {deadline && (
+        <Text style={[taskStyles.deadlineBadge, deadline.overdue && taskStyles.deadlineOverdue]}>
+          {deadline.label}
+        </Text>
+      )}
+
       <TouchableOpacity
         style={taskStyles.btn}
         onPress={onPress}
@@ -152,6 +174,16 @@ const taskStyles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '700',
     letterSpacing: 2,
+  },
+  deadlineBadge: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#7C4DCC',
+    letterSpacing: 0.1,
+    marginBottom: 2,
+  },
+  deadlineOverdue: {
+    color: '#CC4D4D',
   },
 });
 
@@ -267,6 +299,7 @@ export default function HomeScreen() {
   const [addTaskCategory, setAddTaskCategory]         = useState<TaskCategory | null>(null);
   const [page2ScrollEnabled, setPage2ScrollEnabled]   = useState(true);
   const [editTaskId, setEditTaskId]                   = useState<string | null>(null);
+  const [homeStats, setHomeStats]                     = useState<HomeStats | null>(null);
 
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -352,6 +385,13 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchTasks(userId).catch(() => {});
   }, [userId, fetchTasks]);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetchHomeStats(userId)
+      .then(setHomeStats)
+      .catch(() => {});
+  }, [userId]);
 
   // Reset chat when user swipes to a different pet
   useEffect(() => {
@@ -674,11 +714,24 @@ export default function HomeScreen() {
 
                   {/* Stats preview row */}
                   <View style={styles.statsRow}>
-                    {[
-                      { val: '—', lbl: 'sessions\nthis week' },
-                      { val: '—', lbl: 'focus time\ntoday' },
-                      { val: '—', lbl: 'streak\ndays' },
-                    ].map((item) => (
+                    {([
+                      {
+                        val: homeStats != null ? String(homeStats.sessionsThisWeek) : '—',
+                        lbl: 'sessions\nthis week',
+                      },
+                      {
+                        val: homeStats != null
+                          ? homeStats.focusTimeToday >= 60
+                            ? `${Math.floor(homeStats.focusTimeToday / 60)}h ${homeStats.focusTimeToday % 60}m`
+                            : `${homeStats.focusTimeToday}m`
+                          : '—',
+                        lbl: 'focus time\ntoday',
+                      },
+                      {
+                        val: homeStats != null ? String(homeStats.streakDays) : '—',
+                        lbl: 'streak\ndays',
+                      },
+                    ] as { val: string; lbl: string }[]).map((item) => (
                       <View key={item.lbl} style={styles.statsTile}>
                         <Text style={styles.statsTileVal}>{item.val}</Text>
                         <Text style={styles.statsTileLbl}>{item.lbl}</Text>
