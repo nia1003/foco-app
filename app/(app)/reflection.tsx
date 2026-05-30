@@ -3,8 +3,10 @@
  * 三個快問題：分心標籤 + 完成度 + 心情
  * 提交後呼叫 completeSession + updateTaskProgress → reward
  */
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
+  Alert,
   GestureResponderEvent,
   ScrollView,
   StyleSheet,
@@ -15,13 +17,14 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { Colors } from '@/constants/theme';
-import { usePetStore } from '@/stores/petStore';
 import { completeSession, updateTaskProgress } from '@/services/focoService';
-import { mockSessionResult } from '@/data/mockData';
 import type { SessionPayload } from '@/types';
 
 const PINK     = Colors.pinkText;
 const PINK_BG  = '#F2CEDC';
+
+const waitForNextFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 // ── Distraction tag definitions ───────────────
 const DISTRACTION_TAGS = [
@@ -103,7 +106,6 @@ function CompletionSlider({
 // ── Main screen ───────────────────────────────
 export default function ReflectionScreen() {
   const router = useRouter();
-  const { pets: allPets } = usePetStore();
 
   const { payloadJson, localStatsJson, defaultCompletion } =
     useLocalSearchParams<{
@@ -120,6 +122,17 @@ export default function ReflectionScreen() {
   const [completionPct, setCompletionPct] = useState(initPct);
   const [moodScore, setMoodScore] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedTags([]);
+      setCompletionPct(initPct);
+      setMoodScore(null);
+      setSubmitting(false);
+      submittingRef.current = false;
+    }, [payloadJson, localStatsJson, initPct]),
+  );
 
   const toggleTag = (id: string) =>
     setSelectedTags((prev) =>
@@ -134,8 +147,10 @@ export default function ReflectionScreen() {
   };
 
   const submit = async () => {
-    if (submitting) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
+    await waitForNextFrame();
 
     const payload: SessionPayload = {
       ...basePayload,
@@ -146,6 +161,10 @@ export default function ReflectionScreen() {
 
     try {
       const result = await completeSession(payload);
+      const oldXp = typeof localStats.old_xp === 'number' ? localStats.old_xp : null;
+      if (oldXp !== null && result.new_xp <= oldXp) {
+        throw new Error('Session saved, but companion XP did not increase. Please reload pets and try again.');
+      }
 
       // Update task progress (fire-and-forget — don't block reward)
       if (basePayload.task_id) {
@@ -153,9 +172,16 @@ export default function ReflectionScreen() {
       }
 
       goToReward(JSON.stringify({ ...result, ...localStats }));
-    } catch {
-      goToReward(JSON.stringify({ ...mockSessionResult, ...localStats }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert(
+        'Could not save session',
+        message === 'Not authenticated'
+          ? 'Please sign in again before saving this focus session.'
+          : `${message}\n\nPlease fix the issue, then try submitting again.`,
+      );
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -230,6 +256,7 @@ export default function ReflectionScreen() {
 
         {/* ── Actions ──────────────────────────── */}
         <TouchableOpacity
+          testID="reflection-submit-button"
           style={[styles.submitBtn, submitting && { opacity: 0.55 }]}
           onPress={submit}
           activeOpacity={0.85}
@@ -240,7 +267,12 @@ export default function ReflectionScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.skipBtn} onPress={submit} activeOpacity={0.6}>
+        <TouchableOpacity
+          style={[styles.skipBtn, submitting && { opacity: 0.55 }]}
+          onPress={submit}
+          activeOpacity={0.6}
+          disabled={submitting}
+        >
           <Text style={styles.skipText}>跳過，直接看結果</Text>
         </TouchableOpacity>
       </ScrollView>

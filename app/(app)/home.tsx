@@ -43,6 +43,7 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { chatWithPet, getPets, deleteTask } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
+import { isMockPetId, resolveLaunchPetId } from '@/lib/focusSession';
 import type { Task, TaskCategory } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -257,7 +258,8 @@ export default function HomeScreen() {
   const { tasks, addTask, removeTask, fetchTasks } = useTaskStore();
   const avatarUri = usePreferencesStore((s) => s.avatarUri);
 
-  const storePool = pets.length > 0 ? pets : mockPets;
+  const realPets = pets.filter((pet) => !isMockPetId(pet.id));
+  const storePool = realPets.length > 0 ? realPets : mockPets;
 
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
@@ -269,6 +271,7 @@ export default function HomeScreen() {
   // ref used for programmatic smooth-scroll to centre after snap
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const carouselRef = useRef<any>(null);
+  const pendingCarouselSettleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pet chat state
   const [chat, setChat] = useState<{ visible: boolean; msg: string; text: string; loading: boolean; err: string }>({
@@ -343,7 +346,7 @@ export default function HomeScreen() {
     if (pets.length && !isStale) { restoreActivePet(); return; }
     getPets(userId)
       .then((fetched) => { setPets(fetched); restoreActivePet(); })
-      .catch(() => { if (!pets.length) setPets(mockPets); });
+      .catch(() => {});
   }, [userId]);
 
   useEffect(() => {
@@ -355,14 +358,19 @@ export default function HomeScreen() {
     setChat({ visible: false, msg: '', text: '', loading: false, err: '' });
   }, [activeCarouselIndex]);
 
-  // Sync carousel to stored active pet on mount
+  // Sync carousel to stored active pet when selection is restored externally.
   useEffect(() => {
     if (!activePet?.name) return;
     const idx = UNLOCKED_DEFS.findIndex(
-      (p) => p.name.toLowerCase() === activePet.name.toLowerCase(),
+      (p) =>
+        p.id === activePet.name.toLowerCase() ||
+        p.name.toLowerCase() === activePet.name.toLowerCase(),
     );
-    if (idx >= 0) setActiveCarouselIndex(idx);
-  }, [activePet?.name]);
+    if (idx < 0 || idx === activeCarouselIndex) return;
+    setActiveCarouselIndex(idx);
+    carouselRef.current?.scrollTo({ x: idx * PET_CARD_W, animated: false });
+    scrollX.setValue(idx * PET_CARD_W);
+  }, [activePet?.name, activeCarouselIndex, scrollX]);
 
   // ── Derived ─────────────────────────────────────────────────────
   const displayName     = userName ?? userEmail?.split('@')[0] ?? 'there';
@@ -377,13 +385,27 @@ export default function HomeScreen() {
 
   // ── Handlers ────────────────────────────────────────────────────
   const goFocus = (task?: Task) => {
+    const launchPetId = resolveLaunchPetId({
+      requestedPetId: activePetRecord?.id,
+      pets,
+      activePet,
+    });
+
+    if (!launchPetId) {
+      Alert.alert(
+        'Companion still loading',
+        'Please wait a moment for your pets to sync, then start focus again.',
+      );
+      return;
+    }
+
     play('transition_up');
     router.push({
       pathname: '/(app)/focus',
       params: {
         durationMin: String(durationMin),
-        petId: activePetRecord?.id ?? '',
-        taskId: task?.id ?? '',
+        petId: launchPetId,
+        ...(task?.id ? { taskId: task.id } : {}),
         ...(task ? { taskTitle: task.title } : {}),
       },
     });
@@ -394,16 +416,57 @@ export default function HomeScreen() {
     setAddTaskCategory(category);
   }, [play]);
 
-  const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const settleCarouselAtOffset = useCallback((xOffset: number, shouldCorrectCenter = true) => {
+    const idx = Math.max(
+      0,
+      Math.min(UNLOCKED_DEFS.length - 1, Math.round(xOffset / PET_CARD_W)),
+    );
+    const targetX = idx * PET_CARD_W;
+
+    if (idx !== activeCarouselIndex) setActiveCarouselIndex(idx);
+
+    const def = UNLOCKED_DEFS[idx];
+    const record =
+      storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
+    if (record?.id && !isMockPetId(record.id)) {
+      const currentActivePetId = usePetStore.getState().activePetId;
+      if (record.id !== currentActivePetId) {
+        usePetStore.getState().setActivePet(record.id);
+      }
+    }
+
+    if (shouldCorrectCenter && Math.abs(xOffset - targetX) > 1) {
+      carouselRef.current?.scrollTo({ x: targetX, animated: true });
+    }
+  }, [activeCarouselIndex, storePool]);
+
+  const handleCarouselMomentumEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (pendingCarouselSettleRef.current) {
+      clearTimeout(pendingCarouselSettleRef.current);
+      pendingCarouselSettleRef.current = null;
+    }
+    settleCarouselAtOffset(e.nativeEvent.contentOffset.x);
+  }, [settleCarouselAtOffset]);
+
+  const handleCarouselDragEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const xOffset = e.nativeEvent.contentOffset.x;
-    const idx     = Math.max(0, Math.min(UNLOCKED_DEFS.length - 1, Math.round(xOffset / PET_CARD_W)));
-    setActiveCarouselIndex(idx);
-    const def    = UNLOCKED_DEFS[idx];
-    const record = storePool.find((p) => p.name.toLowerCase() === def?.id) ?? storePool[0];
-    if (record?.id) usePetStore.getState().setActivePet(record.id);
-    // Smooth-scroll to guarantee perfect horizontal centre after momentum ends
-    carouselRef.current?.scrollTo({ x: idx * PET_CARD_W, animated: true });
-  };
+    if (pendingCarouselSettleRef.current) clearTimeout(pendingCarouselSettleRef.current);
+    pendingCarouselSettleRef.current = setTimeout(() => {
+      pendingCarouselSettleRef.current = null;
+      settleCarouselAtOffset(xOffset, false);
+    }, 120);
+  }, [settleCarouselAtOffset]);
+
+  const handleCarouselMomentumBegin = useCallback(() => {
+    if (pendingCarouselSettleRef.current) {
+      clearTimeout(pendingCarouselSettleRef.current);
+      pendingCarouselSettleRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (pendingCarouselSettleRef.current) clearTimeout(pendingCarouselSettleRef.current);
+  }, []);
 
   // Tap pet → open chat input (no greeting)
   const handlePetPress = useCallback((_petId: string) => {
@@ -509,7 +572,9 @@ export default function HomeScreen() {
                   [{ nativeEvent: { contentOffset: { x: scrollX } } }],
                   { useNativeDriver: true },
                 )}
-                onMomentumScrollEnd={handleCarouselScroll}
+                onScrollEndDrag={handleCarouselDragEnd}
+                onMomentumScrollBegin={handleCarouselMomentumBegin}
+                onMomentumScrollEnd={handleCarouselMomentumEnd}
               >
                 {UNLOCKED_DEFS.map((def, i) => {
                   const c = i * PET_CARD_W;

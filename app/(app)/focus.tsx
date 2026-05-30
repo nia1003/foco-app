@@ -19,8 +19,7 @@ import { useTimer } from '@/hooks/useTimer';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { useSound } from '@/components/SoundProvider';
-import { completeSession } from '@/services/focoService';
-import { mockSessionResult } from '@/data/mockData';
+import { resolveLaunchPetId } from '@/lib/focusSession';
 import type { SessionPayload } from '@/types';
 
 export default function FocusScreen() {
@@ -38,8 +37,11 @@ export default function FocusScreen() {
   }>();
   const { userId } = useAuthStore();
   const { activePet: storePet, pets: allPets } = usePetStore();
-  // Use petId from nav params (set by FocusSetupModal) — falls back to store activePet
-  const resolvedPetId = paramPetId || storePet?.id || 'unknown';
+  // Saving requires a real Supabase pet id; display-only fallbacks must not reach the API.
+  const resolvedPetId =
+    resolveLaunchPetId({ requestedPetId: paramPetId, pets: allPets, activePet: storePet }) ??
+    'unknown';
+  const resolvedTaskId = taskId?.trim() ? taskId : null;
   const durationSeconds = Number(durationMin) * 60;
 
   // Resolve pet definition for 3D render — use the param pet, not necessarily activePet
@@ -54,6 +56,7 @@ export default function FocusScreen() {
   const { play, playToggle } = useSound();
   const { surfaces } = useAppTheme();
   const [showQuitModal, setShowQuitModal] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
 
   // Use a ref so handleEnd always reads the latest value and stale closures can't freeze the screen
   const submittingRef = useRef(false);
@@ -83,12 +86,12 @@ export default function FocusScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setTaskId(taskId ?? null);
+      setTaskId(resolvedTaskId);
       start();
       return () => {
         reset();
       };
-    }, [durationSeconds, taskId]),
+    }, [durationSeconds, resolvedTaskId]),
   );
 
   // Float + subtle pulse when running
@@ -134,6 +137,7 @@ export default function FocusScreen() {
   const handleEnd = async (earlyStop: boolean) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
+    setSubmitting(true);
 
     const snap = getSnapshot();
     const now = Date.now();
@@ -149,7 +153,7 @@ export default function FocusScreen() {
     const payload: SessionPayload = {
       user_id: userId ?? 'unknown',
       pet_id: resolvedPetId,
-      task_id: snap.taskId,
+      task_id: snap.taskId?.trim() ? snap.taskId : null,
       planned_duration: snap.plannedDuration,
       actual_duration: actualDuration,
       pause_count: snap.pauseCount,
@@ -168,28 +172,28 @@ export default function FocusScreen() {
       left_app_count: snap.leftAppCount,
       started_at: startedAtISO,
       events: snap.events,
-      old_xp: storePet?.xp ?? 0,
+      old_xp: resolvedPetRecord?.xp ?? storePet?.xp ?? 0,
       ...(taskTitle ? { task_title: taskTitle } : {}),
     };
 
-    try {
-      const result = await completeSession(payload);
-      router.replace({
-        pathname: '/(app)/reward',
-        params: { result: JSON.stringify({ ...result, ...localStats }) },
-      });
-    } catch (err) {
-      console.error('[FOCO] session-complete failed:', err);
-      router.replace({
-        pathname: '/(app)/reward',
-        params: {
-          result: JSON.stringify({ ...mockSessionResult, ...localStats }),
-        },
-      });
-    } finally {
-      // Reset so the user can retry if navigation somehow fails
-      submittingRef.current = false;
-    }
+    const durationRatio =
+      snap.plannedDuration > 0
+        ? Math.min(actualDuration / snap.plannedDuration, 1)
+        : 1;
+    const defaultCompletion = earlyStop ? Math.round(durationRatio * 100) : 100;
+
+    router.replace({
+      pathname: '/(app)/reflection',
+      params: {
+        payloadJson: JSON.stringify(payload),
+        localStatsJson: JSON.stringify(localStats),
+        defaultCompletion: String(defaultCompletion),
+      },
+    });
+
+    // Reset so the user can retry if navigation somehow fails
+    submittingRef.current = false;
+    setSubmitting(false);
   };
 
   return (
@@ -224,11 +228,12 @@ export default function FocusScreen() {
         {/* Controls: Quit | Pause/Resume | Done */}
         <View style={styles.controls}>
           <TouchableOpacity
-            style={styles.controlBtn}
+            style={[styles.controlBtn, submitting && styles.controlBtnDisabled]}
             onPress={() => {
               play('tap');
               setShowQuitModal(true);
             }}
+            disabled={submitting}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✕</Text>
@@ -243,11 +248,13 @@ export default function FocusScreen() {
                 shadowColor: surfaces.shadowColor,
               },
               paused && { opacity: 0.9 },
+              submitting && { opacity: 0.65 },
             ]}
             onPress={() => {
               playToggle(paused); // paused→resume: toggle_on; running→pause: toggle_off
               paused ? resume() : pause();
             }}
+            disabled={submitting}
             activeOpacity={0.85}
           >
             <Text style={[styles.mainBtnText, { color: surfaces.ctaText }]}>
@@ -256,17 +263,19 @@ export default function FocusScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.controlBtn}
+            style={[styles.controlBtn, submitting && styles.controlBtnDisabled]}
             onPress={() => {
               play('transition_up');
               handleEnd(false);
             }}
+            disabled={submitting}
             activeOpacity={0.75}
           >
             <Text style={styles.controlIcon}>✓</Text>
             <Text style={styles.controlLabel}>Done</Text>
           </TouchableOpacity>
         </View>
+        {submitting ? <Text style={styles.savingText}>Saving session...</Text> : null}
       </View>
 
       {/* Quit modal */}
@@ -355,8 +364,16 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   controlBtn: { alignItems: 'center', gap: 4 },
+  controlBtnDisabled: { opacity: 0.45 },
   controlIcon: { fontSize: 22, color: Colors.ink },
   controlLabel: { fontSize: 11, color: Colors.inkFaint, letterSpacing: 0.5 },
+  savingText: {
+    marginTop: -10,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.inkFaint,
+  },
   mainBtn: {
     paddingHorizontal: 40,
     paddingVertical: 16,

@@ -3,12 +3,12 @@
 // Copy this file to constants/theme.ts when tokens change.
 
 export const Colors = {
-  "primary": "#27272a",
+  "primary": "#1a1622",
   "beige": "#EFE8E0",
   "pinkHot": "#F2CEDC",
   "pinkText": "#b5607a",
   "pinkSoft": "#E7A0CC",
-  "primaryBlue": "#1d4ed8",
+  "primaryBlue": "#203F9A",
   "blueDeep": "#203F9A",
   "blueSoft": "#94C2DA",
   "blueMid": "#4E7CB2",
@@ -42,7 +42,7 @@ export const Colors = {
   "surfaceGlass": "rgba(255, 255, 255, 0.95)",
   "surfaceMuted": "rgba(255, 255, 255, 0.4)",
   "surfaceGlassMuted": "rgba(255, 255, 255, 0.4)",
-  "background": "#F5F5F5",
+  "background": "#EFE8E0",
   "border": "#E5E7EB",
   "borderLight": "#E5E7EB",
   "borderMid": "#D1D5DB",

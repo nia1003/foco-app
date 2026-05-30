@@ -16,24 +16,27 @@ const corsHeaders = {
 function calcQualityScore(params: {
   actualDuration: number
   plannedDuration: number
+  completionPercent: number | null
   completed: boolean
   earlyStop: boolean
   pauseCount: number
   leftAppCount: number
   leftAppTotalSec: number
 }): number {
-  const { actualDuration, plannedDuration, completed, earlyStop,
+  const { actualDuration, plannedDuration, completionPercent, completed, earlyStop,
           pauseCount, leftAppCount, leftAppTotalSec } = params
 
+  const reflectionCompletionRatio = completionPercent !== null ? completionPercent / 100 : null
+
   if (earlyStop) {
-    const ratio = plannedDuration > 0 ? actualDuration / plannedDuration : 0
+    const ratio = reflectionCompletionRatio ?? (plannedDuration > 0 ? actualDuration / plannedDuration : 0)
     return Math.round(ratio * 40)
   }
 
   // 完成度 (0–70)
-  const completionRatio = plannedDuration > 0
+  const completionRatio = reflectionCompletionRatio ?? (plannedDuration > 0
     ? Math.min(actualDuration / plannedDuration, 1.0)
-    : 1.0
+    : 1.0)
   let score = Math.round(completionRatio * 70)
 
   // 完成獎勵 (+15)
@@ -104,6 +107,19 @@ function calcLevel(totalXP: number): number {
   return level
 }
 
+function isMissingReflectionColumnError(error: unknown): boolean {
+  const record = error as Record<string, unknown> | null
+  const code = typeof record?.code === 'string' ? record.code : ''
+  const text = [record?.message, record?.details, record?.hint]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+
+  return (
+    code === 'PGRST204' ||
+    /distraction_reasons|completion_percent|mood_score|schema cache|column .* does not exist/i.test(text)
+  )
+}
+
 // ── 主函式 ───────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -126,9 +142,24 @@ serve(async (req) => {
       early_stop,
       started_at,
       events           = [],
+      distraction_reasons = [],
+      completion_percent = null,
+      mood_score = null,
     } = body
 
     const ended_at = new Date().toISOString()
+    const normalizedTaskId =
+      typeof task_id === 'string' && task_id.trim().length > 0
+        ? task_id
+        : null
+    const normalizedCompletionPercent =
+      typeof completion_percent === 'number'
+        ? Math.max(0, Math.min(100, Math.round(completion_percent)))
+        : null
+    const effectiveCompleted =
+      normalizedCompletionPercent !== null
+        ? normalizedCompletionPercent >= 90
+        : completed
 
 
     if (!user_id || !pet_id || actual_duration == null || planned_duration == null) {
@@ -143,18 +174,35 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
+    const { data: pet, error: petReadError } = await supabase
+      .from('pets')
+      .select('xp, level')
+      .eq('id', pet_id)
+      .eq('owner_id', user_id)
+      .maybeSingle()
+
+    if (petReadError) throw petReadError
+
+    if (!pet) {
+      return new Response(
+        JSON.stringify({ error: 'Selected companion was not found. Please reload pets and try again.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
     // ── 1. Quality Score → DISC → XP ─────────────────────────
     const qualityScore = calcQualityScore({
       actualDuration:  actual_duration,
       plannedDuration: planned_duration,
-      completed,
+      completionPercent: normalizedCompletionPercent,
+      completed:        effectiveCompleted,
       earlyStop:       early_stop,
       pauseCount:      pause_count,
       leftAppCount:    left_app_count,
       leftAppTotalSec: left_app_total_sec,
     })
 
-    const focusType = calcFocusType(completed, pause_count, left_app_count, qualityScore)
+    const focusType = calcFocusType(effectiveCompleted, pause_count, left_app_count, qualityScore)
 
     const xpGained = calcXP({
       actualDuration: actual_duration,
@@ -163,60 +211,72 @@ serve(async (req) => {
     })
 
     // ── 2. 寫入 sessions ─────────────────────────────────────
-    const { data: session, error: sessionError } = await supabase
+    const sessionInsert = {
+      user_id,
+      task_id: normalizedTaskId,
+      planned_duration,
+      actual_duration,
+      pause_count,
+      pause_total_sec,
+      left_app_count,
+      left_app_total_sec,
+      completed: effectiveCompleted,
+      early_stop,
+      focus_type_result: focusType,
+      xp_earned:         xpGained,
+      quality_score:     qualityScore,
+      started_at,
+      ended_at,
+      events,
+      distraction_reasons,
+      completion_percent: normalizedCompletionPercent,
+      mood_score,
+    }
+
+    let { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .insert({
-        user_id,
-        task_id,
-        planned_duration,
-        actual_duration,
-        pause_count,
-        pause_total_sec,
-        left_app_count,
-        left_app_total_sec,
-        completed,
-        early_stop,
-        focus_type_result: focusType,
-        xp_earned:         xpGained,
-        quality_score:     qualityScore,
-        started_at,
-        ended_at,
-        events,
-      })
+      .insert(sessionInsert)
       .select('id')
       .single()
 
-    if (sessionError) throw sessionError
-
-    // ── 3. 讀取目前 pet XP（找不到就跳過，不中斷 session 儲存）──
-    const { data: pet } = await supabase
-      .from('pets')
-      .select('xp, level')
-      .eq('id', pet_id)
-      .maybeSingle()
-
-    let newXP    = xpGained
-    let newLevel = 1
-    let levelUp  = false
-
-    if (pet) {
-      newXP    = pet.xp + xpGained
-      newLevel = Math.min(calcLevel(newXP), 5)
-      levelUp  = newLevel > pet.level
-
-      // ── 4. 更新 pet ────────────────────────────────────────
-      await supabase
-        .from('pets')
-        .update({ xp: newXP, level: newLevel })
-        .eq('id', pet_id)
+    if (sessionError && isMissingReflectionColumnError(sessionError)) {
+      const fallbackInsert = { ...sessionInsert }
+      delete (fallbackInsert as Record<string, unknown>).distraction_reasons
+      delete (fallbackInsert as Record<string, unknown>).completion_percent
+      delete (fallbackInsert as Record<string, unknown>).mood_score
+      const fallback = await supabase
+        .from('sessions')
+        .insert(fallbackInsert)
+        .select('id')
+        .single()
+      session = fallback.data
+      sessionError = fallback.error
     }
 
+    if (sessionError) throw sessionError
+
+    // ── 3. Update the real pet XP; missing pets are fatal for reward integrity.
+    const newXP    = pet.xp + xpGained
+    const newLevel = Math.min(calcLevel(newXP), 5)
+    const levelUp  = newLevel > pet.level
+
+    // ── 4. 更新 pet ────────────────────────────────────────
+    const { error: petUpdateError } = await supabase
+      .from('pets')
+      .update({ xp: newXP, level: newLevel })
+      .eq('id', pet_id)
+      .eq('owner_id', user_id)
+      .select('id')
+      .single()
+
+    if (petUpdateError) throw petUpdateError
+
     // ── 5. 完成任務標記 done ─────────────────────────────────
-    if (task_id && completed) {
+    if (normalizedTaskId && effectiveCompleted) {
       await supabase
         .from('tasks')
         .update({ status: 'done' })
-        .eq('id', task_id)
+        .eq('id', normalizedTaskId)
     }
 
     // ── 6. 下一級 XP 門檻 ────────────────────────────────────

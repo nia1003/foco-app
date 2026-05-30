@@ -2,7 +2,8 @@
 // FOCO Service — Session / Pet / Task API
 // 全部走 Supabase（DB + Edge Function）
 // ─────────────────────────────────────────────
-import { supabase } from '@/lib/supabase';
+import { clearLocalSupabaseSession, getCurrentSession, supabase } from '@/lib/supabase';
+import { calculateQualityScore } from '@/lib/sessionScoring';
 import type { SessionPayload, SessionResult, FocoPet, Task, SessionRecord, DayData, SessionSummary, TaskCategory } from '@/types';
 
 // ── 等級門檻（index = level - 1）────────────────
@@ -10,6 +11,40 @@ const XP_THRESHOLDS = [0, 100, 250, 500, 900];
 
 function xpNextLevel(level: number): number {
   return level < 5 ? XP_THRESHOLDS[level] : 900;
+}
+
+function normalizeSessionResult(payload: SessionPayload, result: SessionResult): SessionResult {
+  const highCompletion =
+    typeof payload.completion_percent === 'number' && payload.completion_percent >= 90;
+
+  if (highCompletion && (!Number.isFinite(result.quality_score) || result.quality_score <= 0)) {
+    return {
+      ...result,
+      quality_score: calculateQualityScore({ ...payload, completed: true }),
+    };
+  }
+
+  return result;
+}
+
+function assertValidSessionResult(payload: SessionPayload, result: SessionResult): void {
+  if (!result.session_id) {
+    throw new Error('Session save returned an invalid result. Please try again.');
+  }
+
+  if (result.pet_id !== payload.pet_id) {
+    throw new Error('Session saved with a different companion. Please reload pets and try again.');
+  }
+
+  if (
+    !Number.isFinite(result.xp_gained) ||
+    result.xp_gained <= 0 ||
+    !Number.isFinite(result.new_xp) ||
+    !Number.isFinite(result.new_level) ||
+    !Number.isFinite(result.xp_next_level)
+  ) {
+    throw new Error('Session saved, but reward data was invalid. Please reload pets and try again.');
+  }
 }
 
 // ── pet-chat（呼叫 Supabase Edge Function → Together AI）────
@@ -38,10 +73,11 @@ export async function chatWithPet(petId: string, message: string): Promise<strin
 
 // ── session-complete（呼叫 Supabase Edge Function）
 export async function completeSession(payload: SessionPayload): Promise<SessionResult> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const session = await getCurrentSession();
   if (!session) throw new Error('Not authenticated');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
 
   const res = await fetch(
     `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/session-complete`,
@@ -52,15 +88,22 @@ export async function completeSession(payload: SessionPayload): Promise<SessionR
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     },
-  );
+  ).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const msg = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      await clearLocalSupabaseSession();
+      throw new Error('Not authenticated');
+    }
     throw new Error(msg || 'session-complete failed');
   }
 
-  return res.json() as Promise<SessionResult>;
+  const result = normalizeSessionResult(payload, await res.json() as SessionResult);
+  assertValidSessionResult(payload, result);
+  return result;
 }
 
 // ── getPets — 取得 user 所有寵物（多寵物支援）──────
