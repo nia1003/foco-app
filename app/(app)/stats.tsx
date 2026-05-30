@@ -269,7 +269,11 @@ function buildHourlyStats(sessions: SessionRecord[], anchor: Date): DayStat[] {
   return HOUR_SLOTS.map((h) => {
     const slotStart = dayStart.getTime() + h * 3_600_000;
     const agg = aggregateSessions(sessions, slotStart, slotStart + 3 * 3_600_000);
-    return { date: new Date(slotStart), day: String(h).padStart(2, '0'), ...agg };
+    return {
+      date: new Date(slotStart),
+      day: String(h).padStart(2, '0'),
+      ...agg,
+    };
   });
 }
 
@@ -525,20 +529,22 @@ function LineChart({
   chartStats,
   selectedIndex,
   onSelect,
+  hideDotWhenEmpty = false,
 }: {
   chartStats: DayStat[];
   selectedIndex: number;
   onSelect: (i: number) => void;
+  hideDotWhenEmpty?: boolean;
 }) {
   const { colors, isDark } = useAppTheme();
   const lcStyles = useThemedStyles(createLineChartLabelStyles);
   const W = CHART_W;
   const H = 80;
   const PAD_TOP = 22;
-  const PAD_X = 10;
+  const n = chartStats.length;
+  const PAD_X = W / (2 * Math.max(n, 1));
   const innerW = W - PAD_X * 2;
   const svgH = H + PAD_TOP + 8;
-  const n = chartStats.length;
 
   if (n === 0) return null;
 
@@ -576,8 +582,12 @@ function LineChart({
           strokeLinecap="round"
         />
 
-        {pts.map((p, i) =>
-          i === selectedIndex ? (
+        {pts.map((p, i) => {
+          const isEmpty = hideDotWhenEmpty &&
+            chartStats[i].hours === 0 &&
+            chartStats[i].day === '';
+          if (isEmpty) return null;
+          return i === selectedIndex ? (
             <React.Fragment key={i}>
               <Circle cx={p.x} cy={p.y} r={12} fill="rgba(236,197,254,0.20)" />
               <Circle cx={p.x} cy={p.y} r={5.5} fill={C_PURPLE} />
@@ -590,8 +600,8 @@ function LineChart({
               r={3.5}
               fill="rgba(236,197,254,0.60)"
             />
-          ),
-        )}
+          );
+        })}
       </Svg>
 
       {/* Tap targets + day labels */}
@@ -604,6 +614,7 @@ function LineChart({
             activeOpacity={0.7}
           >
             <Text
+              numberOfLines={1}
               style={[
                 lcStyles.dayLabel,
                 i === selectedIndex && lcStyles.dayLabelActive,
@@ -933,6 +944,7 @@ export default function StatsScreen() {
                     chartStats={historyStats}
                     selectedIndex={historySelectedIdx}
                     onSelect={setHistorySelectedIdx}
+                    hideDotWhenEmpty={historyTab === 'daily'}
                   />
                   {historyStats[historySelectedIdx] && (
                     <View style={styles.selectedDetail}>
