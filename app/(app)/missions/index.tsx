@@ -19,7 +19,9 @@ import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
 import { deleteTask } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
+import { TaskIcon } from '@/components/tasks/TaskIcon';
 import { TaskDetailModal } from '../../../components/tasks/TaskDetailModal';
+import { resolveTaskIcon } from '@/lib/taskIcon';
 import type { Task } from '@/types';
 
 const BG   = '#FFFFFF';
@@ -28,6 +30,66 @@ const CARD = '#F2F2F2';
 const BTN_SIZE = 36;
 
 type TabType = 'task' | 'daily';
+
+function formatDeadline(deadlineAt: string | null | undefined): { label: string; overdue: boolean } | null {
+  if (!deadlineAt) return null;
+  const diffDays = Math.ceil((new Date(deadlineAt).getTime() - Date.now()) / 86_400_000);
+  if (diffDays < 0) return { label: 'overdue', overdue: true };
+  if (diffDays === 0) return { label: 'due today', overdue: false };
+  if (diffDays === 1) return { label: '1 day left', overdue: false };
+  return { label: `${diffDays} days left`, overdue: false };
+}
+
+function MissionTaskCard({
+  task,
+  onOpen,
+  onStart,
+  onDelete,
+}: {
+  task: Task;
+  onOpen: () => void;
+  onStart: () => void;
+  onDelete: () => void;
+}) {
+  const deadline = formatDeadline(task.deadline_at);
+
+  return (
+    <View style={s.taskCard}>
+      <TouchableOpacity style={s.taskOpenArea} onPress={onOpen} activeOpacity={0.78}>
+        <View style={s.taskTextBlock}>
+          <Text style={s.taskTitle} numberOfLines={2}>{task.title}</Text>
+          {deadline ? (
+            <Text style={[s.deadlineBadge, deadline.overdue && s.deadlineOverdue]} numberOfLines={1}>
+              {deadline.label}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={s.deleteBtn}
+        onPress={onDelete}
+        activeOpacity={0.7}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Trash2 size={16} color="rgba(26,22,34,0.40)" />
+      </TouchableOpacity>
+
+      <View style={s.taskIconWrap}>
+        <TaskIcon icon={resolveTaskIcon(task)} size={22} />
+      </View>
+
+      <TouchableOpacity
+        style={s.startBtn}
+        onPress={onStart}
+        activeOpacity={0.8}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Text style={s.startIcon}>→</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function MissionsScreen() {
   const [tab, setTab]                 = useState<TabType>('task');
@@ -136,7 +198,7 @@ export default function MissionsScreen() {
           </View>
         )}
 
-        {tabTasks.map((task: Task) => (
+        {false && tabTasks.map((task: Task) => (
           <View key={task.id} style={s.taskCard}>
             <TouchableOpacity
               style={s.taskInfoPressable}
@@ -173,6 +235,20 @@ export default function MissionsScreen() {
             </View>
           </View>
         ))}
+
+        {tabTasks.length > 0 && (
+          <View style={s.taskGrid}>
+            {tabTasks.map((task: Task) => (
+              <MissionTaskCard
+                key={task.id}
+                task={task}
+                onOpen={() => { play('tap'); setSelectedTaskId(task.id); }}
+                onStart={() => startFocus({ taskMode: 'existing', selectedTaskId: task.id })}
+                onDelete={() => { play('tap'); handleDeleteTask(task.id, task.title); }}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <AddTaskModal
@@ -245,16 +321,27 @@ const s = StyleSheet.create({
   },
 
   taskCard: {
+    width: '48%',
+    height: 135,
     backgroundColor: CARD,
     borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    position: 'relative',
   },
-  emptyCard: { justifyContent: 'center', paddingHorizontal: 18 },
+  taskGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  emptyCard: { width: '100%', height: 'auto', justifyContent: 'center', paddingHorizontal: 18, paddingVertical: 16 },
+  taskOpenArea: {
+    flex: 1,
+  },
+  taskTextBlock: {
+    paddingRight: 24,
+    alignItems: 'flex-start',
+  },
   taskInfoPressable: {
     flex: 1,
     flexDirection: 'row',
@@ -262,17 +349,19 @@ const s = StyleSheet.create({
     gap: 10,
   },
   taskIconWrap: {
-    width: BTN_SIZE,
-    height: BTN_SIZE,
-    borderRadius: 10,
+    position: 'absolute',
+    left: 16,
+    bottom: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     backgroundColor: 'rgba(26,22,34,0.07)',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
   taskIconText: { fontSize: 18 },
   taskInfo: { flex: 1 },
-  taskTitle: { fontSize: 15, fontWeight: '600', color: INK },
+  taskTitle: { fontSize: 13, fontWeight: '700', color: INK, lineHeight: 17 },
   taskSub: { fontSize: 12, color: 'rgba(26,22,34,0.45)', marginTop: 2 },
   taskMemo: {
     fontSize: 11,
@@ -284,6 +373,9 @@ const s = StyleSheet.create({
 
   taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   startBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
     width: BTN_SIZE,
     height: BTN_SIZE,
     borderRadius: BTN_SIZE / 2,
@@ -292,5 +384,20 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   startIcon: { fontSize: 16, color: '#ffffff', fontWeight: '700' },
-  deleteBtn: { padding: 4 },
+  deleteBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    padding: 4,
+  },
+  deadlineBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#7C4DCC',
+    letterSpacing: 0.1,
+    marginTop: 4,
+  },
+  deadlineOverdue: {
+    color: '#CC4D4D',
+  },
 });
