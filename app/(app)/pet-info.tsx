@@ -29,6 +29,7 @@ import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
 import { mockPets } from '@/data/mockData';
 import { chatWithPet } from '@/services/focoService';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -55,6 +56,7 @@ const LEVEL_INFO: Record<number, { scale: number; label: string; desc: string }>
 };
 
 export default function PetInfoScreen() {
+  const { screenBg } = useAppTheme();
   const { petId } = useLocalSearchParams<{ petId?: string }>();
   const { pets, activePet } = usePetStore();
   const insets = useSafeAreaInsets();
@@ -194,7 +196,7 @@ export default function PetInfoScreen() {
   });
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
 
       {/* FocoBar floats above everything */}
@@ -370,7 +372,7 @@ export default function PetInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
+  root: { flex: 1 },
 
   // FocoBar floats above
   barWrap: {

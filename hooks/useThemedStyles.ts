@@ -8,12 +8,6 @@ export function useThemedStyles<T>(factory: (theme: AppTheme) => T): T {
   return useMemo(
     () => factory(theme),
 
-    [
-      theme.isDark,
-      theme.appStyleId,
-      theme.colors,
-      theme.surfaces,
-      theme.screenBg,
-    ],
+    [theme.isDark, theme.colors, theme.surfaces, theme.screenBg],
   );
 }

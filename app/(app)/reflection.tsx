@@ -1,27 +1,22 @@
-/**
- * ReflectionScreen — 微反思結算（專注結束後自動進入）
- * 三個快問題：分心標籤 + 完成度 + 心情
- * 提交後呼叫 completeSession + updateTaskProgress → reward
- */
 import React, { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Alert,
   GestureResponderEvent,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppBackground } from '@/components/ui/AppBackground';
-import { Colors } from '@/constants/theme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
 import { completeSession, updateTaskProgress } from '@/services/focoService';
+import {
+  createReflectionSliderStyles,
+  createReflectionStyles,
+} from '@/styles/reflectionScreen.styles';
 import type { SessionPayload } from '@/types';
-
-const PINK     = Colors.pinkText;
-const PINK_BG  = '#F2CEDC';
 
 const waitForNextFrame = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -54,6 +49,7 @@ function CompletionSlider({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const sliderStyles = useThemedStyles(createReflectionSliderStyles);
   const trackRef = useRef<View>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const trackPageXRef = useRef(0);
@@ -106,6 +102,7 @@ function CompletionSlider({
 // ── Main screen ───────────────────────────────
 export default function ReflectionScreen() {
   const router = useRouter();
+  const styles = useThemedStyles(createReflectionStyles);
 
   const { payloadJson, localStatsJson, defaultCompletion } =
     useLocalSearchParams<{
@@ -245,7 +242,7 @@ export default function ReflectionScreen() {
                   activeOpacity={0.75}
                 >
                   <Text style={styles.moodEmoji}>{m.emoji}</Text>
-                  <Text style={[styles.moodLabel, active && { color: PINK, fontWeight: '700' }]}>
+                  <Text style={[styles.moodLabel, active && styles.tagTextActive]}>
                     {m.label}
                   </Text>
                 </TouchableOpacity>
@@ -279,112 +276,3 @@ export default function ReflectionScreen() {
     </View>
   );
 }
-
-// ── Slider styles ─────────────────────────────
-const sliderStyles = StyleSheet.create({
-  wrap: { marginTop: 8, marginBottom: 4 },
-  valueRow: {
-    flexDirection: 'row', alignItems: 'baseline',
-    justifyContent: 'space-between', marginBottom: 12,
-  },
-  valueText: { fontSize: 26, fontWeight: '700', color: PINK, letterSpacing: -0.5 },
-  valueHint: { fontSize: 12, color: Colors.inkFaint },
-  track: {
-    height: 6, borderRadius: 9999,
-    backgroundColor: 'rgba(20,16,28,0.08)',
-    justifyContent: 'center',
-  },
-  fill: {
-    position: 'absolute', left: 0,
-    height: 6, borderRadius: 9999,
-    backgroundColor: PINK_BG,
-  },
-  thumb: {
-    position: 'absolute',
-    width: 26, height: 26, borderRadius: 13,
-    backgroundColor: '#fff',
-    borderWidth: 2.5, borderColor: PINK,
-    top: -10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  endLabels: {
-    flexDirection: 'row', justifyContent: 'space-between', marginTop: 10,
-  },
-  endLabel: { fontSize: 10, color: Colors.inkFaint },
-});
-
-// ── Screen styles ─────────────────────────────
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fbfaf7' },
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: 24, paddingTop: 72, paddingBottom: 60 },
-
-  headingBlock: { marginBottom: 36 },
-  heading: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 34, fontWeight: '500',
-    color: Colors.ink, letterSpacing: -0.6,
-    marginBottom: 6,
-  },
-  sub: { fontSize: 14, color: Colors.inkSoft, lineHeight: 20 },
-
-  section: {
-    marginBottom: 36,
-    backgroundColor: 'rgba(255,255,255,0.60)',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.72)',
-    padding: 20,
-  },
-  qLabel: { fontSize: 15, fontWeight: '700', color: Colors.ink, marginBottom: 4 },
-  qHint: { fontSize: 12, color: Colors.inkFaint, marginBottom: 14 },
-
-  // Distraction tags
-  tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: {
-    paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(20,16,28,0.05)',
-    borderWidth: 1, borderColor: 'transparent',
-  },
-  tagActive: { backgroundColor: PINK_BG, borderColor: PINK },
-  tagText: { fontSize: 13, fontWeight: '500', color: Colors.inkSoft },
-  tagTextActive: { color: PINK, fontWeight: '700' },
-
-  // Mood
-  moodRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  moodBtn: {
-    alignItems: 'center', gap: 4,
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
-  moodBtnActive: { backgroundColor: PINK_BG },
-  moodEmoji: { fontSize: 26 },
-  moodLabel: { fontSize: 10, color: Colors.inkFaint, letterSpacing: 0.2 },
-
-  // Actions
-  submitBtn: {
-    paddingVertical: 17,
-    borderRadius: 9999,
-    backgroundColor: Colors.ink,
-    alignItems: 'center',
-    shadowColor: Colors.ink,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 6,
-    marginBottom: 12,
-  },
-  submitText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 2 },
-  skipBtn: { paddingVertical: 12, alignItems: 'center' },
-  skipText: { fontSize: 13, color: Colors.inkFaint },
-});

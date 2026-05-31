@@ -25,6 +25,7 @@ import { PETS } from '@/constants/pets';
 import { usePetStore } from '@/stores/petStore';
 import { useSound } from '@/components/SoundProvider';
 import { mockPets } from '@/data/mockData';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 const { width: W, height: H } = Dimensions.get('window');
 const UNLOCKED = PETS.filter((p) => !p.locked);
@@ -35,6 +36,7 @@ const LEVEL_LABELS: Record<number, string> = {
 };
 
 export default function PetCollectionScreen() {
+  const { screenBg } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
@@ -51,7 +53,7 @@ export default function PetCollectionScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
 
       {/* FocoBar */}
@@ -155,7 +157,7 @@ export default function PetCollectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
+  root: { flex: 1 },
 
   barWrap: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,

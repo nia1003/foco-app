@@ -19,11 +19,15 @@ import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { createAuthFormStyles } from '@/styles/authForm.styles';
 import { authService } from '@/services/authService';
 import { useApiCall } from '@/hooks/useApiCall';
 
 export default function LoginScreen() {
+  const { screenBg, colors } = useAppTheme();
+  const styles = useThemedStyles(createAuthFormStyles);
   const router = useRouter();
   const { play } = useSound();
   const [email, setEmail] = useState('');
@@ -43,7 +47,7 @@ export default function LoginScreen() {
   });
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -66,7 +70,7 @@ export default function LoginScreen() {
                   value={email}
                   onChangeText={setEmail}
                   placeholder="you@example.com"
-                  placeholderTextColor={Colors.inkFaint}
+                  placeholderTextColor={colors.inkFaint}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -82,7 +86,7 @@ export default function LoginScreen() {
                   value={password}
                   onChangeText={setPassword}
                   placeholder="••••••"
-                  placeholderTextColor={Colors.inkFaint}
+                  placeholderTextColor={colors.inkFaint}
                   secureTextEntry={!showPw}
                 />
                 <TouchableOpacity onPress={() => { play('tap'); setShowPw((v) => !v); }} style={styles.eyeBtn}>
@@ -120,48 +124,3 @@ export default function LoginScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
-  content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
-  cardWrap: { marginTop: 8 },
-  heading: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 26,
-    fontWeight: '500',
-    color: Colors.ink,
-    letterSpacing: -0.3,
-  },
-  sub: { fontSize: 14, color: Colors.inkSoft, marginTop: 6 },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.inkFaint,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginTop: 24,
-  },
-  inputWrap: { paddingBottom: 4 },
-  input: { fontSize: 18, fontWeight: '500', color: Colors.ink, paddingVertical: 6 },
-  pwRow: { flexDirection: 'row', alignItems: 'center' },
-  eyeBtn: { paddingLeft: 12, paddingVertical: 6 },
-  eyeIcon: { fontSize: 18 },
-  underline: { height: 1.2, backgroundColor: 'rgba(20,16,28,0.15)', marginTop: 2 },
-  continueBtn: {
-    marginTop: 32,
-    paddingVertical: 16,
-    borderRadius: 9999,
-    backgroundColor: Colors.ink,
-    alignItems: 'center',
-    shadowColor: Colors.ink,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  continueBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 3 },
-  disabled: { opacity: 0.4 },
-  switchBtn: { marginTop: 20, alignItems: 'center' },
-  switchText: { fontSize: 13, color: Colors.inkFaint },
-  switchLink: { color: Colors.ink, fontWeight: '600' },
-});

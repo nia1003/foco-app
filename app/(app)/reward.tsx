@@ -16,10 +16,12 @@ import { AppBackground } from '@/components/ui/AppBackground';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { Colors } from '@/constants/theme';
 import { PETS } from '@/constants/pets';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { usePetStore } from '@/stores/petStore';
 import type { SessionResult } from '@/types';
 
 export default function RewardScreen() {
+  const { screenBg } = useAppTheme();
   const router = useRouter();
   const { result: resultStr } = useLocalSearchParams<{ result: string }>();
   const result: SessionResult = resultStr ? JSON.parse(resultStr) : {};
@@ -85,7 +87,7 @@ export default function RewardScreen() {
   });
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
 
       <Animated.View style={[styles.content, { opacity: contentAnim }]}>

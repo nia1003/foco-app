@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function TaskIcon({ icon, size = 20 }: Props) {
-  const { isDark, appStyleId, colors } = useAppTheme();
+  const { colors } = useAppTheme();
 
   if (icon.type === 'emoji') {
     return <Text style={[styles.emoji, { fontSize: size }]}>{icon.value}</Text>;
@@ -21,8 +21,7 @@ export function TaskIcon({ icon, size = 20 }: Props) {
     return <Text style={[styles.emoji, { fontSize: size }]}>📌</Text>;
   }
 
-  const stroke =
-    appStyleId === 'monochrome' ? (isDark ? '#ffffff' : '#000000') : colors.ink;
+  const stroke = colors.ink;
 
   const { Icon } = def;
   return (

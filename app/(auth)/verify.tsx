@@ -19,11 +19,15 @@ import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { createAuthFormStyles } from '@/styles/authForm.styles';
 import { authService } from '@/services/authService';
 import { useApiCall } from '@/hooks/useApiCall';
 
 export default function VerifyScreen() {
+  const { screenBg, colors } = useAppTheme();
+  const styles = useThemedStyles(createAuthFormStyles);
   const router = useRouter();
   const { play } = useSound();
   const { email } = useLocalSearchParams<{ email: string }>();
@@ -57,7 +61,7 @@ export default function VerifyScreen() {
     });
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -69,24 +73,24 @@ export default function VerifyScreen() {
 
           <View style={styles.cardWrap}>
             <FrostCard radius={32}>
-              <View style={styles.iconWrap}>
-                <Text style={styles.icon}>✉️</Text>
+              <View style={localStyles.iconWrap}>
+                <Text style={localStyles.icon}>✉️</Text>
               </View>
 
-              <Text style={styles.heading}>Check your inbox</Text>
-              <Text style={styles.sub}>
+              <Text style={[styles.heading, localStyles.centered]}>Check your inbox</Text>
+              <Text style={[styles.sub, localStyles.centered]}>
                 We sent a 6-digit code to{'\n'}
-                <Text style={styles.emailText}>{email}</Text>
+                <Text style={[localStyles.emailText, { color: colors.ink }]}>{email}</Text>
               </Text>
 
               <Text style={styles.label}>VERIFICATION CODE</Text>
               <View style={styles.inputWrap}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, localStyles.codeInput]}
                   value={code}
                   onChangeText={(t) => setCode(t.replace(/[^0-9]/g, '').slice(0, 6))}
                   placeholder="000000"
-                  placeholderTextColor={Colors.inkFaint}
+                  placeholderTextColor={colors.inkFaint}
                   keyboardType="number-pad"
                   maxLength={6}
                   autoFocus
@@ -95,28 +99,28 @@ export default function VerifyScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.verifyBtn, (!valid || verifyBlocked) && styles.disabled]}
+                style={[styles.continueBtn, (!valid || verifyBlocked) && styles.disabled]}
                 disabled={!valid || verifyBlocked}
                 onPress={verify}
                 activeOpacity={0.85}
               >
-                <Text style={styles.verifyBtnText}>
+                <Text style={styles.continueBtnText}>
                   {verifying ? 'VERIFYING…' : verifyBlocked ? `WAIT ${verifyCooldown}s` : 'VERIFY →'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.resendBtn, resendBlocked && styles.resendBlocked]}
+                style={[localStyles.resendBtn, resendBlocked && localStyles.resendBlocked]}
                 disabled={resendBlocked}
                 onPress={resend}
                 activeOpacity={0.7}
               >
-                <Text style={styles.resendText}>
+                <Text style={styles.switchText}>
                   {resending
                     ? 'Sending…'
                     : resendBlocked
                       ? `Resend in ${resendCooldown}s`
-                      : <Text>Didn't receive it? <Text style={styles.resendLink}>Resend code</Text></Text>
+                      : <Text>Didn't receive it? <Text style={styles.switchLink}>Resend code</Text></Text>
                   }
                 </Text>
               </TouchableOpacity>
@@ -129,39 +133,17 @@ export default function VerifyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
-  content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
-  cardWrap: { marginTop: 8 },
+const localStyles = StyleSheet.create({
   iconWrap: { alignItems: 'center', marginBottom: 16 },
   icon: { fontSize: 40 },
-  heading: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 26, fontWeight: '500', color: Colors.ink,
-    letterSpacing: -0.3, textAlign: 'center',
+  centered: { textAlign: 'center' },
+  emailText: { fontWeight: '600' },
+  codeInput: {
+    fontSize: 28,
+    fontWeight: '600',
+    letterSpacing: 6,
+    textAlign: 'center',
   },
-  sub: { fontSize: 14, color: Colors.inkSoft, marginTop: 8, textAlign: 'center', lineHeight: 20 },
-  emailText: { fontWeight: '600', color: Colors.ink },
-  label: {
-    fontSize: 11, fontWeight: '700', color: Colors.inkFaint,
-    letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 28,
-  },
-  inputWrap: { paddingBottom: 4, marginTop: 6 },
-  input: {
-    fontSize: 28, fontWeight: '600', color: Colors.ink,
-    paddingVertical: 6, letterSpacing: 6, textAlign: 'center',
-  },
-  underline: { height: 1.2, backgroundColor: 'rgba(20,16,28,0.15)', marginTop: 2 },
-  verifyBtn: {
-    marginTop: 28, paddingVertical: 16, borderRadius: 9999,
-    backgroundColor: Colors.ink, alignItems: 'center',
-    shadowColor: Colors.ink, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18, shadowRadius: 24, elevation: 6,
-  },
-  verifyBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 2.5 },
-  disabled: { opacity: 0.4 },
   resendBtn: { marginTop: 20, alignItems: 'center' },
   resendBlocked: { opacity: 0.4 },
-  resendText: { fontSize: 13, color: Colors.inkFaint },
-  resendLink: { color: Colors.ink, fontWeight: '600' },
 });

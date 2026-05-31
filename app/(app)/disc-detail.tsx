@@ -16,6 +16,7 @@ import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { Colors } from '@/constants/theme';
 import { useSound } from '@/components/SoundProvider';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 // ── DISC data ────────────────────────────────────────────────────
 
@@ -87,12 +88,13 @@ const DISC_TYPES: DiscType[] = [
 // ── Component ────────────────────────────────────────────────────
 
 export default function DiscDetailScreen() {
+  const { screenBg } = useAppTheme();
   const router = useRouter();
   const { dominant } = useLocalSearchParams<{ dominant?: string }>();
   const { play } = useSound();
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
 
       {/* Header */}
@@ -170,7 +172,7 @@ export default function DiscDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fbfaf7' },
+  root: { flex: 1 },
 
   header: {
     flexDirection: 'row',

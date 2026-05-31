@@ -26,6 +26,7 @@ import Svg, {
 import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FocoBar } from '@/components/layout/FocoBar';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import type { SessionResult, SessionEvent } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -156,6 +157,7 @@ function DiamondIcon({ size = 15, color = '#333' }: { size?: number; color?: str
 
 // ── 主畫面 ────────────────────────────────────
 export default function AnalysisScreen() {
+  const { screenBg } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { result: resultStr } = useLocalSearchParams<{ result: string }>();
@@ -191,7 +193,7 @@ export default function AnalysisScreen() {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: screenBg, paddingTop: insets.top }]}>
       <AppBackground />
       <FocoBar back />
 
