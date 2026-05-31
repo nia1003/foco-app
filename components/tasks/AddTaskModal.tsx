@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -17,6 +17,10 @@ import { createTask } from '@/services/focoService';
 import type { Task } from '@/types';
 
 const INK = '#1a1622';
+const WHEEL_ITEM_HEIGHT = 42;
+const DATE_OPTION_COUNT = 30;
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => i * 5);
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
 
 interface Props {
   visible: boolean;
@@ -26,36 +30,110 @@ interface Props {
   onCreated: (task: Task) => void;
 }
 
-function formatDeadlineInput(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+type WheelOption = {
+  label: string;
+  value: number;
+};
+
+type DateWheelOption = WheelOption & {
+  date: Date;
+};
+
+function formatDateOption(date: Date, index: number) {
+  if (index === 0) return 'Today';
+  if (index === 1) return 'Tomorrow';
+  if (index === 2) return 'Day after';
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-function parseDeadlineInput(value: string) {
-  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?$/);
-  if (!match) return null;
+function createDateOptions(): DateWheelOption[] {
+  return Array.from({ length: DATE_OPTION_COUNT }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+    date.setHours(0, 0, 0, 0);
+    return {
+      label: formatDateOption(date, index),
+      value: index,
+      date,
+    };
+  });
+}
 
-  const [, year, month, day, hour = '23', minute = '59'] = match;
-  const parsed = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    0,
-    0,
+function formatDeadlineSummary(date: DateWheelOption | undefined, hour: number, minute: number) {
+  if (!date) return null;
+  const due = date.date;
+  return `${due.getFullYear()}/${pad2(due.getMonth() + 1)}/${pad2(due.getDate())} ${pad2(hour)}:${pad2(minute)}`;
+}
+
+function buildDeadlineIso(date: DateWheelOption | undefined, hour: number, minute: number) {
+  if (!date) return null;
+  const due = new Date(date.date);
+  due.setHours(hour, minute, 0, 0);
+  return due.toISOString();
+}
+
+function WheelColumn({
+  label,
+  options,
+  selectedIndex,
+  onSelect,
+}: {
+  label: string;
+  options: WheelOption[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      y: selectedIndex * WHEEL_ITEM_HEIGHT,
+      animated: true,
+    });
+  }, [selectedIndex]);
+
+  const handleScrollEnd = (y: number) => {
+    const index = Math.max(0, Math.min(options.length - 1, Math.round(y / WHEEL_ITEM_HEIGHT)));
+    onSelect(index);
+  };
+
+  return (
+    <View style={styles.wheelColumn}>
+      <Text style={styles.wheelLabel}>{label}</Text>
+      <View style={styles.wheelFrame}>
+        <View pointerEvents="none" style={styles.wheelHighlight} />
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={WHEEL_ITEM_HEIGHT}
+          decelerationRate="fast"
+          contentOffset={{ x: 0, y: selectedIndex * WHEEL_ITEM_HEIGHT }}
+          contentContainerStyle={styles.wheelContent}
+          onMomentumScrollEnd={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
+          onScrollEndDrag={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
+          nestedScrollEnabled
+        >
+          {options.map((option, index) => {
+            const selected = index === selectedIndex;
+            return (
+              <TouchableOpacity
+                key={`${label}-${option.value}`}
+                style={styles.wheelItem}
+                onPress={() => onSelect(index)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.wheelItemText, selected && styles.wheelItemTextActive]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
   );
-
-  if (
-    Number.isNaN(parsed.getTime()) ||
-    parsed.getFullYear() !== Number(year) ||
-    parsed.getMonth() !== Number(month) - 1 ||
-    parsed.getDate() !== Number(day)
-  ) {
-    return null;
-  }
-
-  return parsed;
 }
 
 export function AddTaskModal({
@@ -72,8 +150,32 @@ export function AddTaskModal({
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
-  const [deadlineInput, setDeadlineInput] = useState('');
+  const [selectedDateIndex, setSelectedDateIndex] = useState(1);
+  const [selectedHourIndex, setSelectedHourIndex] = useState(23);
+  const [selectedMinuteIndex, setSelectedMinuteIndex] = useState(11);
   const [saving, setSaving] = useState(false);
+
+  const dateOptions = useMemo(() => createDateOptions(), [visible]);
+  const hourOptions = useMemo(
+    () => HOUR_OPTIONS.map((hour) => ({ label: pad2(hour), value: hour })),
+    [],
+  );
+  const minuteOptions = useMemo(
+    () => MINUTE_OPTIONS.map((minute) => ({ label: pad2(minute), value: minute })),
+    [],
+  );
+
+  const syncDeadline = useCallback((
+    dateIndex: number,
+    hourIndex: number,
+    minuteIndex: number,
+  ) => {
+    setDeadlineAt(buildDeadlineIso(
+      dateOptions[dateIndex],
+      HOUR_OPTIONS[hourIndex],
+      MINUTE_OPTIONS[minuteIndex],
+    ));
+  }, [dateOptions]);
 
   const resetForm = useCallback(() => {
     setTitle('');
@@ -81,45 +183,41 @@ export function AddTaskModal({
     setDurationMin(defaultDurationMin);
     setHasDeadline(false);
     setDeadlineAt(null);
-    setDeadlineInput('');
+    setSelectedDateIndex(1);
+    setSelectedHourIndex(23);
+    setSelectedMinuteIndex(11);
     setSaving(false);
   }, [defaultDurationMin]);
-
-  const setDeadlineDate = (date: Date) => {
-    setDeadlineAt(date.toISOString());
-    setDeadlineInput(formatDeadlineInput(date));
-  };
-
-  const pickDeadline = (daysFromNow: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + daysFromNow);
-    d.setHours(23, 59, 59, 0);
-    setDeadlineDate(d);
-  };
 
   const handleToggleDeadline = (value: boolean) => {
     setHasDeadline(value);
     if (value) {
-      pickDeadline(1);
+      syncDeadline(selectedDateIndex, selectedHourIndex, selectedMinuteIndex);
     } else {
       setDeadlineAt(null);
-      setDeadlineInput('');
     }
   };
 
-  const handleDeadlineInputChange = (value: string) => {
-    setDeadlineInput(value);
-    const parsed = parseDeadlineInput(value);
-    setDeadlineAt(parsed ? parsed.toISOString() : null);
+  const handleDateSelect = (index: number) => {
+    setSelectedDateIndex(index);
+    syncDeadline(index, selectedHourIndex, selectedMinuteIndex);
   };
 
-  const deadlineLabel = (() => {
-    if (!deadlineAt) return null;
-    const diff = Math.ceil((new Date(deadlineAt).getTime() - Date.now()) / 86_400_000);
-    if (diff <= 0) return 'today';
-    if (diff === 1) return 'tomorrow';
-    return `${diff} days`;
-  })();
+  const handleHourSelect = (index: number) => {
+    setSelectedHourIndex(index);
+    syncDeadline(selectedDateIndex, index, selectedMinuteIndex);
+  };
+
+  const handleMinuteSelect = (index: number) => {
+    setSelectedMinuteIndex(index);
+    syncDeadline(selectedDateIndex, selectedHourIndex, index);
+  };
+
+  const deadlineLabel = formatDeadlineSummary(
+    dateOptions[selectedDateIndex],
+    HOUR_OPTIONS[selectedHourIndex],
+    MINUTE_OPTIONS[selectedMinuteIndex],
+  );
 
   useEffect(() => {
     if (visible) resetForm();
@@ -138,7 +236,7 @@ export function AddTaskModal({
       return;
     }
     if (hasDeadline && !deadlineAt) {
-      Alert.alert('Invalid deadline', 'Use YYYY-MM-DD HH:mm, for example 2026-06-01 23:59.');
+      Alert.alert('Deadline required', 'Choose a deadline date and time.');
       return;
     }
 
@@ -227,37 +325,27 @@ export function AddTaskModal({
             {hasDeadline && (
               <>
                 <Text style={styles.timerLabel}>deadline</Text>
-                <TextInput
-                  style={styles.input}
-                  value={deadlineInput}
-                  onChangeText={handleDeadlineInputChange}
-                  placeholder="YYYY-MM-DD HH:mm"
-                  placeholderTextColor="rgba(26,22,34,0.35)"
-                  keyboardType="numbers-and-punctuation"
-                />
-                <View style={styles.deadlineRow}>
-                  {(['today', 'tomorrow', '3 days', '1 week'] as const).map((label, i) => {
-                    const days = [0, 1, 3, 7][i];
-                    const isActive = (() => {
-                      if (!deadlineAt) return false;
-                      const diff = Math.ceil(
-                        (new Date(deadlineAt).getTime() - Date.now()) / 86_400_000,
-                      );
-                      return diff === days || (days === 0 && diff <= 0);
-                    })();
-                    return (
-                      <TouchableOpacity
-                        key={label}
-                        style={[styles.deadlineChip, isActive && styles.deadlineChipActive]}
-                        onPress={() => (isActive ? handleDeadlineInputChange('') : pickDeadline(days))}
-                        activeOpacity={0.75}
-                      >
-                        <Text style={[styles.deadlineChipText, isActive && styles.deadlineChipTextActive]}>
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View style={styles.pickerPanel}>
+                  <View style={styles.wheelRow}>
+                    <WheelColumn
+                      label="Date"
+                      options={dateOptions}
+                      selectedIndex={selectedDateIndex}
+                      onSelect={handleDateSelect}
+                    />
+                    <WheelColumn
+                      label="Hour"
+                      options={hourOptions}
+                      selectedIndex={selectedHourIndex}
+                      onSelect={handleHourSelect}
+                    />
+                    <WheelColumn
+                      label="Min"
+                      options={minuteOptions}
+                      selectedIndex={selectedMinuteIndex}
+                      onSelect={handleMinuteSelect}
+                    />
+                  </View>
                 </View>
                 {deadlineLabel && (
                   <Text style={styles.deadlineSelected}>Due: {deadlineLabel}</Text>
@@ -353,31 +441,65 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     marginBottom: 12,
   },
-  deadlineRow: {
+  pickerPanel: {
+    backgroundColor: '#F0EAF8',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 12,
+  },
+  wheelRow: {
     flexDirection: 'row',
     gap: 8,
-    flexWrap: 'wrap',
-    marginBottom: 10,
   },
-  deadlineChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 9999,
-    backgroundColor: '#F0EAF8',
+  wheelColumn: {
+    flex: 1,
+  },
+  wheelLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(26,22,34,0.42)',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  wheelFrame: {
+    height: WHEEL_ITEM_HEIGHT * 3,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: 'rgba(124,77,204,0.15)',
+    overflow: 'hidden',
   },
-  deadlineChipActive: {
-    backgroundColor: '#7C4DCC',
-    borderColor: '#7C4DCC',
+  wheelHighlight: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    top: WHEEL_ITEM_HEIGHT,
+    height: WHEEL_ITEM_HEIGHT,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124,77,204,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.18)',
+    zIndex: 1,
   },
-  deadlineChipText: {
+  wheelContent: {
+    paddingVertical: WHEEL_ITEM_HEIGHT,
+  },
+  wheelItem: {
+    height: WHEEL_ITEM_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  wheelItemText: {
+    textAlign: 'center',
     fontSize: 13,
-    fontWeight: '500',
-    color: '#7C4DCC',
+    fontWeight: '600',
+    color: 'rgba(26,22,34,0.40)',
   },
-  deadlineChipTextActive: {
-    color: '#ffffff',
+  wheelItemTextActive: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: INK,
   },
   deadlineSelected: {
     fontSize: 12,
