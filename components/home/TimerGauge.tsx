@@ -44,8 +44,8 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder:  (_, gs) => Math.abs(gs.dx) > 4,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder:  () => true,
       onPanResponderGrant: (_, gs) => {
         dragStart.current = { x: gs.x0, val: valueRef.current };
         onStartRef.current?.();
@@ -126,19 +126,21 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
   const pInner = pt(pRad, R - 9);
 
   return (
-    <View style={styles.container} {...(!editing ? pan.panHandlers : {})}>
+    <View style={styles.container}>
       {/* Semicircular dial */}
-      <Svg width={SVG_W} height={SVG_H}>
-        <Path d={arcPath} fill="none" stroke="#e4e4e4" strokeWidth={1.5} />
-        {ticks}
-        <Line
-          x1={pInner.x.toFixed(1)} y1={pInner.y.toFixed(1)}
-          x2={pOuter.x.toFixed(1)} y2={pOuter.y.toFixed(1)}
-          stroke="#E53E3E"
-          strokeWidth={4.5}
-          strokeLinecap="round"
-        />
-      </Svg>
+      <View style={styles.gaugeSurface} {...(!editing ? pan.panHandlers : {})}>
+        <Svg width={SVG_W} height={SVG_H}>
+          <Path d={arcPath} fill="none" stroke="#e4e4e4" strokeWidth={1.5} />
+          {ticks}
+          <Line
+            x1={pInner.x.toFixed(1)} y1={pInner.y.toFixed(1)}
+            x2={pOuter.x.toFixed(1)} y2={pOuter.y.toFixed(1)}
+            stroke="#E53E3E"
+            strokeWidth={4.5}
+            strokeLinecap="round"
+          />
+        </Svg>
+      </View>
 
       {/* Number centred lower inside arc bowl */}
       <View style={styles.numOverlay} pointerEvents="box-none">
@@ -168,6 +170,10 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: 'transparent',
+    alignItems: 'center',
+    width: '100%',
+  },
+  gaugeSurface: {
     alignItems: 'center',
     width: '100%',
   },
