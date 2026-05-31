@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Dimensions, PanResponder, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Dimensions, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 
 const MIN_VAL = 5;
@@ -30,6 +30,8 @@ interface Props {
 }
 
 export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
+  const [editing, setEditing] = useState(false);
+  const [inputText, setInputText] = useState(String(value));
   const valueRef      = useRef(value);
   valueRef.current    = value;
   const onChangeRef   = useRef(onChange);
@@ -60,6 +62,21 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
       onPanResponderTerminate: () => { onEndRef.current?.(); },
     }),
   ).current;
+
+  const commitInput = () => {
+    const parsed = parseInt(inputText, 10);
+    if (!Number.isNaN(parsed)) {
+      const clamped = Math.max(MIN_VAL, Math.min(MAX_VAL, parsed));
+      const snapped = Math.round(clamped / STEP) * STEP;
+      onChangeRef.current(Math.max(MIN_VAL, Math.min(MAX_VAL, snapped)));
+    }
+    setEditing(false);
+  };
+
+  const beginEditing = () => {
+    setInputText(String(valueRef.current));
+    setEditing(true);
+  };
 
   // ── Arc track ──────────────────────────────────────────────────
   const arcL    = pt(Math.PI, R);
@@ -92,7 +109,7 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
   const pInner = pt(pRad, R - 9);
 
   return (
-    <View style={styles.container} {...pan.panHandlers}>
+    <View style={styles.container} {...(!editing ? pan.panHandlers : {})}>
       {/* Semicircular dial */}
       <Svg width={SVG_W} height={SVG_H}>
         <Path d={arcPath} fill="none" stroke="#e4e4e4" strokeWidth={1.5} />
@@ -107,8 +124,24 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
       </Svg>
 
       {/* Number centred lower inside arc bowl */}
-      <View style={styles.numOverlay} pointerEvents="none">
-        <Text style={styles.num}>{value}</Text>
+      <View style={styles.numOverlay} pointerEvents="box-none">
+        {editing ? (
+          <TextInput
+            style={styles.numInput}
+            value={inputText}
+            onChangeText={setInputText}
+            keyboardType="number-pad"
+            autoFocus
+            selectTextOnFocus
+            maxLength={3}
+            onBlur={commitInput}
+            onSubmitEditing={commitInput}
+          />
+        ) : (
+          <Pressable onPress={beginEditing} hitSlop={8}>
+            <Text style={styles.num}>{value}</Text>
+          </Pressable>
+        )}
         <Text style={styles.unit}>MIN</Text>
       </View>
     </View>
@@ -134,6 +167,18 @@ const styles = StyleSheet.create({
     color: '#111111',
     lineHeight: 58,
     letterSpacing: -2,
+  },
+  numInput: {
+    fontSize: 54,
+    fontWeight: '800',
+    color: '#111111',
+    lineHeight: 58,
+    letterSpacing: -2,
+    minWidth: 96,
+    textAlign: 'center',
+    padding: 0,
+    borderBottomWidth: 2,
+    borderBottomColor: '#111111',
   },
   unit: {
     fontSize: 11,
