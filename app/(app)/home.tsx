@@ -28,7 +28,7 @@ import Reanimated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
@@ -316,6 +316,7 @@ export default function HomeScreen() {
   const storePool = realPets.length > 0 ? realPets : mockPets;
 
   const [durationMin, setDurationMin]                 = useState(25);
+  const [homeTimerTouched, setHomeTimerTouched]       = useState(false);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
   const [addTaskOpen, setAddTaskOpen]                 = useState(false);
@@ -408,6 +409,12 @@ export default function HomeScreen() {
     fetchTasks(userId).catch(() => {});
   }, [userId, fetchTasks]);
 
+  useFocusEffect(
+    useCallback(() => {
+      setHomeTimerTouched(false);
+    }, []),
+  );
+
   useEffect(() => {
     if (!userId) return;
     fetchHomeStats(userId)
@@ -447,6 +454,7 @@ export default function HomeScreen() {
 
   // ── Handlers ────────────────────────────────────────────────────
   const goFocus = (task?: Task) => {
+    const focusDurationMin = task && !homeTimerTouched ? task.duration_min : durationMin;
     const launchPetId = resolveLaunchPetId({
       requestedPetId: activePetRecord?.id,
       pets,
@@ -465,7 +473,7 @@ export default function HomeScreen() {
     router.push({
       pathname: '/(app)/focus',
       params: {
-        durationMin: String(durationMin),
+        durationMin: String(focusDurationMin),
         petId: launchPetId,
         ...(task?.id ? { taskId: task.id } : {}),
         ...(task ? { taskTitle: task.title } : {}),
@@ -477,6 +485,11 @@ export default function HomeScreen() {
     play('tap');
     setAddTaskOpen(true);
   }, [play]);
+
+  const handleHomeTimerChange = useCallback((nextDurationMin: number) => {
+    setHomeTimerTouched(true);
+    setDurationMin(nextDurationMin);
+  }, []);
 
   const settleCarouselAtOffset = useCallback((xOffset: number, shouldCorrectCenter = true) => {
     const idx = Math.max(
@@ -825,7 +838,7 @@ export default function HomeScreen() {
                   <Text style={styles.sectionLabel}>timer</Text>
                   <TimerGauge
                     value={durationMin}
-                    onChange={setDurationMin}
+                    onChange={handleHomeTimerChange}
                     onDragStart={() => setPage2ScrollEnabled(false)}
                     onDragEnd={() => setPage2ScrollEnabled(true)}
                   />
