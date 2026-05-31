@@ -39,7 +39,7 @@ export default function FocusTypeScreen() {
   const handleContinue = () => {
     if (!selected) return;
     play('transition_up');
-    router.replace('/(app)/home');
+    router.push('/(auth)/done');
   };
 
   return (

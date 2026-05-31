@@ -62,9 +62,21 @@ export default function RootLayout() {
     }
 
     const inAuthGroup = segments[0] === '(auth)';
-    if (isAuthenticated && inAuthGroup) {
+
+    // These screens appear AFTER OTP verification — the user is already
+    // authenticated at this point but must finish onboarding. Never kick
+    // them out to /(app)/home before they complete setup.
+    const ONBOARDING_SCREENS = new Set([
+      'verify', 'profile', 'focus-type', 'consent', 'pet', 'done',
+    ]);
+    const currentAuthScreen = segments[1] as string | undefined;
+    const inOnboarding = inAuthGroup && !!currentAuthScreen && ONBOARDING_SCREENS.has(currentAuthScreen);
+
+    if (isAuthenticated && inAuthGroup && !inOnboarding) {
+      // Authenticated user on a pre-auth screen (index / login / signup) → go home
       router.replace('/(app)/home');
     } else if (!isAuthenticated && !inAuthGroup) {
+      // Unauthenticated user in the app → back to login
       router.replace('/(auth)');
     }
   }, [isAuthenticated, isLoading, segments, router]);
