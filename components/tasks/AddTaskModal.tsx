@@ -93,6 +93,7 @@ function WheelColumn({
 }) {
   const scrollRef = useRef<ScrollView>(null);
   const lastIndexRef = useRef(selectedIndex);
+  const wheelGestureActiveRef = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -106,6 +107,7 @@ function WheelColumn({
     Math.max(0, Math.min(options.length - 1, Math.round(y / WHEEL_ITEM_HEIGHT)));
 
   const handleScroll = (y: number) => {
+    if (!wheelGestureActiveRef.current) return;
     const index = resolveIndex(y);
     if (index !== lastIndexRef.current) {
       lastIndexRef.current = index;
@@ -114,10 +116,12 @@ function WheelColumn({
   };
 
   const handleScrollEnd = (y: number) => {
+    if (!wheelGestureActiveRef.current) return;
     const index = resolveIndex(y);
     scrollRef.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated: true });
     lastIndexRef.current = index;
     onSelect(index);
+    wheelGestureActiveRef.current = false;
   };
 
   const handlePress = (index: number) => {
@@ -136,8 +140,15 @@ function WheelColumn({
           showsVerticalScrollIndicator={false}
           decelerationRate="normal"
           scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
           contentOffset={{ x: 0, y: selectedIndex * WHEEL_ITEM_HEIGHT }}
           contentContainerStyle={styles.wheelContent}
+          onTouchStart={() => {
+            wheelGestureActiveRef.current = true;
+          }}
+          onTouchCancel={() => {
+            wheelGestureActiveRef.current = false;
+          }}
           onScroll={(event) => handleScroll(event.nativeEvent.contentOffset.y)}
           onMomentumScrollEnd={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
           onScrollEndDrag={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
