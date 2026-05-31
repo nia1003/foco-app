@@ -1,21 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Edit3 } from 'lucide-react-native';
 import { useSound } from '@/components/SoundProvider';
-import { useAppTheme } from '@/hooks/useAppTheme';
-import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { TimerGauge } from '@/components/home/TimerGauge';
 import { TaskIcon } from '@/components/tasks/TaskIcon';
 import { TaskIconPickerContent } from '@/components/tasks/TaskIconPickerContent';
-import { DEFAULT_TASK_ICON, type TaskIconValue } from '@/lib/taskIcon';
+import { DEFAULT_TASK_ICON, resolveTaskIcon, type TaskIconValue } from '@/lib/taskIcon';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -24,6 +24,13 @@ import { mockPets } from '@/data/mockData';
 import { useFocusLaunch } from '@/hooks/useFocusLaunch';
 import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
 import { updateTask as updateTaskApi } from '@/services/focoService';
+import type { Task } from '@/types';
+
+const INK = '#1a1622';
+const WHEEL_ITEM_HEIGHT = 34;
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => i * 5);
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 interface Props {
   visible: boolean;
@@ -31,12 +38,238 @@ interface Props {
   onClose: () => void;
 }
 
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+type WheelOption = {
+  label: string;
+  value: number;
+};
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function startOfDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function formatMonthTitle(year: number, monthIndex: number) {
+  return `${year}/${pad2(monthIndex + 1)}`;
+}
+
+function buildCalendarCells(year: number, monthIndex: number) {
+  const firstDay = new Date(year, monthIndex, 1);
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells: (Date | null)[] = [
+    ...Array(firstDay.getDay()).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function formatDeadlineSummary(date: Date, hour: number, minute: number) {
+  return `${date.getFullYear()}/${pad2(date.getMonth() + 1)}/${pad2(date.getDate())} ${pad2(hour)}:${pad2(minute)}`;
+}
+
+function buildDeadlineIso(date: Date, hour: number, minute: number) {
+  const due = new Date(date);
+  due.setHours(hour, minute, 0, 0);
+  return due.toISOString();
+}
+
+function clampIndex(index: number, length: number) {
+  return Math.max(0, Math.min(length - 1, index));
+}
+
+function nearestMinuteIndex(minute: number) {
+  const rounded = Math.round(minute / 5) * 5;
+  return clampIndex(MINUTE_OPTIONS.indexOf(rounded === 60 ? 55 : rounded), MINUTE_OPTIONS.length);
+}
+
+function WheelColumn({
+  label,
+  options,
+  selectedIndex,
+  onSelect,
+}: {
+  label: string;
+  options: WheelOption[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const lastIndexRef = useRef(selectedIndex);
+  const wheelGestureActiveRef = useRef(false);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      y: selectedIndex * WHEEL_ITEM_HEIGHT,
+      animated: false,
+    });
+    lastIndexRef.current = selectedIndex;
+  }, [options.length, selectedIndex]);
+
+  const resolveIndex = (y: number) =>
+    Math.max(0, Math.min(options.length - 1, Math.round(y / WHEEL_ITEM_HEIGHT)));
+
+  const handleScroll = (y: number) => {
+    if (!wheelGestureActiveRef.current) return;
+    const index = resolveIndex(y);
+    if (index !== lastIndexRef.current) {
+      lastIndexRef.current = index;
+      onSelect(index);
+    }
+  };
+
+  const handleScrollEnd = (y: number) => {
+    if (!wheelGestureActiveRef.current) return;
+    const index = resolveIndex(y);
+    scrollRef.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated: true });
+    lastIndexRef.current = index;
+    onSelect(index);
+    wheelGestureActiveRef.current = false;
+  };
+
+  const handlePress = (index: number) => {
+    scrollRef.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated: true });
+    lastIndexRef.current = index;
+    onSelect(index);
+  };
+
+  return (
+    <View style={styles.wheelColumn}>
+      <Text style={styles.wheelLabel}>{label}</Text>
+      <View style={styles.wheelFrame}>
+        <View pointerEvents="none" style={styles.wheelHighlight} />
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          decelerationRate="normal"
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+          contentOffset={{ x: 0, y: selectedIndex * WHEEL_ITEM_HEIGHT }}
+          contentContainerStyle={styles.wheelContent}
+          onTouchStart={() => {
+            wheelGestureActiveRef.current = true;
+          }}
+          onTouchCancel={() => {
+            wheelGestureActiveRef.current = false;
+          }}
+          onScroll={(event) => handleScroll(event.nativeEvent.contentOffset.y)}
+          onMomentumScrollEnd={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
+          onScrollEndDrag={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
+          nestedScrollEnabled
+          directionalLockEnabled
+        >
+          {options.map((option, index) => {
+            const selected = index === selectedIndex;
+            return (
+              <TouchableOpacity
+                key={`${label}-${option.value}`}
+                style={styles.wheelItem}
+                onPress={() => handlePress(index)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.wheelItemText, selected && styles.wheelItemTextActive]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+function CalendarPicker({
+  selectedDate,
+  viewYear,
+  viewMonth,
+  onMonthChange,
+  onSelectDate,
+}: {
+  selectedDate: Date;
+  viewYear: number;
+  viewMonth: number;
+  onMonthChange: (year: number, month: number) => void;
+  onSelectDate: (date: Date) => void;
+}) {
+  const today = startOfDay(new Date());
+  const cells = buildCalendarCells(viewYear, viewMonth);
+
+  const shiftMonth = (amount: number) => {
+    const next = new Date(viewYear, viewMonth + amount, 1);
+    onMonthChange(next.getFullYear(), next.getMonth());
+  };
+
+  return (
+    <View style={styles.calendar}>
+      <View style={styles.calendarHeader}>
+        <TouchableOpacity style={styles.calendarNav} onPress={() => shiftMonth(-1)} activeOpacity={0.75}>
+          <Text style={styles.calendarNavText}>{'<'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.calendarTitle}>{formatMonthTitle(viewYear, viewMonth)}</Text>
+        <TouchableOpacity style={styles.calendarNav} onPress={() => shiftMonth(1)} activeOpacity={0.75}>
+          <Text style={styles.calendarNavText}>{'>'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.calendarRow}>
+        {WEEKDAYS.map((day, index) => (
+          <Text key={`${day}-${index}`} style={styles.weekdayText}>{day}</Text>
+        ))}
+      </View>
+
+      {Array.from({ length: cells.length / 7 }, (_, weekIndex) => (
+        <View key={weekIndex} style={styles.calendarRow}>
+          {cells.slice(weekIndex * 7, weekIndex * 7 + 7).map((date, dayIndex) => {
+            if (!date) return <View key={dayIndex} style={styles.calendarCell} />;
+
+            const disabled = startOfDay(date).getTime() < today.getTime();
+            const selected = isSameDay(date, selectedDate);
+            const isToday = isSameDay(date, today);
+
+            return (
+              <TouchableOpacity
+                key={date.toISOString()}
+                style={styles.calendarCell}
+                onPress={() => !disabled && onSelectDate(date)}
+                activeOpacity={disabled ? 1 : 0.75}
+              >
+                <View style={[
+                  styles.calendarDay,
+                  isToday && styles.calendarDayToday,
+                  selected && styles.calendarDaySelected,
+                  disabled && styles.calendarDayDisabled,
+                ]}>
+                  <Text style={[
+                    styles.calendarDayText,
+                    selected && styles.calendarDayTextSelected,
+                    disabled && styles.calendarDayTextDisabled,
+                  ]}>
+                    {date.getDate()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function TaskDetailModal({ visible, taskId, onClose }: Props) {
   const { play } = useSound();
-  const { colors, surfaces } = useAppTheme();
-  const styles = useThemedStyles(createStyles);
   const { launchFocus } = useFocusLaunch();
-
   const { userId } = useAuthStore();
   const { pets, activePet } = usePetStore();
   const focusDurationMin = usePreferencesStore((s) => s.focusDurationMin);
@@ -44,12 +277,60 @@ export function TaskDetailModal({ visible, taskId, onClose }: Props) {
   const task = useMemo(() => tasks.find((item) => item.id === taskId) ?? null, [tasks, taskId]);
   const modalPets = pets.length > 0 ? pets : mockPets.slice(0, 1);
 
-  const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [memo, setMemo] = useState('');
   const [icon, setIcon] = useState<TaskIconValue>(DEFAULT_TASK_ICON);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [durationMin, setDurationMin] = useState(focusDurationMin);
+  const [hasDeadline, setHasDeadline] = useState(false);
+  const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [calendarViewYear, setCalendarViewYear] = useState(() => new Date().getFullYear());
+  const [calendarViewMonth, setCalendarViewMonth] = useState(() => new Date().getMonth());
+  const [selectedHourIndex, setSelectedHourIndex] = useState(23);
+  const [selectedMinuteIndex, setSelectedMinuteIndex] = useState(11);
   const [saving, setSaving] = useState(false);
+
+  const hourOptions = useMemo(
+    () => HOUR_OPTIONS.map((hour) => ({ label: pad2(hour), value: hour })),
+    [],
+  );
+  const minuteOptions = useMemo(
+    () => MINUTE_OPTIONS.map((minute) => ({ label: pad2(minute), value: minute })),
+    [],
+  );
+
+  const currentHourIndex = clampIndex(selectedHourIndex, hourOptions.length);
+  const currentMinuteIndex = clampIndex(selectedMinuteIndex, minuteOptions.length);
+
+  const syncDeadline = useCallback((
+    date: Date,
+    hourIndex: number,
+    minuteIndex: number,
+  ) => {
+    const hour = hourOptions[clampIndex(hourIndex, hourOptions.length)]?.value ?? 0;
+    const minute = minuteOptions[clampIndex(minuteIndex, minuteOptions.length)]?.value ?? 0;
+    setDeadlineAt(buildDeadlineIso(date, hour, minute));
+  }, [hourOptions, minuteOptions]);
+
+  const resetFromTask = useCallback((sourceTask: Task) => {
+    const taskDeadline = sourceTask.deadline_at ? new Date(sourceTask.deadline_at) : null;
+    const baseDate = taskDeadline ?? new Date();
+
+    setTitle(sourceTask.title);
+    setMemo(sourceTask.memo ?? '');
+    setIcon(resolveTaskIcon(sourceTask));
+    setIconPickerOpen(false);
+    setDurationMin(sourceTask.duration_min);
+    setHasDeadline(Boolean(taskDeadline));
+    setDeadlineAt(sourceTask.deadline_at ?? null);
+    setSelectedDate(startOfDay(baseDate));
+    setCalendarViewYear(baseDate.getFullYear());
+    setCalendarViewMonth(baseDate.getMonth());
+    setSelectedHourIndex(taskDeadline ? taskDeadline.getHours() : 23);
+    setSelectedMinuteIndex(taskDeadline ? nearestMinuteIndex(taskDeadline.getMinutes()) : 11);
+    setSaving(false);
+  }, []);
 
   useEffect(() => {
     if (!visible) return;
@@ -59,18 +340,9 @@ export function TaskDetailModal({ visible, taskId, onClose }: Props) {
   }, [visible, userId, fetchTasks]);
 
   useEffect(() => {
-    if (!task) return;
-    setTitle(task.title);
-    setMemo(task.memo ?? '');
-    setIcon(
-      task.icon_type && task.icon_value
-        ? { type: task.icon_type, value: task.icon_value }
-        : DEFAULT_TASK_ICON,
-    );
-    setEditing(false);
-    setIconPickerOpen(false);
-    setSaving(false);
-  }, [task]);
+    if (!visible || !task) return;
+    resetFromTask(task);
+  }, [visible, task, resetFromTask]);
 
   const pendingTasks = tasks.filter((item) => item.status === 'pending');
 
@@ -88,40 +360,100 @@ export function TaskDetailModal({ visible, taskId, onClose }: Props) {
     ...partial,
   });
 
+  const handleToggleDeadline = (value: boolean) => {
+    setHasDeadline(value);
+    if (value) {
+      syncDeadline(selectedDate, currentHourIndex, currentMinuteIndex);
+    } else {
+      setDeadlineAt(null);
+    }
+  };
+
+  const handleDateSelect = (date: Date) => {
+    const nextDate = startOfDay(date);
+    setSelectedDate(nextDate);
+    syncDeadline(nextDate, currentHourIndex, currentMinuteIndex);
+  };
+
+  const handleCalendarMonthChange = (year: number, month: number) => {
+    setCalendarViewYear(year);
+    setCalendarViewMonth(month);
+  };
+
+  const handleHourSelect = (index: number) => {
+    const nextHourIndex = clampIndex(index, hourOptions.length);
+    setSelectedHourIndex(nextHourIndex);
+    syncDeadline(selectedDate, nextHourIndex, currentMinuteIndex);
+  };
+
+  const handleMinuteSelect = (index: number) => {
+    const nextMinuteIndex = clampIndex(index, minuteOptions.length);
+    setSelectedMinuteIndex(nextMinuteIndex);
+    syncDeadline(selectedDate, currentHourIndex, nextMinuteIndex);
+  };
+
+  const handleClose = () => {
+    if (task) resetFromTask(task);
+    onClose();
+  };
+
   const handleStart = async () => {
     if (!task) return;
     play('tap');
     onClose();
-    const setup = buildSetup({
-      taskMode: 'existing',
-      selectedTaskId: task.id,
-      durationMin: task.duration_min,
-    });
-    await launchFocus(setup, pendingTasks, { fallbackTitle: task.title });
+    await launchFocus(
+      buildSetup({
+        taskMode: 'existing',
+        selectedTaskId: task.id,
+        durationMin,
+      }),
+      pendingTasks,
+      { fallbackTitle: task.title },
+    );
   };
 
-  const handleConfirm = async () => {
+  const handleSave = async () => {
     if (!task) return;
     const trimmed = title.trim();
+    const trimmedMemo = memo.trim();
     if (!trimmed) {
       Alert.alert('Title required', 'Enter a task name to continue.');
       return;
     }
+    if (hasDeadline && !deadlineAt) {
+      Alert.alert('Deadline required', 'Choose a deadline date and time.');
+      return;
+    }
 
-    const trimmedMemo = memo.trim();
+    const category = hasDeadline ? 'task' : 'daily';
+    const deadlineValue = hasDeadline ? deadlineAt : null;
     setSaving(true);
     try {
-      const updated = await updateTaskApi(task.id, {
-        title: trimmed,
-        durationMin: task.duration_min,
-        category: task.category ?? 'task',
-        icon_type: icon.type,
-        icon_value: icon.value,
-        memo: trimmedMemo ? trimmedMemo : null,
-      });
-      updateTaskInStore(updated);
+      if (!userId || task.id.startsWith('local-')) {
+        updateTaskInStore({
+          ...task,
+          title: trimmed,
+          duration_min: durationMin,
+          category,
+          icon_type: icon.type,
+          icon_value: icon.value,
+          memo: trimmedMemo ? trimmedMemo : undefined,
+          deadline_at: deadlineValue,
+        });
+      } else {
+        const updated = await updateTaskApi(task.id, {
+          title: trimmed,
+          durationMin,
+          category,
+          icon_type: icon.type,
+          icon_value: icon.value,
+          memo: trimmedMemo ? trimmedMemo : null,
+          deadline_at: deadlineValue,
+        });
+        updateTaskInStore(updated);
+      }
       play('tap');
-      setEditing(false);
+      onClose();
     } catch {
       Alert.alert('Could not update task', 'Please check your connection and try again.');
     } finally {
@@ -129,234 +461,462 @@ export function TaskDetailModal({ visible, taskId, onClose }: Props) {
     }
   };
 
-  if (!visible) return null;
+  const deadlineLabel = formatDeadlineSummary(
+    selectedDate,
+    hourOptions[currentHourIndex]?.value ?? 0,
+    minuteOptions[currentMinuteIndex]?.value ?? 0,
+  );
+
+  if (!visible || !task) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          {iconPickerOpen ? (
-            <>
-              <TouchableOpacity
-                style={styles.backRow}
-                onPress={() => {
-                  play('tap');
-                  setIconPickerOpen(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.backText}>‹ Back</Text>
-              </TouchableOpacity>
-              <TaskIconPickerContent
-                value={icon}
-                onChange={setIcon}
-                onDone={() => {
-                  play('tap');
-                  setIconPickerOpen(false);
-                }}
-              />
-            </>
-          ) : (
-            <>
-              <View style={styles.headerRow}>
-                <Text style={styles.title}>{editing ? 'Edit Task' : 'Task Details'}</Text>
+    <Modal visible transparent animationType="slide" onRequestClose={handleClose}>
+      <Pressable style={styles.backdrop} onPress={handleClose}>
+        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {iconPickerOpen ? (
+              <>
                 <TouchableOpacity
-                  style={[styles.editBtn, editing && styles.editBtnActive]}
+                  style={styles.backRow}
                   onPress={() => {
                     play('tap');
-                    setEditing((value) => !value);
+                    setIconPickerOpen(false);
                   }}
-                  activeOpacity={0.8}
+                  activeOpacity={0.7}
                 >
-                  <Edit3 size={15} color={editing ? colors.pinkText : colors.inkSoft} />
-                  <Text style={[styles.editBtnText, editing && styles.editBtnTextActive]}>
-                    {editing ? 'Editing' : 'Edit'}
-                  </Text>
+                  <Text style={styles.backText}>{'< Back'}</Text>
                 </TouchableOpacity>
-              </View>
-
-              <Text style={styles.subtitle}>
-                {task?.category === 'daily' ? 'Daily mission' : 'Standard task'}
-              </Text>
-
-              <TouchableOpacity
-                style={styles.iconRow}
-                onPress={() => {
-                  if (!editing) return;
-                  play('tap');
-                  setIconPickerOpen(true);
-                }}
-                activeOpacity={editing ? 0.8 : 1}
-              >
-                <View style={styles.iconPreview}>
-                  <TaskIcon icon={icon} size={26} />
+                <TaskIconPickerContent
+                  value={icon}
+                  onChange={setIcon}
+                  onDone={() => {
+                    play('tap');
+                    setIconPickerOpen(false);
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <View style={styles.headerRow}>
+                  <View style={styles.headerCopy}>
+                    <Text style={styles.title}>Task Details</Text>
+                    <Text style={styles.subtitle}>
+                      {hasDeadline ? 'Deadline task' : 'Daily / no deadline'}
+                    </Text>
+                  </View>
+                  <View style={styles.deadlineSwitchWrap}>
+                    <Text style={styles.switchLabel}>Deadline</Text>
+                    <Switch
+                      value={hasDeadline}
+                      onValueChange={handleToggleDeadline}
+                      trackColor={{ false: '#E6E6E6', true: 'rgba(124,77,204,0.35)' }}
+                      thumbColor={hasDeadline ? '#7C4DCC' : '#ffffff'}
+                    />
+                  </View>
                 </View>
-                <Text style={styles.iconBtnLabel}>{editing ? 'Change icon' : 'Icon'}</Text>
-              </TouchableOpacity>
 
-              <TextInput
-                style={[styles.input, !editing && styles.inputReadOnly]}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="What do you want to focus on?"
-                placeholderTextColor={colors.inkFaint}
-                editable={editing}
-                selectTextOnFocus={editing}
-              />
-
-              <TextInput
-                style={[styles.input, styles.memoInput, !editing && styles.inputReadOnly]}
-                value={memo}
-                onChangeText={setMemo}
-                placeholder="Memo"
-                placeholderTextColor={colors.inkFaint}
-                editable={editing}
-                multiline
-                textAlignVertical="top"
-              />
-
-              <Text style={styles.durationHint}>Focus length: {task?.duration_min} min</Text>
-
-              <View style={styles.actions}>
                 <TouchableOpacity
-                  style={styles.cancelBtn}
+                  style={styles.iconRow}
                   onPress={() => {
                     play('tap');
-                    onClose();
+                    setIconPickerOpen(true);
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <View style={styles.iconPreview}>
+                    <TaskIcon icon={icon} size={26} />
+                  </View>
+                  <View style={styles.iconCopy}>
+                    <Text style={styles.iconLabel}>Task icon</Text>
+                    <Text style={styles.iconHint}>Tap to choose an emoji or icon</Text>
+                  </View>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.createBtn, saving && styles.createBtnDisabled]}
-                  onPress={editing ? handleConfirm : handleStart}
-                  disabled={saving}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.createText}>
-                    {saving ? 'Saving…' : editing ? 'Confirm' : 'Start'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
+
+                <TextInput
+                  style={styles.input}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="Enter task name"
+                  placeholderTextColor="rgba(26,22,34,0.35)"
+                  returnKeyType="next"
+                />
+
+                <TextInput
+                  style={[styles.input, styles.memoInput]}
+                  value={memo}
+                  onChangeText={setMemo}
+                  placeholder="Memo (optional)"
+                  placeholderTextColor="rgba(26,22,34,0.35)"
+                  multiline
+                  textAlignVertical="top"
+                />
+
+                {hasDeadline && (
+                  <>
+                    <Text style={styles.timerLabel}>deadline</Text>
+                    <View style={styles.pickerPanel}>
+                      <View style={styles.pickerGroup}>
+                        <Text style={styles.pickerGroupLabel}>Date</Text>
+                        <CalendarPicker
+                          selectedDate={selectedDate}
+                          viewYear={calendarViewYear}
+                          viewMonth={calendarViewMonth}
+                          onMonthChange={handleCalendarMonthChange}
+                          onSelectDate={handleDateSelect}
+                        />
+                      </View>
+                      <View style={styles.pickerGroup}>
+                        <Text style={styles.pickerGroupLabel}>Time</Text>
+                        <View style={styles.wheelRow}>
+                          <WheelColumn
+                            label="Hour"
+                            options={hourOptions}
+                            selectedIndex={currentHourIndex}
+                            onSelect={handleHourSelect}
+                          />
+                          <WheelColumn
+                            label="Minute"
+                            options={minuteOptions}
+                            selectedIndex={currentMinuteIndex}
+                            onSelect={handleMinuteSelect}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={styles.deadlineSelected}>Due: {deadlineLabel}</Text>
+                  </>
+                )}
+
+                <Text style={styles.timerLabel}>focus duration</Text>
+                <TimerGauge value={durationMin} onChange={setDurationMin} />
+
+                <View style={styles.actions}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} activeOpacity={0.8}>
+                    <Text style={styles.cancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.startBtn} onPress={handleStart} activeOpacity={0.85}>
+                    <Text style={styles.startText}>Start</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.createBtn, saving && styles.createBtnDisabled]}
+                    onPress={handleSave}
+                    disabled={saving}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.createText}>{saving ? 'Saving...' : 'Save'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
 
-function createStyles({ colors, surfaces }: any) {
-  return StyleSheet.create({
-    backdrop: {
-      flex: 1,
-      backgroundColor: surfaces.modalBackdrop,
-      justifyContent: 'center',
-      padding: 24,
-    },
-    sheet: {
-      borderRadius: 24,
-      backgroundColor: surfaces.modalSheetBg,
-      borderWidth: 0.5,
-      borderColor: surfaces.dividerStrong,
-      padding: 22,
-      maxHeight: '85%',
-      overflow: 'hidden',
-      elevation: 12,
-      shadowColor: surfaces.shadowColor,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.2,
-      shadowRadius: 24,
-    },
-    backRow: { marginBottom: 8, alignSelf: 'flex-start' },
-    backText: { fontSize: 14, fontWeight: '600', color: colors.pinkText },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-    },
-    title: {
-      flex: 1,
-      fontSize: 18,
-      fontWeight: '700',
-      color: colors.ink,
-      textAlign: 'center',
-    },
-    editBtn: {
-      minWidth: 56,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 9999,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'row',
-      gap: 5,
-      backgroundColor: surfaces.modalInsetBg,
-      borderWidth: 0.5,
-      borderColor: surfaces.dividerStrong,
-    },
-    editBtnActive: {
-      backgroundColor: surfaces.pillActiveBg,
-      borderColor: surfaces.pillActiveBorder,
-    },
-    editBtnText: { fontSize: 12, fontWeight: '600', color: colors.inkSoft },
-    editBtnTextActive: { color: colors.pinkText },
-    subtitle: {
-      fontSize: 12,
-      color: colors.inkFaint,
-      textAlign: 'center',
-      marginTop: 4,
-      marginBottom: 16,
-    },
-    iconRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      marginBottom: 14,
-    },
-    iconPreview: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: surfaces.modalInsetBg,
-      borderWidth: 0.5,
-      borderColor: surfaces.dividerStrong,
-    },
-    iconBtnLabel: { fontSize: 14, fontWeight: '600', color: colors.pinkText },
-    input: {
-      fontSize: 16,
-      color: colors.ink,
-      paddingVertical: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: surfaces.divider,
-      marginBottom: 10,
-    },
-    inputReadOnly: { color: colors.inkSoft },
-    memoInput: { minHeight: 72, fontSize: 14, lineHeight: 19 },
-    durationHint: { fontSize: 12, color: colors.inkFaint, marginBottom: 18 },
-    actions: { flexDirection: 'row', gap: 10 },
-    cancelBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 14,
-      alignItems: 'center',
-      backgroundColor: surfaces.modalInsetBg,
-      borderWidth: 0.5,
-      borderColor: surfaces.dividerStrong,
-    },
-    cancelText: { fontSize: 14, fontWeight: '600', color: colors.inkSoft },
-    createBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 14,
-      alignItems: 'center',
-      backgroundColor: surfaces.ctaBg,
-    },
-    createBtnDisabled: { opacity: 0.6 },
-    createText: { fontSize: 14, fontWeight: '700', color: surfaces.ctaText },
-  });
-}
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 48,
+    maxHeight: '90%',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 22,
+  },
+  headerCopy: { flex: 1 },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: INK,
+    letterSpacing: -0.5,
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: 'rgba(26,22,34,0.45)',
+  },
+  deadlineSwitchWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  switchLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(26,22,34,0.55)',
+    letterSpacing: 0.2,
+  },
+  backRow: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  backText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7C4DCC',
+  },
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#F0EAF8',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.15)',
+    marginBottom: 16,
+  },
+  iconPreview: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  iconCopy: {
+    flex: 1,
+  },
+  iconLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: INK,
+  },
+  iconHint: {
+    fontSize: 12,
+    color: 'rgba(26,22,34,0.45)',
+    marginTop: 2,
+  },
+  input: {
+    fontSize: 16,
+    color: INK,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(26,22,34,0.20)',
+    marginBottom: 16,
+  },
+  memoInput: {
+    fontSize: 14,
+    minHeight: 56,
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  timerLabel: {
+    fontSize: 13,
+    color: 'rgba(26,22,34,0.55)',
+    letterSpacing: 0.2,
+    marginBottom: 12,
+  },
+  pickerPanel: {
+    backgroundColor: '#F0EAF8',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 12,
+  },
+  pickerGroup: {
+    marginBottom: 14,
+  },
+  pickerGroupLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#5E4A7A',
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  calendar: {
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.15)',
+    padding: 10,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  calendarNav: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(124,77,204,0.10)',
+  },
+  calendarNavText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#7C4DCC',
+  },
+  calendarTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: INK,
+  },
+  calendarRow: {
+    flexDirection: 'row',
+  },
+  weekdayText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(26,22,34,0.38)',
+    paddingVertical: 5,
+  },
+  calendarCell: {
+    flex: 1,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDay: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDayToday: {
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.45)',
+  },
+  calendarDaySelected: {
+    backgroundColor: '#7C4DCC',
+  },
+  calendarDayDisabled: {
+    opacity: 0.3,
+  },
+  calendarDayText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: INK,
+  },
+  calendarDayTextSelected: {
+    color: '#FFFFFF',
+  },
+  calendarDayTextDisabled: {
+    color: 'rgba(26,22,34,0.35)',
+  },
+  wheelRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  wheelColumn: {
+    flex: 1,
+  },
+  wheelLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(26,22,34,0.42)',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  wheelFrame: {
+    height: WHEEL_ITEM_HEIGHT * 3,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.15)',
+    overflow: 'hidden',
+  },
+  wheelHighlight: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    top: WHEEL_ITEM_HEIGHT,
+    height: WHEEL_ITEM_HEIGHT,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124,77,204,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.18)',
+    zIndex: 1,
+  },
+  wheelContent: {
+    paddingVertical: WHEEL_ITEM_HEIGHT,
+  },
+  wheelItem: {
+    height: WHEEL_ITEM_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  wheelItemText: {
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(26,22,34,0.40)',
+  },
+  wheelItemTextActive: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: INK,
+  },
+  deadlineSelected: {
+    fontSize: 12,
+    color: 'rgba(26,22,34,0.45)',
+    marginBottom: 20,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 24,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#E6E6E6',
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'rgba(26,22,34,0.55)',
+  },
+  startBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#F0EAF8',
+    alignItems: 'center',
+  },
+  startText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#7C4DCC',
+  },
+  createBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#111111',
+    alignItems: 'center',
+  },
+  createBtnDisabled: { opacity: 0.5 },
+  createText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+});
