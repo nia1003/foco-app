@@ -110,18 +110,20 @@ function TaskCard({
         <Text style={taskStyles.menuDots}>⋮</Text>
       </TouchableOpacity>
 
+      <View style={taskStyles.textBlock}>
+        <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
+
+        {/* Deadline badge */}
+        {deadline && (
+          <Text style={[taskStyles.deadlineBadge, deadline.overdue && taskStyles.deadlineOverdue]} numberOfLines={1}>
+            {deadline.label}
+          </Text>
+        )}
+      </View>
+
       <View style={taskStyles.iconWrap}>
         <TaskIcon icon={resolveTaskIcon(task)} size={22} />
       </View>
-
-      <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
-
-      {/* Deadline badge */}
-      {deadline && (
-        <Text style={[taskStyles.deadlineBadge, deadline.overdue && taskStyles.deadlineOverdue]}>
-          {deadline.label}
-        </Text>
-      )}
 
       <TouchableOpacity
         style={taskStyles.btn}
@@ -143,8 +145,7 @@ const taskStyles = StyleSheet.create({
     backgroundColor: '#E6E6E6',
     paddingHorizontal: 18,
     paddingVertical: 16,
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    position: 'relative',
   },
   menuBtn: {
     position: 'absolute',
@@ -158,23 +159,31 @@ const taskStyles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 20,
   },
+  textBlock: {
+    paddingRight: 24,
+    alignItems: 'flex-start',
+  },
   title: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: INK,
-    lineHeight: 16,
-    alignSelf: 'flex-start',
+    lineHeight: 17,
   },
   iconWrap: {
+    position: 'absolute',
+    left: 16,
+    bottom: 16,
     width: 38,
     height: 38,
     borderRadius: 12,
     backgroundColor: 'rgba(26,22,34,0.07)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
   },
   btn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -189,11 +198,11 @@ const taskStyles = StyleSheet.create({
     letterSpacing: 2,
   },
   deadlineBadge: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#7C4DCC',
     letterSpacing: 0.1,
-    marginBottom: 2,
+    marginTop: 4,
   },
   deadlineOverdue: {
     color: '#CC4D4D',
