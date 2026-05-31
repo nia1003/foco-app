@@ -17,10 +17,10 @@ import { createTask } from '@/services/focoService';
 import type { Task } from '@/types';
 
 const INK = '#1a1622';
-const WHEEL_ITEM_HEIGHT = 42;
-const YEAR_OPTION_COUNT = 6;
-const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => i);
+const WHEEL_ITEM_HEIGHT = 34;
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => i * 5);
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 interface Props {
   visible: boolean;
@@ -37,44 +37,42 @@ type WheelOption = {
   value: number;
 };
 
-function createYearOptions(): WheelOption[] {
-  const startYear = new Date().getFullYear();
-  return Array.from({ length: YEAR_OPTION_COUNT }, (_, index) => ({
-    label: String(startYear + index),
-    value: startYear + index,
-  }));
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
-function createMonthOptions(): WheelOption[] {
-  return Array.from({ length: 12 }, (_, index) => {
-    const month = index + 1;
-    return {
-      label: pad2(month),
-      value: month,
-    };
-  });
+function startOfDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
 }
 
-function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate();
+function formatMonthTitle(year: number, monthIndex: number) {
+  return `${year}/${pad2(monthIndex + 1)}`;
 }
 
-function createDayOptions(year: number, month: number): WheelOption[] {
-  return Array.from({ length: daysInMonth(year, month) }, (_, index) => {
-    const day = index + 1;
-    return {
-      label: pad2(day),
-      value: day,
-    };
-  });
+function buildCalendarCells(year: number, monthIndex: number) {
+  const firstDay = new Date(year, monthIndex, 1);
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells: (Date | null)[] = [
+    ...Array(firstDay.getDay()).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
 }
 
-function formatDeadlineSummary(year: number, month: number, day: number, hour: number, minute: number) {
-  return `${year}/${pad2(month)}/${pad2(day)} ${pad2(hour)}:${pad2(minute)}`;
+function formatDeadlineSummary(date: Date, hour: number, minute: number) {
+  return `${date.getFullYear()}/${pad2(date.getMonth() + 1)}/${pad2(date.getDate())} ${pad2(hour)}:${pad2(minute)}`;
 }
 
-function buildDeadlineIso(year: number, month: number, day: number, hour: number, minute: number) {
-  const due = new Date(year, month - 1, day, hour, minute, 0, 0);
+function buildDeadlineIso(date: Date, hour: number, minute: number) {
+  const due = new Date(date);
+  due.setHours(hour, minute, 0, 0);
   return due.toISOString();
 }
 
@@ -94,16 +92,37 @@ function WheelColumn({
   onSelect: (index: number) => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
+  const lastIndexRef = useRef(selectedIndex);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
       y: selectedIndex * WHEEL_ITEM_HEIGHT,
-      animated: true,
+      animated: false,
     });
-  }, [selectedIndex]);
+    lastIndexRef.current = selectedIndex;
+  }, [options.length]);
+
+  const resolveIndex = (y: number) =>
+    Math.max(0, Math.min(options.length - 1, Math.round(y / WHEEL_ITEM_HEIGHT)));
+
+  const handleScroll = (y: number) => {
+    const index = resolveIndex(y);
+    if (index !== lastIndexRef.current) {
+      lastIndexRef.current = index;
+      onSelect(index);
+    }
+  };
 
   const handleScrollEnd = (y: number) => {
-    const index = Math.max(0, Math.min(options.length - 1, Math.round(y / WHEEL_ITEM_HEIGHT)));
+    const index = resolveIndex(y);
+    scrollRef.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated: true });
+    lastIndexRef.current = index;
+    onSelect(index);
+  };
+
+  const handlePress = (index: number) => {
+    scrollRef.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated: true });
+    lastIndexRef.current = index;
     onSelect(index);
   };
 
@@ -115,13 +134,15 @@ function WheelColumn({
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          snapToInterval={WHEEL_ITEM_HEIGHT}
-          decelerationRate="fast"
+          decelerationRate="normal"
+          scrollEventThrottle={16}
           contentOffset={{ x: 0, y: selectedIndex * WHEEL_ITEM_HEIGHT }}
           contentContainerStyle={styles.wheelContent}
+          onScroll={(event) => handleScroll(event.nativeEvent.contentOffset.y)}
           onMomentumScrollEnd={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
           onScrollEndDrag={(event) => handleScrollEnd(event.nativeEvent.contentOffset.y)}
           nestedScrollEnabled
+          directionalLockEnabled
         >
           {options.map((option, index) => {
             const selected = index === selectedIndex;
@@ -129,7 +150,7 @@ function WheelColumn({
               <TouchableOpacity
                 key={`${label}-${option.value}`}
                 style={styles.wheelItem}
-                onPress={() => onSelect(index)}
+                onPress={() => handlePress(index)}
                 activeOpacity={0.75}
               >
                 <Text style={[styles.wheelItemText, selected && styles.wheelItemTextActive]}>
@@ -140,6 +161,92 @@ function WheelColumn({
           })}
         </ScrollView>
       </View>
+    </View>
+  );
+}
+
+function CalendarPicker({
+  selectedDate,
+  viewYear,
+  viewMonth,
+  onMonthChange,
+  onSelectDate,
+}: {
+  selectedDate: Date;
+  viewYear: number;
+  viewMonth: number;
+  onMonthChange: (year: number, month: number) => void;
+  onSelectDate: (date: Date) => void;
+}) {
+  const today = startOfDay(new Date());
+  const cells = buildCalendarCells(viewYear, viewMonth);
+
+  const shiftMonth = (amount: number) => {
+    const next = new Date(viewYear, viewMonth + amount, 1);
+    onMonthChange(next.getFullYear(), next.getMonth());
+  };
+
+  return (
+    <View style={styles.calendar}>
+      <View style={styles.calendarHeader}>
+        <TouchableOpacity
+          style={styles.calendarNav}
+          onPress={() => shiftMonth(-1)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.calendarNavText}>{'<'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.calendarTitle}>{formatMonthTitle(viewYear, viewMonth)}</Text>
+        <TouchableOpacity
+          style={styles.calendarNav}
+          onPress={() => shiftMonth(1)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.calendarNavText}>{'>'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.calendarRow}>
+        {WEEKDAYS.map((day, index) => (
+          <Text key={`${day}-${index}`} style={styles.weekdayText}>{day}</Text>
+        ))}
+      </View>
+
+      {Array.from({ length: cells.length / 7 }, (_, weekIndex) => (
+        <View key={weekIndex} style={styles.calendarRow}>
+          {cells.slice(weekIndex * 7, weekIndex * 7 + 7).map((date, dayIndex) => {
+            if (!date) return <View key={dayIndex} style={styles.calendarCell} />;
+
+            const disabled = startOfDay(date).getTime() < today.getTime();
+            const selected = isSameDay(date, selectedDate);
+            const isToday = isSameDay(date, today);
+
+            return (
+              <TouchableOpacity
+                key={date.toISOString()}
+                style={styles.calendarCell}
+                onPress={() => !disabled && onSelectDate(date)}
+                activeOpacity={disabled ? 1 : 0.75}
+              >
+                <View style={[
+                  styles.calendarDay,
+                  isToday && styles.calendarDayToday,
+                  selected && styles.calendarDaySelected,
+                  disabled && styles.calendarDayDisabled,
+                ]}>
+                  <Text style={[
+                    styles.calendarDayText,
+                    selected && styles.calendarDayTextSelected,
+                    disabled && styles.calendarDayTextDisabled,
+                  ]}>
+                    {date.getDate()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -158,15 +265,13 @@ export function AddTaskModal({
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
-  const [selectedYearIndex, setSelectedYearIndex] = useState(0);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [calendarViewYear, setCalendarViewYear] = useState(() => new Date().getFullYear());
+  const [calendarViewMonth, setCalendarViewMonth] = useState(() => new Date().getMonth());
   const [selectedHourIndex, setSelectedHourIndex] = useState(23);
-  const [selectedMinuteIndex, setSelectedMinuteIndex] = useState(0);
+  const [selectedMinuteIndex, setSelectedMinuteIndex] = useState(11);
   const [saving, setSaving] = useState(false);
 
-  const yearOptions = useMemo(() => createYearOptions(), [visible]);
-  const monthOptions = useMemo(() => createMonthOptions(), []);
   const hourOptions = useMemo(
     () => HOUR_OPTIONS.map((hour) => ({ label: pad2(hour), value: hour })),
     [],
@@ -176,44 +281,29 @@ export function AddTaskModal({
     [],
   );
 
-  const defaultSelection = useMemo(() => {
+  const defaultDeadline = useMemo(() => {
     const date = new Date();
-    date.setDate(date.getDate() + 1);
-    const yearIndex = Math.max(0, yearOptions.findIndex((option) => option.value === date.getFullYear()));
     return {
-      yearIndex,
-      monthIndex: date.getMonth(),
-      dayIndex: date.getDate() - 1,
-      hourIndex: date.getHours(),
-      minuteIndex: date.getMinutes(),
+      date: startOfDay(date),
+      viewYear: date.getFullYear(),
+      viewMonth: date.getMonth(),
+      hourIndex: 23,
+      minuteIndex: 11,
     };
-  }, [yearOptions, visible]);
+  }, [visible]);
 
-  const currentYearIndex = clampIndex(selectedYearIndex, yearOptions.length);
-  const currentMonthIndex = clampIndex(selectedMonthIndex, monthOptions.length);
   const currentHourIndex = clampIndex(selectedHourIndex, hourOptions.length);
   const currentMinuteIndex = clampIndex(selectedMinuteIndex, minuteOptions.length);
-  const currentYear = yearOptions[currentYearIndex]?.value ?? yearOptions[0]?.value ?? new Date().getFullYear();
-  const currentMonth = monthOptions[currentMonthIndex]?.value ?? 1;
-  const dayOptions = useMemo(() => createDayOptions(currentYear, currentMonth), [currentYear, currentMonth]);
-  const currentDayIndex = clampIndex(selectedDayIndex, dayOptions.length);
-  const currentDay = dayOptions[currentDayIndex]?.value ?? 1;
 
   const syncDeadline = useCallback((
-    yearIndex: number,
-    monthIndex: number,
-    dayIndex: number,
+    date: Date,
     hourIndex: number,
     minuteIndex: number,
   ) => {
-    const year = yearOptions[clampIndex(yearIndex, yearOptions.length)]?.value ?? currentYear;
-    const month = monthOptions[clampIndex(monthIndex, monthOptions.length)]?.value ?? currentMonth;
-    const days = createDayOptions(year, month);
-    const day = days[clampIndex(dayIndex, days.length)]?.value ?? 1;
     const hour = hourOptions[clampIndex(hourIndex, hourOptions.length)]?.value ?? 0;
     const minute = minuteOptions[clampIndex(minuteIndex, minuteOptions.length)]?.value ?? 0;
-    setDeadlineAt(buildDeadlineIso(year, month, day, hour, minute));
-  }, [currentMonth, currentYear, hourOptions, minuteOptions, monthOptions, yearOptions]);
+    setDeadlineAt(buildDeadlineIso(date, hour, minute));
+  }, [hourOptions, minuteOptions]);
 
   const resetForm = useCallback(() => {
     setTitle('');
@@ -221,69 +311,48 @@ export function AddTaskModal({
     setDurationMin(defaultDurationMin);
     setHasDeadline(false);
     setDeadlineAt(null);
-    setSelectedYearIndex(defaultSelection.yearIndex);
-    setSelectedMonthIndex(defaultSelection.monthIndex);
-    setSelectedDayIndex(defaultSelection.dayIndex);
-    setSelectedHourIndex(defaultSelection.hourIndex);
-    setSelectedMinuteIndex(defaultSelection.minuteIndex);
+    setSelectedDate(defaultDeadline.date);
+    setCalendarViewYear(defaultDeadline.viewYear);
+    setCalendarViewMonth(defaultDeadline.viewMonth);
+    setSelectedHourIndex(defaultDeadline.hourIndex);
+    setSelectedMinuteIndex(defaultDeadline.minuteIndex);
     setSaving(false);
-  }, [defaultDurationMin, defaultSelection.dayIndex, defaultSelection.hourIndex, defaultSelection.minuteIndex, defaultSelection.monthIndex, defaultSelection.yearIndex]);
+  }, [defaultDeadline.date, defaultDeadline.hourIndex, defaultDeadline.minuteIndex, defaultDeadline.viewMonth, defaultDeadline.viewYear, defaultDurationMin]);
 
   const handleToggleDeadline = (value: boolean) => {
     setHasDeadline(value);
     if (value) {
-      syncDeadline(currentYearIndex, currentMonthIndex, currentDayIndex, currentHourIndex, currentMinuteIndex);
+      syncDeadline(selectedDate, currentHourIndex, currentMinuteIndex);
     } else {
       setDeadlineAt(null);
     }
   };
 
-  const handleYearSelect = (index: number) => {
-    const nextYearIndex = clampIndex(index, yearOptions.length);
-    const nextYear = yearOptions[nextYearIndex]?.value ?? currentYear;
-    const nextDayOptions = createDayOptions(nextYear, currentMonth);
-    const nextDayIndex = clampIndex(currentDayIndex, nextDayOptions.length);
-    setSelectedYearIndex(nextYearIndex);
-    if (nextDayIndex !== currentDayIndex) {
-      setSelectedDayIndex(nextDayIndex);
-    }
-    syncDeadline(nextYearIndex, currentMonthIndex, nextDayIndex, currentHourIndex, currentMinuteIndex);
+  const handleDateSelect = (date: Date) => {
+    const nextDate = startOfDay(date);
+    setSelectedDate(nextDate);
+    syncDeadline(nextDate, currentHourIndex, currentMinuteIndex);
   };
 
-  const handleMonthSelect = (index: number) => {
-    const nextMonthIndex = clampIndex(index, monthOptions.length);
-    const nextMonth = monthOptions[nextMonthIndex]?.value ?? currentMonth;
-    const nextDayOptions = createDayOptions(currentYear, nextMonth);
-    const nextDayIndex = clampIndex(currentDayIndex, nextDayOptions.length);
-    setSelectedMonthIndex(nextMonthIndex);
-    if (nextDayIndex !== currentDayIndex) {
-      setSelectedDayIndex(nextDayIndex);
-    }
-    syncDeadline(currentYearIndex, nextMonthIndex, nextDayIndex, currentHourIndex, currentMinuteIndex);
-  };
-
-  const handleDaySelect = (index: number) => {
-    const nextDayIndex = clampIndex(index, dayOptions.length);
-    setSelectedDayIndex(nextDayIndex);
-    syncDeadline(currentYearIndex, currentMonthIndex, nextDayIndex, currentHourIndex, currentMinuteIndex);
+  const handleCalendarMonthChange = (year: number, month: number) => {
+    setCalendarViewYear(year);
+    setCalendarViewMonth(month);
   };
 
   const handleHourSelect = (index: number) => {
     const nextHourIndex = clampIndex(index, hourOptions.length);
     setSelectedHourIndex(nextHourIndex);
-    syncDeadline(currentYearIndex, currentMonthIndex, currentDayIndex, nextHourIndex, currentMinuteIndex);
+    syncDeadline(selectedDate, nextHourIndex, currentMinuteIndex);
   };
 
   const handleMinuteSelect = (index: number) => {
     const nextMinuteIndex = clampIndex(index, minuteOptions.length);
     setSelectedMinuteIndex(nextMinuteIndex);
-    syncDeadline(currentYearIndex, currentMonthIndex, currentDayIndex, currentHourIndex, nextMinuteIndex);
+    syncDeadline(selectedDate, currentHourIndex, nextMinuteIndex);
   };
 
   const deadlineLabel = formatDeadlineSummary(
-    currentYear,
-    currentMonth,
-    currentDay,
+    selectedDate,
     hourOptions[currentHourIndex]?.value ?? 0,
     minuteOptions[currentMinuteIndex]?.value ?? 0,
   );
@@ -352,7 +421,11 @@ export function AddTaskModal({
     <Modal visible transparent animationType="slide" onRequestClose={handleClose}>
       <Pressable style={styles.backdrop} onPress={handleClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
             <View style={styles.headerRow}>
               <View style={styles.headerCopy}>
                 <Text style={styles.title}>+ Task</Text>
@@ -396,39 +469,26 @@ export function AddTaskModal({
                 <Text style={styles.timerLabel}>deadline</Text>
                 <View style={styles.pickerPanel}>
                   <View style={styles.pickerGroup}>
-                    <Text style={styles.pickerGroupLabel}>日期</Text>
-                    <View style={styles.wheelRow}>
-                      <WheelColumn
-                        label="年"
-                        options={yearOptions}
-                        selectedIndex={currentYearIndex}
-                        onSelect={handleYearSelect}
-                      />
-                      <WheelColumn
-                        label="月"
-                        options={monthOptions}
-                        selectedIndex={currentMonthIndex}
-                        onSelect={handleMonthSelect}
-                      />
-                      <WheelColumn
-                        label="日"
-                        options={dayOptions}
-                        selectedIndex={currentDayIndex}
-                        onSelect={handleDaySelect}
-                      />
-                    </View>
+                    <Text style={styles.pickerGroupLabel}>Date</Text>
+                    <CalendarPicker
+                      selectedDate={selectedDate}
+                      viewYear={calendarViewYear}
+                      viewMonth={calendarViewMonth}
+                      onMonthChange={handleCalendarMonthChange}
+                      onSelectDate={handleDateSelect}
+                    />
                   </View>
                   <View style={styles.pickerGroup}>
-                    <Text style={styles.pickerGroupLabel}>時間</Text>
+                    <Text style={styles.pickerGroupLabel}>Time</Text>
                     <View style={styles.wheelRow}>
                       <WheelColumn
-                        label="時"
+                        label="Hour"
                         options={hourOptions}
                         selectedIndex={currentHourIndex}
                         onSelect={handleHourSelect}
                       />
                       <WheelColumn
-                        label="分"
+                        label="Minute"
                         options={minuteOptions}
                         selectedIndex={currentMinuteIndex}
                         onSelect={handleMinuteSelect}
@@ -545,6 +605,82 @@ const styles = StyleSheet.create({
     color: '#5E4A7A',
     marginBottom: 8,
     letterSpacing: 0.2,
+  },
+  calendar: {
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.15)',
+    padding: 10,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  calendarNav: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(124,77,204,0.10)',
+  },
+  calendarNavText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#7C4DCC',
+  },
+  calendarTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: INK,
+  },
+  calendarRow: {
+    flexDirection: 'row',
+  },
+  weekdayText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(26,22,34,0.38)',
+    paddingVertical: 5,
+  },
+  calendarCell: {
+    flex: 1,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDay: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDayToday: {
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.45)',
+  },
+  calendarDaySelected: {
+    backgroundColor: '#7C4DCC',
+  },
+  calendarDayDisabled: {
+    opacity: 0.3,
+  },
+  calendarDayText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: INK,
+  },
+  calendarDayTextSelected: {
+    color: '#FFFFFF',
+  },
+  calendarDayTextDisabled: {
+    color: 'rgba(26,22,34,0.35)',
   },
   wheelRow: {
     flexDirection: 'row',
