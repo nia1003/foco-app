@@ -18,8 +18,8 @@ import type { Task } from '@/types';
 
 const INK = '#1a1622';
 const WHEEL_ITEM_HEIGHT = 42;
-const DATE_OPTION_COUNT = 30;
-const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => i * 5);
+const YEAR_OPTION_COUNT = 6;
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => i);
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
 
 interface Props {
@@ -37,41 +37,49 @@ type WheelOption = {
   value: number;
 };
 
-type DateWheelOption = WheelOption & {
-  date: Date;
-};
-
-function formatDateOption(date: Date, index: number) {
-  if (index === 0) return 'Today';
-  if (index === 1) return 'Tomorrow';
-  if (index === 2) return 'Day after';
-  return `${date.getMonth() + 1}/${date.getDate()}`;
+function createYearOptions(): WheelOption[] {
+  const startYear = new Date().getFullYear();
+  return Array.from({ length: YEAR_OPTION_COUNT }, (_, index) => ({
+    label: String(startYear + index),
+    value: startYear + index,
+  }));
 }
 
-function createDateOptions(): DateWheelOption[] {
-  return Array.from({ length: DATE_OPTION_COUNT }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() + index);
-    date.setHours(0, 0, 0, 0);
+function createMonthOptions(): WheelOption[] {
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
     return {
-      label: formatDateOption(date, index),
-      value: index,
-      date,
+      label: pad2(month),
+      value: month,
     };
   });
 }
 
-function formatDeadlineSummary(date: DateWheelOption | undefined, hour: number, minute: number) {
-  if (!date) return null;
-  const due = date.date;
-  return `${due.getFullYear()}/${pad2(due.getMonth() + 1)}/${pad2(due.getDate())} ${pad2(hour)}:${pad2(minute)}`;
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate();
 }
 
-function buildDeadlineIso(date: DateWheelOption | undefined, hour: number, minute: number) {
-  if (!date) return null;
-  const due = new Date(date.date);
-  due.setHours(hour, minute, 0, 0);
+function createDayOptions(year: number, month: number): WheelOption[] {
+  return Array.from({ length: daysInMonth(year, month) }, (_, index) => {
+    const day = index + 1;
+    return {
+      label: pad2(day),
+      value: day,
+    };
+  });
+}
+
+function formatDeadlineSummary(year: number, month: number, day: number, hour: number, minute: number) {
+  return `${year}/${pad2(month)}/${pad2(day)} ${pad2(hour)}:${pad2(minute)}`;
+}
+
+function buildDeadlineIso(year: number, month: number, day: number, hour: number, minute: number) {
+  const due = new Date(year, month - 1, day, hour, minute, 0, 0);
   return due.toISOString();
+}
+
+function clampIndex(index: number, length: number) {
+  return Math.max(0, Math.min(length - 1, index));
 }
 
 function WheelColumn({
@@ -150,12 +158,15 @@ export function AddTaskModal({
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
-  const [selectedDateIndex, setSelectedDateIndex] = useState(1);
+  const [selectedYearIndex, setSelectedYearIndex] = useState(0);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [selectedHourIndex, setSelectedHourIndex] = useState(23);
-  const [selectedMinuteIndex, setSelectedMinuteIndex] = useState(11);
+  const [selectedMinuteIndex, setSelectedMinuteIndex] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  const dateOptions = useMemo(() => createDateOptions(), [visible]);
+  const yearOptions = useMemo(() => createYearOptions(), [visible]);
+  const monthOptions = useMemo(() => createMonthOptions(), []);
   const hourOptions = useMemo(
     () => HOUR_OPTIONS.map((hour) => ({ label: pad2(hour), value: hour })),
     [],
@@ -165,17 +176,44 @@ export function AddTaskModal({
     [],
   );
 
+  const defaultSelection = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    const yearIndex = Math.max(0, yearOptions.findIndex((option) => option.value === date.getFullYear()));
+    return {
+      yearIndex,
+      monthIndex: date.getMonth(),
+      dayIndex: date.getDate() - 1,
+      hourIndex: date.getHours(),
+      minuteIndex: date.getMinutes(),
+    };
+  }, [yearOptions, visible]);
+
+  const currentYearIndex = clampIndex(selectedYearIndex, yearOptions.length);
+  const currentMonthIndex = clampIndex(selectedMonthIndex, monthOptions.length);
+  const currentHourIndex = clampIndex(selectedHourIndex, hourOptions.length);
+  const currentMinuteIndex = clampIndex(selectedMinuteIndex, minuteOptions.length);
+  const currentYear = yearOptions[currentYearIndex]?.value ?? yearOptions[0]?.value ?? new Date().getFullYear();
+  const currentMonth = monthOptions[currentMonthIndex]?.value ?? 1;
+  const dayOptions = useMemo(() => createDayOptions(currentYear, currentMonth), [currentYear, currentMonth]);
+  const currentDayIndex = clampIndex(selectedDayIndex, dayOptions.length);
+  const currentDay = dayOptions[currentDayIndex]?.value ?? 1;
+
   const syncDeadline = useCallback((
-    dateIndex: number,
+    yearIndex: number,
+    monthIndex: number,
+    dayIndex: number,
     hourIndex: number,
     minuteIndex: number,
   ) => {
-    setDeadlineAt(buildDeadlineIso(
-      dateOptions[dateIndex],
-      HOUR_OPTIONS[hourIndex],
-      MINUTE_OPTIONS[minuteIndex],
-    ));
-  }, [dateOptions]);
+    const year = yearOptions[clampIndex(yearIndex, yearOptions.length)]?.value ?? currentYear;
+    const month = monthOptions[clampIndex(monthIndex, monthOptions.length)]?.value ?? currentMonth;
+    const days = createDayOptions(year, month);
+    const day = days[clampIndex(dayIndex, days.length)]?.value ?? 1;
+    const hour = hourOptions[clampIndex(hourIndex, hourOptions.length)]?.value ?? 0;
+    const minute = minuteOptions[clampIndex(minuteIndex, minuteOptions.length)]?.value ?? 0;
+    setDeadlineAt(buildDeadlineIso(year, month, day, hour, minute));
+  }, [currentMonth, currentYear, hourOptions, minuteOptions, monthOptions, yearOptions]);
 
   const resetForm = useCallback(() => {
     setTitle('');
@@ -183,40 +221,71 @@ export function AddTaskModal({
     setDurationMin(defaultDurationMin);
     setHasDeadline(false);
     setDeadlineAt(null);
-    setSelectedDateIndex(1);
-    setSelectedHourIndex(23);
-    setSelectedMinuteIndex(11);
+    setSelectedYearIndex(defaultSelection.yearIndex);
+    setSelectedMonthIndex(defaultSelection.monthIndex);
+    setSelectedDayIndex(defaultSelection.dayIndex);
+    setSelectedHourIndex(defaultSelection.hourIndex);
+    setSelectedMinuteIndex(defaultSelection.minuteIndex);
     setSaving(false);
-  }, [defaultDurationMin]);
+  }, [defaultDurationMin, defaultSelection.dayIndex, defaultSelection.hourIndex, defaultSelection.minuteIndex, defaultSelection.monthIndex, defaultSelection.yearIndex]);
 
   const handleToggleDeadline = (value: boolean) => {
     setHasDeadline(value);
     if (value) {
-      syncDeadline(selectedDateIndex, selectedHourIndex, selectedMinuteIndex);
+      syncDeadline(currentYearIndex, currentMonthIndex, currentDayIndex, currentHourIndex, currentMinuteIndex);
     } else {
       setDeadlineAt(null);
     }
   };
 
-  const handleDateSelect = (index: number) => {
-    setSelectedDateIndex(index);
-    syncDeadline(index, selectedHourIndex, selectedMinuteIndex);
+  const handleYearSelect = (index: number) => {
+    const nextYearIndex = clampIndex(index, yearOptions.length);
+    const nextYear = yearOptions[nextYearIndex]?.value ?? currentYear;
+    const nextDayOptions = createDayOptions(nextYear, currentMonth);
+    const nextDayIndex = clampIndex(currentDayIndex, nextDayOptions.length);
+    setSelectedYearIndex(nextYearIndex);
+    if (nextDayIndex !== currentDayIndex) {
+      setSelectedDayIndex(nextDayIndex);
+    }
+    syncDeadline(nextYearIndex, currentMonthIndex, nextDayIndex, currentHourIndex, currentMinuteIndex);
+  };
+
+  const handleMonthSelect = (index: number) => {
+    const nextMonthIndex = clampIndex(index, monthOptions.length);
+    const nextMonth = monthOptions[nextMonthIndex]?.value ?? currentMonth;
+    const nextDayOptions = createDayOptions(currentYear, nextMonth);
+    const nextDayIndex = clampIndex(currentDayIndex, nextDayOptions.length);
+    setSelectedMonthIndex(nextMonthIndex);
+    if (nextDayIndex !== currentDayIndex) {
+      setSelectedDayIndex(nextDayIndex);
+    }
+    syncDeadline(currentYearIndex, nextMonthIndex, nextDayIndex, currentHourIndex, currentMinuteIndex);
+  };
+
+  const handleDaySelect = (index: number) => {
+    const nextDayIndex = clampIndex(index, dayOptions.length);
+    setSelectedDayIndex(nextDayIndex);
+    syncDeadline(currentYearIndex, currentMonthIndex, nextDayIndex, currentHourIndex, currentMinuteIndex);
   };
 
   const handleHourSelect = (index: number) => {
-    setSelectedHourIndex(index);
-    syncDeadline(selectedDateIndex, index, selectedMinuteIndex);
+    const nextHourIndex = clampIndex(index, hourOptions.length);
+    setSelectedHourIndex(nextHourIndex);
+    syncDeadline(currentYearIndex, currentMonthIndex, currentDayIndex, nextHourIndex, currentMinuteIndex);
   };
 
   const handleMinuteSelect = (index: number) => {
-    setSelectedMinuteIndex(index);
-    syncDeadline(selectedDateIndex, selectedHourIndex, index);
+    const nextMinuteIndex = clampIndex(index, minuteOptions.length);
+    setSelectedMinuteIndex(nextMinuteIndex);
+    syncDeadline(currentYearIndex, currentMonthIndex, currentDayIndex, currentHourIndex, nextMinuteIndex);
   };
 
   const deadlineLabel = formatDeadlineSummary(
-    dateOptions[selectedDateIndex],
-    HOUR_OPTIONS[selectedHourIndex],
-    MINUTE_OPTIONS[selectedMinuteIndex],
+    currentYear,
+    currentMonth,
+    currentDay,
+    hourOptions[currentHourIndex]?.value ?? 0,
+    minuteOptions[currentMinuteIndex]?.value ?? 0,
   );
 
   useEffect(() => {
@@ -326,25 +395,45 @@ export function AddTaskModal({
               <>
                 <Text style={styles.timerLabel}>deadline</Text>
                 <View style={styles.pickerPanel}>
-                  <View style={styles.wheelRow}>
-                    <WheelColumn
-                      label="Date"
-                      options={dateOptions}
-                      selectedIndex={selectedDateIndex}
-                      onSelect={handleDateSelect}
-                    />
-                    <WheelColumn
-                      label="Hour"
-                      options={hourOptions}
-                      selectedIndex={selectedHourIndex}
-                      onSelect={handleHourSelect}
-                    />
-                    <WheelColumn
-                      label="Min"
-                      options={minuteOptions}
-                      selectedIndex={selectedMinuteIndex}
-                      onSelect={handleMinuteSelect}
-                    />
+                  <View style={styles.pickerGroup}>
+                    <Text style={styles.pickerGroupLabel}>日期</Text>
+                    <View style={styles.wheelRow}>
+                      <WheelColumn
+                        label="年"
+                        options={yearOptions}
+                        selectedIndex={currentYearIndex}
+                        onSelect={handleYearSelect}
+                      />
+                      <WheelColumn
+                        label="月"
+                        options={monthOptions}
+                        selectedIndex={currentMonthIndex}
+                        onSelect={handleMonthSelect}
+                      />
+                      <WheelColumn
+                        label="日"
+                        options={dayOptions}
+                        selectedIndex={currentDayIndex}
+                        onSelect={handleDaySelect}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.pickerGroup}>
+                    <Text style={styles.pickerGroupLabel}>時間</Text>
+                    <View style={styles.wheelRow}>
+                      <WheelColumn
+                        label="時"
+                        options={hourOptions}
+                        selectedIndex={currentHourIndex}
+                        onSelect={handleHourSelect}
+                      />
+                      <WheelColumn
+                        label="分"
+                        options={minuteOptions}
+                        selectedIndex={currentMinuteIndex}
+                        onSelect={handleMinuteSelect}
+                      />
+                    </View>
                   </View>
                 </View>
                 {deadlineLabel && (
@@ -446,6 +535,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 12,
     marginBottom: 12,
+  },
+  pickerGroup: {
+    marginBottom: 14,
+  },
+  pickerGroupLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#5E4A7A',
+    marginBottom: 8,
+    letterSpacing: 0.2,
   },
   wheelRow: {
     flexDirection: 'row',
