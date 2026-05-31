@@ -28,7 +28,6 @@ import Reanimated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
 import { FocoBar } from '@/components/layout/FocoBar';
@@ -742,13 +741,6 @@ export default function HomeScreen() {
                   {/* Daily tasks preview */}
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionLabelInHeader}>daily tasks</Text>
-                    <TouchableOpacity
-                      style={styles.addTaskBtn}
-                      onPress={openHomeTaskModal}
-                      activeOpacity={0.75}
-                    >
-                      <Plus size={16} color="#ffffff" strokeWidth={2.8} />
-                    </TouchableOpacity>
                   </View>
                   {dailyTasks.length > 0 && (
                     <ScrollView
@@ -773,13 +765,6 @@ export default function HomeScreen() {
                   {/* Deadline tasks preview */}
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionLabelInHeader}>deadlines</Text>
-                    <TouchableOpacity
-                      style={styles.addTaskBtn}
-                      onPress={openHomeTaskModal}
-                      activeOpacity={0.75}
-                    >
-                      <Plus size={16} color="#ffffff" strokeWidth={2.8} />
-                    </TouchableOpacity>
                   </View>
                   {deadlineTasks.length > 0 && (
                     <ScrollView
@@ -804,6 +789,14 @@ export default function HomeScreen() {
                   {dailyTasks.length === 0 && deadlineTasks.length === 0 && (
                     <Text style={styles.emptyTasks}>No pending tasks — you're all clear 🎉</Text>
                   )}
+
+                  <TouchableOpacity
+                    style={styles.addTaskWideBtn}
+                    onPress={openHomeTaskModal}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.addTaskWideText}>+ Task</Text>
+                  </TouchableOpacity>
 
                   {/* Timer */}
                   <Text style={styles.sectionLabel}>timer</Text>
@@ -1077,13 +1070,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     lineHeight: 18,
   },
-  addTaskBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  addTaskWideBtn: {
+    alignSelf: 'stretch',
+    height: 44,
+    borderRadius: 9999,
     backgroundColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 18,
+    marginBottom: 2,
+  },
+  addTaskWideText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
   },
 
 
