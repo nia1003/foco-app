@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 
@@ -44,8 +44,8 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder:  (_, gs) => Math.abs(gs.dx) > 4,
       onPanResponderGrant: (_, gs) => {
         dragStart.current = { x: gs.x0, val: valueRef.current };
         onStartRef.current?.();
@@ -63,13 +63,30 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
     }),
   ).current;
 
-  const commitInput = () => {
-    const parsed = parseInt(inputText, 10);
+  useEffect(() => {
+    if (!editing) setInputText(String(value));
+  }, [editing, value]);
+
+  const parseAndClamp = (text: string) => {
+    const parsed = parseInt(text, 10);
     if (!Number.isNaN(parsed)) {
-      const clamped = Math.max(MIN_VAL, Math.min(MAX_VAL, parsed));
-      const snapped = Math.round(clamped / STEP) * STEP;
-      onChangeRef.current(Math.max(MIN_VAL, Math.min(MAX_VAL, snapped)));
+      return Math.max(MIN_VAL, Math.min(MAX_VAL, parsed));
     }
+    return null;
+  };
+
+  const handleInputChange = (text: string) => {
+    setInputText(text);
+    const next = parseAndClamp(text);
+    if (next !== null && next !== valueRef.current) {
+      onChangeRef.current(next);
+    }
+  };
+
+  const commitInput = () => {
+    const next = parseAndClamp(inputText);
+    if (next !== null) onChangeRef.current(next);
+    else setInputText(String(valueRef.current));
     setEditing(false);
   };
 
@@ -129,7 +146,7 @@ export function TimerGauge({ value, onChange, onDragStart, onDragEnd }: Props) {
           <TextInput
             style={styles.numInput}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={handleInputChange}
             keyboardType="number-pad"
             autoFocus
             selectTextOnFocus
