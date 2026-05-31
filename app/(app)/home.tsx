@@ -45,7 +45,7 @@ import { chatWithPet, getPets, deleteTask, fetchHomeStats } from '@/services/foc
 import type { HomeStats } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
 import { isMockPetId, resolveLaunchPetId } from '@/lib/focusSession';
-import type { Task, TaskCategory } from '@/types';
+import type { Task } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PET_CARD_W    = Math.round(SCREEN_W * 0.72);
@@ -296,7 +296,7 @@ export default function HomeScreen() {
   const [durationMin, setDurationMin]                 = useState(25);
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const [activePage2Tab, setActivePage2Tab]           = useState<Page2Tab>('home');
-  const [addTaskCategory, setAddTaskCategory]         = useState<TaskCategory | null>(null);
+  const [addTaskOpen, setAddTaskOpen]                 = useState(false);
   const [page2ScrollEnabled, setPage2ScrollEnabled]   = useState(true);
   const [editTaskId, setEditTaskId]                   = useState<string | null>(null);
   const [homeStats, setHomeStats]                     = useState<HomeStats | null>(null);
@@ -451,9 +451,9 @@ export default function HomeScreen() {
     });
   };
 
-  const openHomeTaskModal = useCallback((category: TaskCategory) => {
+  const openHomeTaskModal = useCallback(() => {
     play('tap');
-    setAddTaskCategory(category);
+    setAddTaskOpen(true);
   }, [play]);
 
   const settleCarouselAtOffset = useCallback((xOffset: number, shouldCorrectCenter = true) => {
@@ -744,7 +744,7 @@ export default function HomeScreen() {
                     <Text style={styles.sectionLabelInHeader}>daily tasks</Text>
                     <TouchableOpacity
                       style={styles.addTaskBtn}
-                      onPress={() => openHomeTaskModal('daily')}
+                      onPress={openHomeTaskModal}
                       activeOpacity={0.75}
                     >
                       <Plus size={16} color="#ffffff" strokeWidth={2.8} />
@@ -775,7 +775,7 @@ export default function HomeScreen() {
                     <Text style={styles.sectionLabelInHeader}>deadlines</Text>
                     <TouchableOpacity
                       style={styles.addTaskBtn}
-                      onPress={() => openHomeTaskModal('task')}
+                      onPress={openHomeTaskModal}
                       activeOpacity={0.75}
                     >
                       <Plus size={16} color="#ffffff" strokeWidth={2.8} />
@@ -838,15 +838,13 @@ export default function HomeScreen() {
       </GestureDetector>
 
       <AddTaskModal
-        visible={addTaskCategory !== null}
-        category={addTaskCategory ?? 'task'}
+        visible={addTaskOpen}
         defaultDurationMin={durationMin}
         userId={userId}
-        onClose={() => setAddTaskCategory(null)}
+        onClose={() => setAddTaskOpen(false)}
         onCreated={(task) => {
-          const category = addTaskCategory ?? 'task';
-          addTask({ ...task, category });
-          setAddTaskCategory(null);
+          addTask(task);
+          setAddTaskOpen(false);
         }}
       />
 

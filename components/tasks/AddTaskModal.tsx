@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -13,22 +14,52 @@ import {
 import { useSound } from '@/components/SoundProvider';
 import { TimerGauge } from '@/components/home/TimerGauge';
 import { createTask } from '@/services/focoService';
-import type { Task, TaskCategory } from '@/types';
+import type { Task } from '@/types';
 
 const INK = '#1a1622';
 
 interface Props {
   visible: boolean;
-  category: TaskCategory;
   defaultDurationMin: number;
   userId: string | null;
   onClose: () => void;
   onCreated: (task: Task) => void;
 }
 
+function formatDeadlineInput(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function parseDeadlineInput(value: string) {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?$/);
+  if (!match) return null;
+
+  const [, year, month, day, hour = '23', minute = '59'] = match;
+  const parsed = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    0,
+    0,
+  );
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== Number(year) ||
+    parsed.getMonth() !== Number(month) - 1 ||
+    parsed.getDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
 export function AddTaskModal({
   visible,
-  category,
   defaultDurationMin,
   userId,
   onClose,
@@ -36,26 +67,50 @@ export function AddTaskModal({
 }: Props) {
   const { play } = useSound();
 
-  const [title, setTitle]           = useState('');
-  const [memo, setMemo]             = useState('');
+  const [title, setTitle] = useState('');
+  const [memo, setMemo] = useState('');
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
+  const [hasDeadline, setHasDeadline] = useState(false);
   const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
-  const [saving, setSaving]         = useState(false);
+  const [deadlineInput, setDeadlineInput] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const resetForm = useCallback(() => {
     setTitle('');
     setMemo('');
     setDurationMin(defaultDurationMin);
+    setHasDeadline(false);
     setDeadlineAt(null);
+    setDeadlineInput('');
     setSaving(false);
   }, [defaultDurationMin]);
 
-  // Quick-pick deadline helpers
+  const setDeadlineDate = (date: Date) => {
+    setDeadlineAt(date.toISOString());
+    setDeadlineInput(formatDeadlineInput(date));
+  };
+
   const pickDeadline = (daysFromNow: number) => {
     const d = new Date();
     d.setDate(d.getDate() + daysFromNow);
     d.setHours(23, 59, 59, 0);
-    setDeadlineAt(d.toISOString());
+    setDeadlineDate(d);
+  };
+
+  const handleToggleDeadline = (value: boolean) => {
+    setHasDeadline(value);
+    if (value) {
+      pickDeadline(1);
+    } else {
+      setDeadlineAt(null);
+      setDeadlineInput('');
+    }
+  };
+
+  const handleDeadlineInputChange = (value: string) => {
+    setDeadlineInput(value);
+    const parsed = parseDeadlineInput(value);
+    setDeadlineAt(parsed ? parsed.toISOString() : null);
   };
 
   const deadlineLabel = (() => {
@@ -70,15 +125,25 @@ export function AddTaskModal({
     if (visible) resetForm();
   }, [visible, resetForm]);
 
-  const handleClose = () => { resetForm(); onClose(); };
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleCreate = async () => {
-    const trimmed     = title.trim();
+    const trimmed = title.trim();
     const trimmedMemo = memo.trim();
     if (!trimmed) {
       Alert.alert('Title required', 'Enter a task name to continue.');
       return;
     }
+    if (hasDeadline && !deadlineAt) {
+      Alert.alert('Invalid deadline', 'Use YYYY-MM-DD HH:mm, for example 2026-06-01 23:59.');
+      return;
+    }
+
+    const category = hasDeadline ? 'task' : 'daily';
+    const deadlineValue = hasDeadline ? deadlineAt : null;
     setSaving(true);
     try {
       if (!userId) {
@@ -90,18 +155,19 @@ export function AddTaskModal({
           status: 'pending',
           category,
           created_at: new Date().toISOString(),
+          deadline_at: deadlineValue,
           ...(trimmedMemo ? { memo: trimmedMemo } : {}),
-          ...(deadlineAt ? { deadline_at: deadlineAt } : {}),
         };
         play('tap');
         onCreated(local);
         handleClose();
         return;
       }
+
       const created = await createTask(userId, trimmed, durationMin, {
         category,
+        deadline_at: deadlineValue,
         ...(trimmedMemo ? { memo: trimmedMemo } : {}),
-        ...(deadlineAt ? { deadline_at: deadlineAt } : {}),
       });
       play('tap');
       onCreated(created);
@@ -120,23 +186,34 @@ export function AddTaskModal({
       <Pressable style={styles.backdrop} onPress={handleClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={styles.title}>+ Task</Text>
-            <Text style={styles.subtitle}>
-              {category === 'daily' ? 'Daily habit' : 'One-time task'}
-            </Text>
+            <View style={styles.headerRow}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.title}>+ Task</Text>
+                <Text style={styles.subtitle}>
+                  {hasDeadline ? 'Deadline task' : 'Daily / no deadline'}
+                </Text>
+              </View>
+              <View style={styles.deadlineSwitchWrap}>
+                <Text style={styles.switchLabel}>Deadline</Text>
+                <Switch
+                  value={hasDeadline}
+                  onValueChange={handleToggleDeadline}
+                  trackColor={{ false: '#E6E6E6', true: 'rgba(124,77,204,0.35)' }}
+                  thumbColor={hasDeadline ? '#7C4DCC' : '#ffffff'}
+                />
+              </View>
+            </View>
 
-            {/* Task name */}
             <TextInput
               style={styles.input}
               value={title}
               onChangeText={setTitle}
-              placeholder="Enter task name…"
+              placeholder="Enter task name"
               placeholderTextColor="rgba(26,22,34,0.35)"
               autoFocus
               returnKeyType="next"
             />
 
-            {/* Memo */}
             <TextInput
               style={[styles.input, styles.memoInput]}
               value={memo}
@@ -147,23 +224,32 @@ export function AddTaskModal({
               textAlignVertical="top"
             />
 
-            {/* Deadline picker — only for one-time tasks */}
-            {category === 'task' && (
+            {hasDeadline && (
               <>
-                <Text style={styles.timerLabel}>deadline (optional)</Text>
+                <Text style={styles.timerLabel}>deadline</Text>
+                <TextInput
+                  style={styles.input}
+                  value={deadlineInput}
+                  onChangeText={handleDeadlineInputChange}
+                  placeholder="YYYY-MM-DD HH:mm"
+                  placeholderTextColor="rgba(26,22,34,0.35)"
+                  keyboardType="numbers-and-punctuation"
+                />
                 <View style={styles.deadlineRow}>
                   {(['today', 'tomorrow', '3 days', '1 week'] as const).map((label, i) => {
                     const days = [0, 1, 3, 7][i];
                     const isActive = (() => {
                       if (!deadlineAt) return false;
-                      const diff = Math.ceil((new Date(deadlineAt).getTime() - Date.now()) / 86_400_000);
+                      const diff = Math.ceil(
+                        (new Date(deadlineAt).getTime() - Date.now()) / 86_400_000,
+                      );
                       return diff === days || (days === 0 && diff <= 0);
                     })();
                     return (
                       <TouchableOpacity
                         key={label}
                         style={[styles.deadlineChip, isActive && styles.deadlineChipActive]}
-                        onPress={() => isActive ? setDeadlineAt(null) : pickDeadline(days)}
+                        onPress={() => (isActive ? handleDeadlineInputChange('') : pickDeadline(days))}
                         activeOpacity={0.75}
                       >
                         <Text style={[styles.deadlineChipText, isActive && styles.deadlineChipTextActive]}>
@@ -179,22 +265,20 @@ export function AddTaskModal({
               </>
             )}
 
-            {/* Timer */}
             <Text style={styles.timerLabel}>focus duration</Text>
             <TimerGauge value={durationMin} onChange={setDurationMin} />
 
-            {/* Actions */}
             <View style={styles.actions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} activeOpacity={0.8}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.createBtn, saving && { opacity: 0.5 }]}
+                style={[styles.createBtn, saving && styles.createBtnDisabled]}
                 onPress={handleCreate}
                 disabled={saving}
                 activeOpacity={0.85}
               >
-                <Text style={styles.createText}>{saving ? 'Saving…' : 'Create'}</Text>
+                <Text style={styles.createText}>{saving ? 'Saving...' : 'Create'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -219,6 +303,14 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     maxHeight: '90%',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 22,
+  },
+  headerCopy: { flex: 1 },
   title: {
     fontSize: 28,
     fontWeight: '800',
@@ -229,7 +321,16 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     color: 'rgba(26,22,34,0.45)',
-    marginBottom: 22,
+  },
+  deadlineSwitchWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  switchLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(26,22,34,0.55)',
+    letterSpacing: 0.2,
   },
   input: {
     fontSize: 16,
@@ -307,6 +408,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111111',
     alignItems: 'center',
   },
+  createBtnDisabled: { opacity: 0.5 },
   createText: {
     fontSize: 15,
     fontWeight: '700',

@@ -27,10 +27,7 @@ const INK  = '#1a1622';
 const CARD = '#F2F2F2';
 const BTN_SIZE = 36;
 
-type TabType = 'task' | 'daily';
-
 export default function MissionsScreen() {
-  const [tab, setTab]                 = useState<TabType>('task');
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
@@ -49,7 +46,6 @@ export default function MissionsScreen() {
   useEffect(() => { fetchTasks(userId).catch(() => {}); }, [userId, fetchTasks]);
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending');
-  const tabTasks     = pendingTasks.filter((t) => (t.category ?? 'task') === tab);
 
   const buildSetup = (partial: Partial<FocusQuickSetupValue>): FocusQuickSetupValue => ({
     taskMode: 'none',
@@ -109,34 +105,16 @@ export default function MissionsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Tabs */}
-        <View style={s.tabs}>
-          {(['task', 'daily'] as TabType[]).map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[s.tabPill, tab === t && s.tabPillActive]}
-              onPress={() => { play('tap'); setTab(t); }}
-              activeOpacity={0.75}
-            >
-              <Text style={[s.tabLabel, tab === t && s.tabLabelActive]}>
-                {t === 'task' ? 'Deadline' : 'Daily'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
         {/* Task list */}
         <Text style={s.sectionLabel}>my tasks</Text>
 
-        {tabTasks.length === 0 && (
+        {pendingTasks.length === 0 && (
           <View style={[s.taskCard, s.emptyCard]}>
-            <Text style={s.emptyText}>
-              No {tab === 'task' ? 'deadline' : 'daily'} tasks yet.
-            </Text>
+            <Text style={s.emptyText}>No tasks yet.</Text>
           </View>
         )}
 
-        {tabTasks.map((task: Task) => (
+        {pendingTasks.map((task: Task) => (
           <View key={task.id} style={s.taskCard}>
             <TouchableOpacity
               style={s.taskInfoPressable}
@@ -177,11 +155,10 @@ export default function MissionsScreen() {
 
       <AddTaskModal
         visible={addTaskOpen}
-        category={tab}
         defaultDurationMin={focusDurationMin}
         userId={userId}
         onClose={() => setAddTaskOpen(false)}
-        onCreated={(task) => { addTask({ ...task, category: tab }); }}
+        onCreated={(task) => { addTask(task); }}
       />
 
       <TaskDetailModal
@@ -225,17 +202,6 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
-
-  tabs: { flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 4 },
-  tabPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    backgroundColor: CARD,
-  },
-  tabPillActive: { backgroundColor: '#111111' },
-  tabLabel: { fontSize: 13, fontWeight: '500', color: 'rgba(26,22,34,0.55)' },
-  tabLabelActive: { color: '#ffffff', fontWeight: '600' },
 
   sectionLabel: {
     fontSize: 13,
