@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Dimensions,
   Platform,
@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import type { SessionEvent } from '@/types';
 
@@ -13,13 +14,12 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const DEFAULT_CARD_W = SCREEN_W - 64;
 
 const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
-const RULE = '- - - - - - - - - - - - - - - - - -';
 
 const QUALITY_LEVELS = [
-  { min: 85, tag: 'EXCEPTIONAL',  color: '#9B59D0' },
-  { min: 65, tag: 'STRONG',       color: '#4A8FD4' },
-  { min: 40, tag: 'STEADY',       color: '#68A86B' },
-  { min: 0,  tag: 'BUILDING',     color: '#8B8BAE' },
+  { min: 85, tag: 'EXCELLENT',  color: '#5B92E5', bgColor: '#E3F2FD' }, 
+  { min: 65, tag: 'STRONG',     color: '#E87D98', bgColor: '#FFF0F3' }, 
+  { min: 40, tag: 'STEADY',     color: '#55B368', bgColor: '#E8F5E9' }, 
+  { min: 0,  tag: 'BUILDING',   color: '#C6A750', bgColor: '#FFF8E1' }, 
 ] as const;
 
 function getLevel(score: number) {
@@ -37,8 +37,22 @@ function formatDateTime(iso: string): string {
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  if (m === 0) return `${s}s`;
-  return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  if (m === 0) return `${s} 秒`;
+  return s === 0 ? `${m} 分鐘` : `${m} 分 ${s} 秒`;
+}
+
+function generateStory(petName: string, duration: number, score: number, taskTitle?: string | null): string {
+  const isHighQuality = score >= 80;
+  const isStruggling = score < 40;
+  const durationStr = formatDuration(duration);
+
+  if (isHighQuality) {
+    return `這是一段極具質感的專注時光。你和 ${petName} 一起努力了 ${durationStr}。${taskTitle ? `在「${taskTitle}」上取得了很棒的進展呢！` : '這段時間裡你心無旁騖，狀態超好！'}這張快照記錄了你們絕佳的專注瞬間，繼續保持下去吧！`;
+  } else if (isStruggling) {
+    return `哎呀，剛才外界的誘惑似乎有點多呢，讓專注變得有些艱難。但沒關係，你和 ${petName} 還是努力堅持了 ${durationStr}。${taskTitle ? `雖然「${taskTitle}」走得有些慢，` : ''}但願意坐在這裡重新開始就是最棒的！下次我們再一起加油！`;
+  } else {
+    return `今天和 ${petName} 穩穩地度過了 ${durationStr} 的平靜時光。${taskTitle ? `你一步一腳印地推進了「${taskTitle}」，` : '這段專注的時間裡，'}牠看起來非常滿意，還在你的手帳上留下了一個專屬印記呢！繼續保持好習慣喔。`;
+  }
 }
 
 type SegmentType = 'focus' | 'pause' | 'left_app';
@@ -69,8 +83,8 @@ function buildSegments(events: SessionEvent[], startedAt: string, totalSec: numb
 
 function segColor(type: SegmentType, accent: string): string {
   if (type === 'focus') return accent;
-  if (type === 'pause') return 'rgba(0,0,0,0.10)';
-  return 'rgba(200,60,60,0.35)';
+  if (type === 'pause') return 'rgba(0,0,0,0.12)';
+  return 'rgba(200,60,60,0.30)';
 }
 
 export interface SessionShareCardProps {
@@ -84,6 +98,8 @@ export interface SessionShareCardProps {
   cardWidth?: number;
   showOverlayShare?: boolean;
   onOverlayShare?: () => void;
+  petName?: string; 
+  petImage?: any;
 }
 
 export function SessionShareCard({
@@ -97,20 +113,41 @@ export function SessionShareCard({
   cardWidth = DEFAULT_CARD_W,
   showOverlayShare = false,
   onOverlayShare,
+  petName = '小夥伴', 
+  petImage,
 }: SessionShareCardProps) {
   const level = getLevel(qualityScore);
   const dateTime = formatDateTime(startedAt);
   const segments = buildSegments(events, startedAt, duration);
+  const storyText = useMemo(() => generateStory(petName, duration, qualityScore, taskTitle), [petName, duration, qualityScore, taskTitle]);
+  const stampTextColor = level.color === '#C6A750' ? '#9E8231' : level.color;
 
   return (
-    <View style={[styles.card, { width: cardWidth }]}>
-      {/* Header */}
-      <Text style={styles.brand}>FOCO</Text>
-      <Text style={styles.brandSub}>FOCUS RECEIPT</Text>
+    <View style={[styles.card, { width: cardWidth, backgroundColor: level.bgColor }]}>
+      
+      <View style={styles.polaroidWrapper}>
+        <View style={styles.polaroid}>
+          <View style={[styles.washiTape, { backgroundColor: level.color }]} />
 
-      <Text style={styles.rule}>{RULE}</Text>
+          <View style={styles.photoArea}>
+            {petImage ? (
+              <Image source={petImage} style={styles.petImage} resizeMode="contain" />
+            ) : null}
+          </View>
+          {/* 只顯示寵物名字 */}
+          <Text style={styles.polaroidText}>{petName}</Text>
 
-      {/* Quality score */}
+          <View style={[styles.refinedStamp, { borderColor: level.color }]}>
+            <View style={[styles.innerCircle, { borderColor: level.color }]} />
+            <Text style={[styles.refinedStampScore, { color: stampTextColor }]}>{qualityScore}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.storyArea}>
+        <Text style={styles.storyText}>{storyText}</Text>
+      </View>
+
       <View style={styles.scoreRow}>
         <Text style={[styles.scoreNum, { color: level.color }]}>{qualityScore}</Text>
         <View style={styles.scoreRight}>
@@ -119,41 +156,8 @@ export function SessionShareCard({
         </View>
       </View>
 
-      {/* Quality bar */}
-      <View style={styles.qualityTrack}>
-        <View style={[styles.qualityFill, { width: `${qualityScore}%` as any, backgroundColor: level.color }]} />
-      </View>
-
-      <Text style={styles.rule}>{RULE}</Text>
-
-      {/* Data rows */}
-      <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>DATE</Text>
-        <Text style={styles.dataRight}>{dateTime}</Text>
-      </View>
-      <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>DURATION</Text>
-        <Text style={styles.dataRight}>{formatDuration(duration)}</Text>
-      </View>
-      {taskTitle ? (
-        <View style={styles.dataRow}>
-          <Text style={styles.dataLeft}>TASK</Text>
-          <Text style={[styles.dataRight, { flex: 1 }]} numberOfLines={1}>{taskTitle}</Text>
-        </View>
-      ) : null}
-      <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>PAUSES</Text>
-        <Text style={styles.dataRight}>{String(pauses).padStart(2, '0')}</Text>
-      </View>
-      <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>LEFT APP</Text>
-        <Text style={styles.dataRight}>{String(leftApp).padStart(2, '0')}</Text>
-      </View>
-
       {events.length > 0 && (
-        <>
-          <Text style={styles.rule}>{RULE}</Text>
-          <Text style={styles.timelineLabel}>SESSION TIMELINE</Text>
+        <View style={styles.timelineSection}>
           <View style={styles.timelineBar}>
             {segments.map((seg, i) => (
               <View
@@ -163,156 +167,127 @@ export function SessionShareCard({
                   {
                     width: `${seg.widthPct}%` as any,
                     backgroundColor: segColor(seg.type, level.color),
-                    borderRadius: i === 0 || i === segments.length - 1 ? 3 : 0,
+                    borderRadius: i === 0 || i === segments.length - 1 ? 4 : 0,
                   },
                 ]}
               />
             ))}
           </View>
-        </>
+          <Text style={styles.timelineStats}>
+            中斷 {pauses} 次 · 離開畫面 {leftApp} 次
+          </Text>
+        </View>
       )}
 
-      <Text style={styles.rule}>{RULE}</Text>
+      <View style={styles.footer}>
+        <Text style={styles.dateText}>{dateTime}</Text>
+      </View>
 
       {showOverlayShare && onOverlayShare ? (
-        <TouchableOpacity style={[styles.shareBtn, { borderColor: level.color }]} onPress={onOverlayShare} activeOpacity={0.8}>
-          <Text style={[styles.shareBtnText, { color: level.color }]}>Share ↗</Text>
+        <TouchableOpacity style={[styles.shareBtn, { backgroundColor: level.color }]} onPress={onOverlayShare} activeOpacity={0.85}>
+          <Text style={styles.shareBtnText}>分享明信片 ↗</Text>
         </TouchableOpacity>
       ) : null}
 
-      <Text style={styles.footer}>foco.app</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 22,
+  card: { borderRadius: 20, padding: 24, shadowColor: '#A08D71', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 6, borderWidth: 1, borderColor: '#FFFFFF', position: 'relative' },
+  polaroidWrapper: { alignItems: 'center', marginTop: -10, marginBottom: 26 },
+  polaroid: { 
+    backgroundColor: '#FFFFFF', 
+    padding: 12, 
+    paddingBottom: 16, 
+    alignItems: 'center', // 確保照片與文字絕對置中
+    borderRadius: 4, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 2, height: 4 }, 
+    shadowOpacity: 0.08, 
+    shadowRadius: 6, 
+    elevation: 4, 
+    transform: [{ rotate: '-3deg' }], 
+    borderWidth: 0.5, 
+    borderColor: '#F0F0F0', 
+    position: 'relative', 
+    overflow: 'visible' 
+  },
+  washiTape: { position: 'absolute', top: -8, left: '50%', marginLeft: -25, width: 50, height: 16, borderRadius: 1, zIndex: 10, opacity: 0.35 },
+  photoArea: { backgroundColor: '#F9F9F9', borderRadius: 2, width: 140, height: 140, justifyContent: 'center', alignItems: 'center' },
+  petImage: { width: 110, height: 110 },
+  polaroidText: { 
+    marginTop: 12, 
+    textAlign: 'center', 
+    fontFamily: MONO, 
+    color: '#A0A0A0', 
+    fontSize: 12, 
+    letterSpacing: 2, 
+    textTransform: 'uppercase' 
+  },
+  
+  refinedStamp: {
+    position: 'absolute',
+    bottom: 26, 
+    right: -12, 
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    zIndex: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    transform: [{ rotate: '8deg' }],
   },
-  brand: {
-    fontFamily: MONO,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111',
-    letterSpacing: 6,
-    textAlign: 'center',
-    marginBottom: 2,
-  },
-  brandSub: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.40)',
-    letterSpacing: 3,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  rule: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.25)',
-    textAlign: 'center',
-    marginVertical: 8,
-    letterSpacing: 1,
-  },
+  innerCircle: { position: 'absolute', width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderStyle: 'dashed' },
+  refinedStampScore: { fontSize: 16, fontWeight: '800', fontFamily: MONO },
+
+  storyArea: { marginBottom: 20 },
+  storyText: { fontSize: 15, color: '#666', lineHeight: 26, fontWeight: '500' },
+
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    marginBottom: 8,
+    marginBottom: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderStyle: 'dashed', 
+    borderTopColor: 'rgba(0,0,0,0.06)', 
   },
   scoreNum: {
     fontFamily: MONO,
-    fontSize: 52,
+    fontSize: 42, 
     fontWeight: '700',
     letterSpacing: -2,
-    lineHeight: 58,
-    includeFontPadding: false,
+    lineHeight: 46,
   },
   scoreRight: { flex: 1 },
   scoreTag: {
     fontFamily: MONO,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: 1.5,
   },
   scoreSub: {
     fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.40)',
+    fontSize: 11,
+    color: '#A89F91',
     marginTop: 2,
     letterSpacing: 0.5,
   },
-  qualityTrack: {
-    height: 3,
-    borderRadius: 3,
-    backgroundColor: 'rgba(0,0,0,0.07)',
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  qualityFill: { height: 3, borderRadius: 3 },
-  dataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginVertical: 3,
-    gap: 8,
-  },
-  dataLeft: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.40)',
-    letterSpacing: 1.5,
-    flexShrink: 0,
-  },
-  dataRight: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: '#111',
-    fontWeight: '600',
-    textAlign: 'right',
-  },
-  timelineLabel: {
-    fontFamily: MONO,
-    fontSize: 9,
-    color: 'rgba(20,16,28,0.35)',
-    letterSpacing: 1.5,
-    marginBottom: 6,
-  },
-  timelineBar: {
-    height: 5,
-    borderRadius: 3,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    gap: 1,
-  },
-  timelineSeg: { height: 5 },
-  shareBtn: {
-    borderWidth: 1,
-    borderRadius: 9999,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  shareBtnText: {
-    fontFamily: MONO,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
-  footer: {
-    fontFamily: MONO,
-    fontSize: 9,
-    color: 'rgba(20,16,28,0.20)',
-    letterSpacing: 2,
-    textAlign: 'center',
-    marginTop: 4,
-  },
+
+  timelineSection: { marginBottom: 24 },
+  timelineBar: { height: 6, borderRadius: 3, flexDirection: 'row', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.04)', gap: 1, marginBottom: 8 },
+  timelineSeg: { height: 6 },
+  timelineStats: { fontFamily: MONO, fontSize: 10, color: '#B0B0B0', textAlign: 'right' },
+  footer: { flexDirection: 'row', justifyContent: 'flex-end', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 16, marginBottom: 10 },
+  dateText: { fontSize: 11, color: '#B0B0B0', fontFamily: MONO, letterSpacing: 1 },
+  shareBtn: { borderRadius: 9999, paddingVertical: 12, alignItems: 'center', marginTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  shareBtnText: { fontFamily: MONO, fontSize: 14, fontWeight: '700', color: '#FFF', letterSpacing: 1 },
 });

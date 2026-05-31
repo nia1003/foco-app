@@ -160,6 +160,7 @@ export interface SessionRecord {
   left_app_count?: number;
   quality_score?: number;
   started_at?: string;
+  pet_id?: string; // 修正: 補上 pet_id 型別定義
   tasks?: { title: string }[] | { title: string } | null;  // join from tasks table (Supabase)
 }
 
