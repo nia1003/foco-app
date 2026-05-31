@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * DayLogScreen — weekly session accordion
  * Params: weekStart (YYYY-MM-DD, Monday), focusDate (YYYY-MM-DD)
@@ -255,7 +256,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 17,
     fontWeight: '500',
     color: Colors.ink,

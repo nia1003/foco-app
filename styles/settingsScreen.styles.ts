@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import { StyleSheet } from 'react-native';
 import type { AppTheme } from '@/hooks/useAppTheme';
 
@@ -9,7 +10,7 @@ export function createSettingsStyles({ colors, surfaces }: AppTheme) {
     scroll: { flex: 1 },
     scrollContent: { paddingHorizontal: 18, paddingBottom: 80 },
     title: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 42,
       fontWeight: '500',
       color: colors.ink,

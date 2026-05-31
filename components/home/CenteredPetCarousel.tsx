@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -265,7 +266,7 @@ function createCarouselStyles({ colors, surfaces }: AppTheme) {
       marginTop: 4,
     },
     name: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 17,
       fontWeight: '500',
       color: colors.ink,

@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import { StyleSheet } from 'react-native';
 import type { AppTheme } from '@/hooks/useAppTheme';
 
@@ -62,7 +63,7 @@ export function createReflectionStyles({ colors, surfaces, screenBg }: AppTheme)
 
     headingBlock: { marginBottom: 36 },
     heading: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 34,
       fontWeight: '500',
       color: colors.ink,

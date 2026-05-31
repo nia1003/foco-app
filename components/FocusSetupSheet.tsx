@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * FocusSetupSheet — full-screen 3-step flow for starting a focus session.
  *   Step 0: Task name + emoji + optional memo (or "No task")
@@ -452,7 +453,7 @@ const styles = StyleSheet.create({
   },
 
   pageTitle: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 28,
     fontWeight: '500',
     color: Colors.ink,

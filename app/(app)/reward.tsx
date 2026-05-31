@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * RewardScreen — 專注結束後的寵物進度頁
  * 顯示：寵物本體（無框）+ 等級進度條從舊值→新值的動畫 + 升級特效
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   levelLabel: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 20,
     fontWeight: '600',
     letterSpacing: -0.3,

@@ -1,4 +1,5 @@
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Fonts } from '@/constants/fonts';
 import type { AppTheme } from '@/hooks/useAppTheme';
 
 export function createStatsStyles({ colors, surfaces, screenBg }: AppTheme) {
@@ -14,7 +15,7 @@ export function createStatsStyles({ colors, surfaces, screenBg }: AppTheme) {
       borderColor: surfaces.panelBorder,
     },
     title: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 42,
       fontWeight: '500',
       color: colors.ink,
@@ -26,7 +27,7 @@ export function createStatsStyles({ colors, surfaces, screenBg }: AppTheme) {
     summaryCard: { flex: 1 },
     summaryInner: { padding: 14 },
     summaryVal: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 22,
       fontWeight: '500',
       color: colors.ink,
@@ -163,11 +164,11 @@ export function createStatsStyles({ colors, surfaces, screenBg }: AppTheme) {
       alignItems: 'center',
     },
     shareOpenBtnText: {
-      fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+      fontFamily: Fonts.uiSemiBold,
       fontSize: 13,
-      fontWeight: '700',
+      fontWeight: '600',
       color: surfaces.ctaText,
-      letterSpacing: 2,
+      letterSpacing: 0.3,
     },
   });
 }

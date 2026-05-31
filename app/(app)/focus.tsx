@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -340,7 +341,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 15, fontWeight: '600' },
   taskName: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 28,
     fontWeight: '500',
     letterSpacing: -0.5,
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modalTitle: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 22,
     fontWeight: '500',
     marginBottom: 10,

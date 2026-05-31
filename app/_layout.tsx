@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 import '../global.css';
 import { useEffect, useRef } from 'react';
-import { LogBox } from 'react-native';
+import { LogBox, Text, TextInput } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -16,11 +16,17 @@ LogBox.ignoreLogs([
   'Refresh Token Not Found',
 ]);
 import { useFonts } from 'expo-font';
-import {
-  Fraunces_400Regular,
-  Fraunces_500Medium,
-  Fraunces_600SemiBold,
-} from '@expo-google-fonts/fraunces';
+import { Fraunces_400Regular } from '@expo-google-fonts/fraunces/400Regular';
+import { Fraunces_500Medium } from '@expo-google-fonts/fraunces/500Medium';
+import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
+import { DMSans_400Regular } from '@expo-google-fonts/dm-sans/400Regular';
+import { DMSans_500Medium } from '@expo-google-fonts/dm-sans/500Medium';
+import { DMSans_600SemiBold } from '@expo-google-fonts/dm-sans/600SemiBold';
+import { DMSans_700Bold } from '@expo-google-fonts/dm-sans/700Bold';
+import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono/400Regular';
+import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono/500Medium';
+import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600SemiBold';
+import { Fonts } from '@/constants/fonts';
 import { useAuthStore } from '@/stores/authStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { audioService } from '@/services/audioService';
@@ -43,7 +49,27 @@ export default function RootLayout() {
     Fraunces_400Regular,
     Fraunces_500Medium,
     Fraunces_600SemiBold,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
+    IBMPlexMono_600SemiBold,
   });
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    const uiFont = { fontFamily: Fonts.ui };
+    (Text as typeof Text & { defaultProps?: { style?: object } }).defaultProps = {
+      ...(Text as typeof Text & { defaultProps?: { style?: object } }).defaultProps,
+      style: uiFont,
+    };
+    (TextInput as typeof TextInput & { defaultProps?: { style?: object } }).defaultProps = {
+      ...(TextInput as typeof TextInput & { defaultProps?: { style?: object } }).defaultProps,
+      style: uiFont,
+    };
+  }, [fontsLoaded]);
 
   // 初始化 Audio + 恢復 Token Session
   useEffect(() => {
@@ -54,7 +80,7 @@ export default function RootLayout() {
 
   // 路由守衛：isLoading 結束後決定跳去哪
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !fontsLoaded) return;
 
     if (!splashHiddenRef.current) {
       splashHiddenRef.current = true;
@@ -79,7 +105,7 @@ export default function RootLayout() {
       // Unauthenticated user in the app → back to login
       router.replace('/(auth)');
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, fontsLoaded, segments, router]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

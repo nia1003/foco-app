@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import { StyleSheet } from 'react-native';
 import type { AppTheme } from '@/hooks/useAppTheme';
 
@@ -9,7 +10,7 @@ export function createHomeStyles({ colors, surfaces }: AppTheme) {
     greeting: { marginTop: 8, paddingHorizontal: 22, paddingBottom: 4 },
     date: { fontSize: 13, color: colors.inkSoft },
     greet: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 32,
       fontWeight: '500',
       color: colors.ink,

@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * DISC Detail — explains the four focus personality types.
  * Reached by tapping "Focus type breakdown" on the Stats screen.
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   },
   backIcon: { fontSize: 18, color: Colors.ink },
   headerTitle: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 18,
     fontWeight: '500',
     color: Colors.ink,

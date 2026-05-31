@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * PetInfoScreen — 上拉式底部卡片
  * - 全螢幕顯示大寵物（無圓形框）
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   speechBubbleText: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 15,
     color: Colors.ink,
     lineHeight: 22,
@@ -489,7 +490,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   petName: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 30,
     fontWeight: '500',
     color: Colors.ink,
@@ -565,7 +566,7 @@ const styles = StyleSheet.create({
   },
   xpLabel: { fontSize: 12, fontWeight: '700', color: Colors.inkFaint, letterSpacing: 1 },
   xpNumbers: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 22,
     fontWeight: '500',
     color: Colors.ink,
@@ -594,7 +595,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   traitValue: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 20,
     fontWeight: '500',
     color: Colors.ink,

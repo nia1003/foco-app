@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * DoneScreen — Onboarding complete.
  */
@@ -92,7 +93,7 @@ const localStyles = StyleSheet.create({
   sparkles: { position: 'absolute', width: '100%', height: '100%' },
   sparkle: { position: 'absolute', color: Colors.pinkHot },
   heading: {
-    fontFamily: 'Fraunces_600SemiBold',
+    fontFamily: Fonts.displaySemiBold,
     fontSize: 32, fontWeight: '600',
     letterSpacing: -0.5, textAlign: 'center',
   },

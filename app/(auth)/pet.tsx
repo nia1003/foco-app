@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * CompanionScreen — Choose your companion.
  * Uses real pet illustrations from assets/pets/.
@@ -106,7 +107,7 @@ const localStyles = StyleSheet.create({
   },
   heroImage: { width: 170, height: 170 },
   heroName: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 28, fontWeight: '500', letterSpacing: -0.3,
   },
   heroTrait: { fontSize: 14, marginTop: 4 },

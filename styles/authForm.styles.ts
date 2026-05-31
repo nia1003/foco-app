@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import { StyleSheet } from 'react-native';
 import type { AppTheme } from '@/hooks/useAppTheme';
 
@@ -7,7 +8,7 @@ export function createAuthFormStyles({ colors, surfaces }: AppTheme) {
     content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
     cardWrap: { marginTop: 8 },
     heading: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 26,
       fontWeight: '500',
       color: colors.ink,
@@ -63,7 +64,7 @@ export function createAuthWelcomeStyles({ colors, surfaces }: AppTheme) {
     content: { flex: 1, paddingHorizontal: 28, paddingTop: 72, justifyContent: 'space-between', paddingBottom: 48 },
     hero: { marginTop: 24 },
     brand: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 52,
       fontWeight: '500',
       color: colors.ink,
@@ -101,7 +102,7 @@ export function createAuthSimpleStyles({ colors, surfaces }: AppTheme) {
     content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
     cardWrap: { marginTop: 8, flex: 1 },
     heading: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 26,
       fontWeight: '500',
       color: colors.ink,

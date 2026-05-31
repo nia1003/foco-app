@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * PetCollectionScreen — 左右滑動切換寵物頁面
  * 每隻寵物全螢幕展示：大 3D 模型 + 底部資訊卡
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
   cardContent: { padding: 22, paddingBottom: 18 },
 
   petName: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 30, fontWeight: '500',
     color: Colors.ink, letterSpacing: -0.4,
     marginBottom: 2,

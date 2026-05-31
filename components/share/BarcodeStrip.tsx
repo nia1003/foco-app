@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { receiptType } from '@/constants/shareTypography';
 
-const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
 const BAR_HEIGHT = 52;
 
 function seededRandom(seed: string) {
@@ -42,7 +42,7 @@ export function BarcodeStrip({ value, seed }: Props) {
           <View key={b.key} style={[styles.bar, { width: b.width }]} />
         ))}
       </View>
-      <Text style={styles.value}>{value}</Text>
+      <Text style={receiptType.barcode}>{value}</Text>
     </View>
   );
 }
@@ -61,12 +61,5 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     backgroundColor: '#111',
     borderRadius: 1,
-  },
-  value: {
-    marginTop: 8,
-    fontSize: 11,
-    letterSpacing: 2,
-    color: '#111',
-    fontFamily: MONO,
   },
 });

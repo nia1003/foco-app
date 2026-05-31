@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * CircularDurationPicker — drag the ring handle to pick minutes.
  * Tap the center number to type a value directly.
@@ -217,14 +218,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   valText: {
-    fontFamily: 'Fraunces_400Regular',
+    fontFamily: Fonts.displayRegular,
     fontSize: 72, fontWeight: '400',
     color: Colors.ink,
     letterSpacing: -3, lineHeight: 80,
     textAlign: 'center',
   },
   editInput: {
-    fontFamily: 'Fraunces_400Regular',
+    fontFamily: Fonts.displayRegular,
     fontSize: 72, fontWeight: '400',
     color: Colors.pinkText,
     letterSpacing: -3, lineHeight: 80,

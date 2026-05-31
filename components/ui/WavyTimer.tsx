@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -131,7 +132,7 @@ function createStyles(_theme: AppTheme) {
       gap: 2,
     },
     timeText: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 42,
       fontWeight: '600',
       letterSpacing: -1.5,

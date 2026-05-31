@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * FocoBar — top brand bar with FOCO wordmark + optional back button / avatar.
  * Uses useSafeAreaInsets so the back button clears the Dynamic Island / notch.
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   wordmark: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 13,
     fontWeight: '500',
     letterSpacing: 6,

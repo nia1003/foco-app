@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
   PanResponder,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { receiptType, shareChromeType } from '@/constants/shareTypography';
 import type { SavedSignature } from './signatureTypes';
 
 interface Props {
@@ -17,8 +17,6 @@ interface Props {
   onCancel: () => void;
   onSave: (signature: SavedSignature) => void;
 }
-
-const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
 
 export function SignaturePadModal({
   visible,
@@ -108,7 +106,7 @@ export function SignaturePadModal({
     >
       <View style={styles.overlay}>
         <View style={styles.sheet}>
-          <Text style={styles.signHere}>SIGN HERE</Text>
+          <Text style={[receiptType.sectionLabel, styles.signHere]}>SIGN HERE</Text>
 
           <View
             style={styles.canvasWrap}
@@ -139,7 +137,7 @@ export function SignaturePadModal({
             </Svg>
           </View>
 
-          <Text style={styles.signatureLabel}>--- SIGNATURE ---</Text>
+          <Text style={[receiptType.hint, styles.signatureLabel]}>--- SIGNATURE ---</Text>
 
           <View style={styles.actions}>
             <TouchableOpacity
@@ -147,7 +145,7 @@ export function SignaturePadModal({
               onPress={handleCancel}
               activeOpacity={0.8}
             >
-              <Text style={styles.btnGhostText}>Cancel</Text>
+              <Text style={shareChromeType.close}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.btnGhost}
@@ -156,7 +154,7 @@ export function SignaturePadModal({
             >
               <Text
                 style={[
-                  styles.btnGhostText,
+                  shareChromeType.close,
                   paths.length === 0 && styles.btnMuted,
                 ]}
               >
@@ -196,10 +194,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(20,16,28,0.12)',
   },
   signHere: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: 'rgba(20,16,28,0.45)',
-    letterSpacing: 1.2,
     marginBottom: 10,
   },
   canvasWrap: {
@@ -212,13 +206,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   signatureLabel: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: 'rgba(20,16,28,0.4)',
     textAlign: 'center',
     marginTop: 10,
     marginBottom: 16,
-    letterSpacing: 1,
   },
   actions: {
     flexDirection: 'row',
@@ -234,12 +224,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnGhostText: {
-    fontFamily: MONO,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#111',
-  },
   btnMuted: { color: 'rgba(20,16,28,0.3)' },
   btnPrimary: {
     flex: 1.4,
@@ -251,9 +235,7 @@ const styles = StyleSheet.create({
   },
   btnPrimaryDisabled: { opacity: 0.45 },
   btnPrimaryText: {
-    fontFamily: MONO,
-    fontSize: 12,
-    fontWeight: '700',
+    ...shareChromeType.action,
     color: '#fff',
   },
 });

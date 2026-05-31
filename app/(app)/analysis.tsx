@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * AnalysisScreen — 單次專注完成卡片
  * 以品質分數為視覺核心，不分 DISC 類型
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
 
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroBrand: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 15,
     color: 'rgba(255,255,255,0.60)',
     letterSpacing: 2.5,
@@ -369,7 +370,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroScore: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 72,
     letterSpacing: -3,
     lineHeight: 80,
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
     color: 'rgba(0,0,0,0.20)',
     letterSpacing: 1.4,
     textAlign: 'center',
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
   },
 
   shareBtn: {

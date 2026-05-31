@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import React, { useRef, useState } from 'react';
 import {
   FlatList,
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(20,16,28,0.10)',
   },
   petPreview: { width: 44, height: 44 },
-  petName: { fontFamily: 'Fraunces_500Medium', fontSize: 17, fontWeight: '500', color: Colors.ink },
+  petName: { fontFamily: Fonts.display, fontSize: 17, fontWeight: '500', color: Colors.ink },
   petTrait: { fontSize: 12, color: Colors.inkFaint, marginTop: 1 },
   closeBtn: { padding: 6 },
   closeIcon: { fontSize: 16, color: Colors.inkSoft },

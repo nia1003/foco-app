@@ -4,7 +4,6 @@ import {
   Dimensions,
   Image,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,11 +27,10 @@ import type { AppTheme } from '@/hooks/useAppTheme';
 import { SessionShareCard } from './SessionShareCard';
 import { sessionRecordToShareInput } from './sessionShareUtils';
 import type { SavedSignature } from './signatureTypes';
+import { receiptType, shareChromeType } from '@/constants/shareTypography';
 
 type ShareTab = 'receipt' | 'focus';
 const FOCUS_CARD_W = Dimensions.get('window').width - 88;
-
-const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
 const RULE = '- - - - - - - - - - - - - - - - - - - -';
 const UNLOCKED_PETS = PETS.filter((p) => !p.locked);
 
@@ -57,7 +55,7 @@ interface Props {
 }
 
 function ReceiptRule() {
-  return <Text style={styles.rule}>{RULE}</Text>;
+  return <Text style={[receiptType.rule, styles.ruleMargin]}>{RULE}</Text>;
 }
 
 function ReceiptRow({
@@ -71,8 +69,8 @@ function ReceiptRow({
 }) {
   return (
     <View style={styles.row}>
-      <Text style={[styles.rowLeft, bold && styles.bold]}>{left}</Text>
-      <Text style={[styles.rowRight, bold && styles.bold]}>{right}</Text>
+      <Text style={[receiptType.label, bold && styles.bold]}>{left}</Text>
+      <Text style={[receiptType.value, styles.rowRight, bold && styles.bold]}>{right}</Text>
     </View>
   );
 }
@@ -80,18 +78,18 @@ function ReceiptRow({
 function LogRow({ title, right }: { title: string; right: string }) {
   return (
     <View style={styles.logRow}>
-      <Text style={styles.logTitle} numberOfLines={2}>
+      <Text style={[receiptType.logLine, styles.logTitle]} numberOfLines={2}>
         {title}
       </Text>
       <View style={styles.logDots} />
-      <Text style={styles.logRight}>{right}</Text>
+      <Text style={[receiptType.value, styles.logRight]}>{right}</Text>
     </View>
   );
 }
 
 function SignaturePreview({ signature }: { signature: SavedSignature | null }) {
   if (!signature?.paths.length) {
-    return <Text style={styles.signaturePlaceholder}>Tap to sign</Text>;
+    return <Text style={receiptType.hint}>Tap to sign</Text>;
   }
 
   return (
@@ -203,7 +201,7 @@ export function ShareReceiptModal({
           onPress={onClose}
           activeOpacity={0.7}
         >
-          <Text style={styles.closeText}>✕ Close</Text>
+          <Text style={[shareChromeType.close, styles.closeTextMuted]}>✕ Close</Text>
         </TouchableOpacity>
 
         <View style={styles.tabRow}>
@@ -217,7 +215,8 @@ export function ShareReceiptModal({
           >
             <Text
               style={[
-                styles.tabBtnText,
+                shareChromeType.tab,
+                styles.tabBtnTextBase,
                 shareTab === 'receipt' && chromeStyles.tabBtnTextActive,
               ]}
             >
@@ -234,7 +233,8 @@ export function ShareReceiptModal({
           >
             <Text
               style={[
-                styles.tabBtnText,
+                shareChromeType.tab,
+                styles.tabBtnTextBase,
                 shareTab === 'focus' && chromeStyles.tabBtnTextActive,
               ]}
             >
@@ -256,8 +256,8 @@ export function ShareReceiptModal({
           >
             {shareTab === 'receipt' ? (
               <View style={styles.receipt}>
-                <Text style={styles.brand}>FOCO</Text>
-                <Text style={styles.brandSub}>TODAY'S RECEIPT</Text>
+                <Text style={receiptType.brand}>FOCO</Text>
+                <Text style={[receiptType.brandSub, styles.brandSubGap]}>TODAY'S RECEIPT</Text>
 
                 <ReceiptRule />
 
@@ -276,7 +276,7 @@ export function ShareReceiptModal({
                         resizeMode="contain"
                       />
                     )}
-                    <Text style={styles.avatarTapHint}>tap</Text>
+                    <Text style={[receiptType.hint, styles.avatarTapHint]}>tap</Text>
                   </TouchableOpacity>
                   <View style={styles.profileMeta}>
                     <ReceiptRow left="name" right={receipt.name} />
@@ -294,9 +294,9 @@ export function ShareReceiptModal({
 
                 <ReceiptRule />
 
-                <Text style={styles.sectionLabel}>TODAY LOG</Text>
+                <Text style={[receiptType.sectionLabel, styles.sectionLabelGap]}>TODAY LOG</Text>
                 {receipt.logItems.length === 0 ? (
-                  <Text style={styles.emptyLog}>No completed tasks today</Text>
+                  <Text style={receiptType.hint}>No completed tasks today</Text>
                 ) : (
                   receipt.logItems.map((item, i) => (
                     <LogRow
@@ -330,8 +330,8 @@ export function ShareReceiptModal({
 
                 <ReceiptRow left="AUTH" right={receipt.authCode} />
                 <View style={styles.row}>
-                  <Text style={styles.rowLeft}>STATUS</Text>
-                  <Text style={[styles.rowRight, styles.bold]}>APPROVED</Text>
+                  <Text style={receiptType.label}>STATUS</Text>
+                  <Text style={[receiptType.value, styles.bold]}>APPROVED</Text>
                 </View>
 
                 <TouchableOpacity
@@ -339,7 +339,7 @@ export function ShareReceiptModal({
                   onPress={() => setSignatureOpen(true)}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.signatureHint}>SIGNATURE</Text>
+                  <Text style={[receiptType.sectionLabel, styles.signatureHintGap]}>SIGNATURE</Text>
                   <View style={styles.signatureArea}>
                     <SignaturePreview signature={signature} />
                   </View>
@@ -354,8 +354,8 @@ export function ShareReceiptModal({
 
                 <ReceiptRule />
 
-                <Text style={styles.thanks}>thank you for your day.</Text>
-                <Text style={styles.retain}>
+                <Text style={[receiptType.logLine, styles.thanks]}>thank you for your day.</Text>
+                <Text style={[receiptType.hint, styles.retain]}>
                   RETAIN THIS COPY FOR YOUR RECORDS
                 </Text>
               </View>
@@ -378,7 +378,7 @@ export function ShareReceiptModal({
                         ‹
                       </Text>
                     </TouchableOpacity>
-                    <Text style={styles.sessionNavLabel}>
+                    <Text style={shareChromeType.nav}>
                       Session {sessionIndex + 1} / {shareableSessions.length}
                     </Text>
                     <TouchableOpacity
@@ -415,7 +415,7 @@ export function ShareReceiptModal({
                 />
               </View>
             ) : (
-              <Text style={styles.emptyFocus}>No focus sessions yet.</Text>
+              <Text style={[shareChromeType.nav, styles.emptyFocus]}>No focus sessions yet.</Text>
             )}
           </View>
 
@@ -424,7 +424,7 @@ export function ShareReceiptModal({
             onPress={handleShareImage}
             activeOpacity={0.88}
           >
-            <Text style={chromeStyles.shareBtnText}>Share</Text>
+            <Text style={[shareChromeType.action, chromeStyles.shareBtnTextOnly]}>Share</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -444,7 +444,7 @@ export function ShareReceiptModal({
               style={styles.petSheet}
               onStartShouldSetResponder={() => true}
             >
-              <Text style={styles.petSheetTitle}>CHOOSE PET</Text>
+              <Text style={[shareChromeType.action, styles.petSheetTitle]}>CHOOSE PET</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -476,6 +476,7 @@ export function ShareReceiptModal({
                       )}
                       <Text
                         style={[
+                          shareChromeType.nav,
                           styles.petOptionName,
                           selected && styles.petOptionNameSelected,
                         ]}
@@ -520,12 +521,8 @@ function createShareChromeStyles({ surfaces }: AppTheme) {
       alignItems: 'center',
       backgroundColor: surfaces.ctaBg,
     },
-    shareBtnText: {
-      fontFamily: MONO,
-      fontSize: 14,
-      fontWeight: '700',
+    shareBtnTextOnly: {
       color: surfaces.ctaText,
-      letterSpacing: 2,
     },
   });
 }
@@ -548,12 +545,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fafafa',
   },
-  tabBtnText: {
-    fontFamily: MONO,
-    fontSize: 12,
-    fontWeight: '600',
+  tabBtnTextBase: {
     color: 'rgba(20,16,28,0.55)',
-    letterSpacing: 0.5,
   },
   focusCapture: { alignItems: 'center', width: '100%' },
   sessionNav: {
@@ -567,24 +560,10 @@ const styles = StyleSheet.create({
   sessionNavBtn: { padding: 8 },
   sessionNavArrow: { fontSize: 22, color: '#111', fontWeight: '300' },
   sessionNavDisabled: { color: 'rgba(20,16,28,0.25)' },
-  sessionNavLabel: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: 'rgba(20,16,28,0.5)',
-    letterSpacing: 0.5,
-  },
   emptyFocus: {
-    fontFamily: MONO,
-    fontSize: 12,
-    color: 'rgba(20,16,28,0.45)',
     textAlign: 'center',
     paddingVertical: 40,
-  },
-  closeText: {
-    fontFamily: MONO,
-    fontSize: 13,
-    color: 'rgba(20,16,28,0.55)',
-    letterSpacing: 0.5,
+    color: 'rgba(20,16,28,0.45)',
   },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 32 },
@@ -599,30 +578,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingVertical: 4,
   },
-  brand: {
-    fontFamily: MONO,
-    fontSize: 28,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#111',
-    letterSpacing: 1,
-  },
-  brandSub: {
-    fontFamily: MONO,
-    fontSize: 12,
-    textAlign: 'center',
-    color: '#111',
-    letterSpacing: 2,
+  brandSubGap: {
     marginTop: 4,
     marginBottom: 12,
   },
-  rule: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.35)',
-    textAlign: 'center',
+  ruleMargin: {
     marginVertical: 10,
-    letterSpacing: 1,
   },
   ruleSolid: {
     height: StyleSheet.hairlineWidth,
@@ -647,10 +608,7 @@ const styles = StyleSheet.create({
   },
   avatarImg: { width: 72, height: 72 },
   avatarTapHint: {
-    fontFamily: MONO,
     fontSize: 8,
-    color: 'rgba(20,16,28,0.35)',
-    letterSpacing: 1,
     marginTop: 2,
   },
   profileMeta: { flex: 1, gap: 6, paddingTop: 4 },
@@ -660,33 +618,14 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: 8,
   },
-  rowLeft: {
-    fontFamily: MONO,
-    fontSize: 12,
-    color: 'rgba(20,16,28,0.55)',
-    textTransform: 'lowercase',
-  },
   rowRight: {
-    fontFamily: MONO,
-    fontSize: 12,
-    color: '#111',
     textAlign: 'right',
     flexShrink: 1,
   },
   bold: { fontWeight: '700' },
-  sectionLabel: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: 'rgba(20,16,28,0.45)',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  emptyLog: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: 'rgba(20,16,28,0.4)',
-    marginBottom: 4,
-  },
+  sectionLabelGap: { marginBottom: 8 },
+  signatureHintGap: { marginBottom: 6 },
+  closeTextMuted: { color: 'rgba(20,16,28,0.55)' },
   logRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -694,9 +633,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   logTitle: {
-    fontFamily: MONO,
-    fontSize: 12,
-    color: '#111',
     maxWidth: '38%',
   },
   logDots: {
@@ -708,20 +644,10 @@ const styles = StyleSheet.create({
     minWidth: 12,
   },
   logRight: {
-    fontFamily: MONO,
-    fontSize: 12,
-    color: '#111',
     minWidth: 56,
     textAlign: 'right',
   },
   signatureBlock: { marginTop: 14 },
-  signatureHint: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.4)',
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
   signatureArea: {
     height: 100,
     justifyContent: 'center',
@@ -731,24 +657,12 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     overflow: 'hidden',
   },
-  signaturePlaceholder: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: 'rgba(20,16,28,0.3)',
-  },
   thanks: {
-    fontFamily: MONO,
-    fontSize: 13,
     textAlign: 'center',
-    color: '#111',
     marginTop: 8,
   },
   retain: {
-    fontFamily: MONO,
-    fontSize: 10,
     textAlign: 'center',
-    color: 'rgba(20,16,28,0.45)',
-    letterSpacing: 0.8,
     marginTop: 8,
     marginBottom: 4,
   },
@@ -768,12 +682,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(20,16,28,0.1)',
   },
   petSheetTitle: {
-    fontFamily: MONO,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#111',
-    letterSpacing: 1.5,
     marginBottom: 14,
+    letterSpacing: 1.2,
   },
   petRow: { gap: 12, paddingRight: 8 },
   petOption: {
@@ -792,11 +702,8 @@ const styles = StyleSheet.create({
   },
   petOptionImg: { width: 56, height: 56 },
   petOptionName: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.5)',
     marginTop: 6,
-    letterSpacing: 0.5,
+    color: 'rgba(20,16,28,0.5)',
   },
   petOptionNameSelected: { color: '#111', fontWeight: '700' },
 });

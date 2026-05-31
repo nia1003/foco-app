@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 import React, { useState } from 'react';
 
 import {
@@ -414,7 +415,7 @@ function createStyles({ colors, surfaces }: AppTheme) {
       gap: 6,
     },
     durationValue: {
-      fontFamily: 'Fraunces_500Medium',
+      fontFamily: Fonts.display,
       fontSize: 48,
       fontWeight: '600',
       color: colors.ink,

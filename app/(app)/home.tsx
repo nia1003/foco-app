@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * HomeScreen — vertical two-page layout (Reanimated + RNGH)
  *   Page 1 (exactly SCREEN_H, light, NO tab bar):  FocoBar + hero + pet carousel + chat
@@ -953,7 +954,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   heroLine: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 34,          // reduced 39 → 34pt (-5pt) to clear space from the pet
     fontWeight: '600',
     color: INK,
@@ -1013,7 +1014,7 @@ const styles = StyleSheet.create({
   chatReplyText: {
     color: '#1A1622',        // exact spec: #1A1622
     fontSize: 12,            // reduced from 15 → 12pt per spec
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontWeight: '500',
     backgroundColor: 'transparent',
     lineHeight: 17,
@@ -1074,7 +1075,7 @@ const styles = StyleSheet.create({
   },
 
   greetName: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 40,
     fontWeight: '600',
     color: INK,
@@ -1083,7 +1084,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   greetSub: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 18,
     fontWeight: '600',
     color: 'rgba(26,22,34,0.50)',

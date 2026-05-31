@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * FocusSetupModal — shared bottom-sheet for starting a focus session.
  * Used by HomeScreen (no pre-selected task) and MissionsScreen (task pre-selected).
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
   sheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 8 : 16 },
 
   title: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 22, fontWeight: '500',
     color: Colors.ink, marginBottom: 20,
   },

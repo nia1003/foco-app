@@ -1,3 +1,4 @@
+import { Fonts } from '@/constants/fonts';
 /**
  * WelcomeScreen — Choose Sign In or Create Account
  */
@@ -96,13 +97,13 @@ const localStyles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 22, paddingTop: 54, paddingBottom: 30 },
   hero: { alignItems: 'center', marginTop: 16 },
   wordmark: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 38, fontWeight: '500',
     letterSpacing: 14, paddingLeft: 14,
   },
   cardWrap: { marginTop: 48 },
   cardTitle: {
-    fontFamily: 'Fraunces_500Medium',
+    fontFamily: Fonts.display,
     fontSize: 28, fontWeight: '500', letterSpacing: -0.4,
   },
   cardSub: { fontSize: 14, marginTop: 6 },

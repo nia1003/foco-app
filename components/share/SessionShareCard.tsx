@@ -1,25 +1,24 @@
 import React from 'react';
 import {
   Dimensions,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { focusCardType } from '@/constants/shareTypography';
 import type { SessionEvent } from '@/types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const DEFAULT_CARD_W = SCREEN_W - 64;
 
-const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
 const RULE = '- - - - - - - - - - - - - - - - - -';
 
 const QUALITY_LEVELS = [
-  { min: 85, tag: 'EXCEPTIONAL',  color: '#9B59D0' },
-  { min: 65, tag: 'STRONG',       color: '#4A8FD4' },
-  { min: 40, tag: 'STEADY',       color: '#68A86B' },
-  { min: 0,  tag: 'BUILDING',     color: '#8B8BAE' },
+  { min: 85, tag: 'EXCEPTIONAL', color: '#9B59D0' },
+  { min: 65, tag: 'STRONG', color: '#4A8FD4' },
+  { min: 40, tag: 'STEADY', color: '#68A86B' },
+  { min: 0, tag: 'BUILDING', color: '#8B8BAE' },
 ] as const;
 
 function getLevel(score: number) {
@@ -28,7 +27,7 @@ function getLevel(score: number) {
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const h = d.getHours().toString().padStart(2, '0');
   const m = d.getMinutes().toString().padStart(2, '0');
   return `${months[d.getMonth()]} ${d.getDate()} · ${h}:${m}`;
@@ -104,56 +103,52 @@ export function SessionShareCard({
 
   return (
     <View style={[styles.card, { width: cardWidth }]}>
-      {/* Header */}
-      <Text style={styles.brand}>FOCO</Text>
-      <Text style={styles.brandSub}>FOCUS RECEIPT</Text>
+      <Text style={focusCardType.brand}>FOCO</Text>
+      <Text style={[focusCardType.brandSub, styles.brandSubGap]}>FOCUS RECEIPT</Text>
 
-      <Text style={styles.rule}>{RULE}</Text>
+      <Text style={[focusCardType.rule, styles.ruleGap]}>{RULE}</Text>
 
-      {/* Quality score */}
       <View style={styles.scoreRow}>
-        <Text style={[styles.scoreNum, { color: level.color }]}>{qualityScore}</Text>
+        <Text style={[focusCardType.score, { color: level.color }]}>{qualityScore}</Text>
         <View style={styles.scoreRight}>
-          <Text style={[styles.scoreTag, { color: level.color }]}>{level.tag}</Text>
-          <Text style={styles.scoreSub}>/100 · 專注品質</Text>
+          <Text style={[focusCardType.scoreTag, { color: level.color }]}>{level.tag}</Text>
+          <Text style={focusCardType.scoreSub}>/100 · 專注品質</Text>
         </View>
       </View>
 
-      {/* Quality bar */}
       <View style={styles.qualityTrack}>
-        <View style={[styles.qualityFill, { width: `${qualityScore}%` as any, backgroundColor: level.color }]} />
+        <View style={[styles.qualityFill, { width: `${qualityScore}%` as `${number}%`, backgroundColor: level.color }]} />
       </View>
 
-      <Text style={styles.rule}>{RULE}</Text>
+      <Text style={[focusCardType.rule, styles.ruleGap]}>{RULE}</Text>
 
-      {/* Data rows */}
       <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>DATE</Text>
-        <Text style={styles.dataRight}>{dateTime}</Text>
+        <Text style={focusCardType.dataLabel}>DATE</Text>
+        <Text style={focusCardType.dataValue}>{dateTime}</Text>
       </View>
       <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>DURATION</Text>
-        <Text style={styles.dataRight}>{formatDuration(duration)}</Text>
+        <Text style={focusCardType.dataLabel}>DURATION</Text>
+        <Text style={focusCardType.dataValue}>{formatDuration(duration)}</Text>
       </View>
       {taskTitle ? (
         <View style={styles.dataRow}>
-          <Text style={styles.dataLeft}>TASK</Text>
-          <Text style={[styles.dataRight, { flex: 1 }]} numberOfLines={1}>{taskTitle}</Text>
+          <Text style={focusCardType.dataLabel}>TASK</Text>
+          <Text style={[focusCardType.dataValue, styles.dataValueFlex]} numberOfLines={1}>{taskTitle}</Text>
         </View>
       ) : null}
       <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>PAUSES</Text>
-        <Text style={styles.dataRight}>{String(pauses).padStart(2, '0')}</Text>
+        <Text style={focusCardType.dataLabel}>PAUSES</Text>
+        <Text style={focusCardType.dataValue}>{String(pauses).padStart(2, '0')}</Text>
       </View>
       <View style={styles.dataRow}>
-        <Text style={styles.dataLeft}>LEFT APP</Text>
-        <Text style={styles.dataRight}>{String(leftApp).padStart(2, '0')}</Text>
+        <Text style={focusCardType.dataLabel}>LEFT APP</Text>
+        <Text style={focusCardType.dataValue}>{String(leftApp).padStart(2, '0')}</Text>
       </View>
 
       {events.length > 0 && (
         <>
-          <Text style={styles.rule}>{RULE}</Text>
-          <Text style={styles.timelineLabel}>SESSION TIMELINE</Text>
+          <Text style={[focusCardType.rule, styles.ruleGap]}>{RULE}</Text>
+          <Text style={focusCardType.timelineLabel}>SESSION TIMELINE</Text>
           <View style={styles.timelineBar}>
             {segments.map((seg, i) => (
               <View
@@ -161,7 +156,7 @@ export function SessionShareCard({
                 style={[
                   styles.timelineSeg,
                   {
-                    width: `${seg.widthPct}%` as any,
+                    width: `${seg.widthPct}%` as `${number}%`,
                     backgroundColor: segColor(seg.type, level.color),
                     borderRadius: i === 0 || i === segments.length - 1 ? 3 : 0,
                   },
@@ -172,15 +167,15 @@ export function SessionShareCard({
         </>
       )}
 
-      <Text style={styles.rule}>{RULE}</Text>
+      <Text style={[focusCardType.rule, styles.ruleGap]}>{RULE}</Text>
 
       {showOverlayShare && onOverlayShare ? (
         <TouchableOpacity style={[styles.shareBtn, { borderColor: level.color }]} onPress={onOverlayShare} activeOpacity={0.8}>
-          <Text style={[styles.shareBtnText, { color: level.color }]}>Share ↗</Text>
+          <Text style={[focusCardType.shareBtn, { color: level.color }]}>Share ↗</Text>
         </TouchableOpacity>
       ) : null}
 
-      <Text style={styles.footer}>foco.app</Text>
+      <Text style={focusCardType.footer}>foco.app</Text>
     </View>
   );
 }
@@ -196,59 +191,15 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
-  brand: {
-    fontFamily: MONO,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111',
-    letterSpacing: 6,
-    textAlign: 'center',
-    marginBottom: 2,
-  },
-  brandSub: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.40)',
-    letterSpacing: 3,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  rule: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.25)',
-    textAlign: 'center',
-    marginVertical: 8,
-    letterSpacing: 1,
-  },
+  brandSubGap: { marginBottom: 10 },
+  ruleGap: { marginVertical: 8 },
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     marginBottom: 8,
   },
-  scoreNum: {
-    fontFamily: MONO,
-    fontSize: 52,
-    fontWeight: '700',
-    letterSpacing: -2,
-    lineHeight: 58,
-    includeFontPadding: false,
-  },
   scoreRight: { flex: 1 },
-  scoreTag: {
-    fontFamily: MONO,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
-  scoreSub: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.40)',
-    marginTop: 2,
-    letterSpacing: 0.5,
-  },
   qualityTrack: {
     height: 3,
     borderRadius: 3,
@@ -264,27 +215,7 @@ const styles = StyleSheet.create({
     marginVertical: 3,
     gap: 8,
   },
-  dataLeft: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: 'rgba(20,16,28,0.40)',
-    letterSpacing: 1.5,
-    flexShrink: 0,
-  },
-  dataRight: {
-    fontFamily: MONO,
-    fontSize: 11,
-    color: '#111',
-    fontWeight: '600',
-    textAlign: 'right',
-  },
-  timelineLabel: {
-    fontFamily: MONO,
-    fontSize: 9,
-    color: 'rgba(20,16,28,0.35)',
-    letterSpacing: 1.5,
-    marginBottom: 6,
-  },
+  dataValueFlex: { flex: 1, textAlign: 'right' },
   timelineBar: {
     height: 5,
     borderRadius: 3,
@@ -292,6 +223,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(0,0,0,0.06)',
     gap: 1,
+    marginBottom: 4,
   },
   timelineSeg: { height: 5 },
   shareBtn: {
@@ -300,19 +232,5 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     marginBottom: 10,
-  },
-  shareBtnText: {
-    fontFamily: MONO,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
-  footer: {
-    fontFamily: MONO,
-    fontSize: 9,
-    color: 'rgba(20,16,28,0.20)',
-    letterSpacing: 2,
-    textAlign: 'center',
-    marginTop: 4,
   },
 });
