@@ -69,7 +69,7 @@ export default function RootLayout() {
     const ONBOARDING_SCREENS = new Set([
       'verify', 'profile', 'focus-type', 'consent', 'pet', 'done',
     ]);
-    const currentAuthScreen = segments[1] as string | undefined;
+    const currentAuthScreen = (segments as string[])[1];
     const inOnboarding = inAuthGroup && !!currentAuthScreen && ONBOARDING_SCREENS.has(currentAuthScreen);
 
     if (isAuthenticated && inAuthGroup && !inOnboarding) {
