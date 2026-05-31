@@ -19,11 +19,15 @@ import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { createAuthFormStyles } from '@/styles/authForm.styles';
 import { authService } from '@/services/authService';
 import { useApiCall } from '@/hooks/useApiCall';
 
 export default function SignupScreen() {
+  const { screenBg, colors } = useAppTheme();
+  const styles = useThemedStyles(createAuthFormStyles);
   const router = useRouter();
   const { play } = useSound();
   const [email, setEmail] = useState('');
@@ -41,7 +45,7 @@ export default function SignupScreen() {
   });
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -63,7 +67,7 @@ export default function SignupScreen() {
                   value={email}
                   onChangeText={setEmail}
                   placeholder="you@example.com"
-                  placeholderTextColor={Colors.inkFaint}
+                  placeholderTextColor={colors.inkFaint}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -72,17 +76,17 @@ export default function SignupScreen() {
                 <View style={styles.underline} />
               </View>
 
-              <Text style={styles.hint}>
+              <Text style={[localStyles.hint, { color: colors.inkFaint }]}>
                 We'll send a 6-digit verification code to this address.
               </Text>
 
               <TouchableOpacity
-                style={[styles.sendBtn, (!valid || blocked) && styles.disabled]}
+                style={[styles.continueBtn, (!valid || blocked) && styles.disabled]}
                 disabled={!valid || blocked}
                 onPress={() => { play('transition_up'); sendCode(); }}
                 activeOpacity={0.85}
               >
-                <Text style={styles.sendBtnText}>
+                <Text style={styles.continueBtnText}>
                   {loading ? 'SENDING…' : blocked ? `WAIT ${cooldown}s` : 'SEND CODE →'}
                 </Text>
               </TouchableOpacity>
@@ -106,32 +110,6 @@ export default function SignupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
-  content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
-  cardWrap: { marginTop: 8 },
-  heading: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 26, fontWeight: '500', color: Colors.ink, letterSpacing: -0.3,
-  },
-  sub: { fontSize: 14, color: Colors.inkSoft, marginTop: 6 },
-  label: {
-    fontSize: 11, fontWeight: '700', color: Colors.inkFaint,
-    letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 28,
-  },
-  inputWrap: { paddingBottom: 4, marginTop: 6 },
-  input: { fontSize: 18, fontWeight: '500', color: Colors.ink, paddingVertical: 6 },
-  underline: { height: 1.2, backgroundColor: 'rgba(20,16,28,0.15)', marginTop: 2 },
-  hint: { fontSize: 12, color: Colors.inkFaint, marginTop: 10, lineHeight: 17 },
-  sendBtn: {
-    marginTop: 28, paddingVertical: 16, borderRadius: 9999,
-    backgroundColor: Colors.ink, alignItems: 'center',
-    shadowColor: Colors.ink, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18, shadowRadius: 24, elevation: 6,
-  },
-  sendBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 2.5 },
-  disabled: { opacity: 0.4 },
-  switchBtn: { marginTop: 20, alignItems: 'center' },
-  switchText: { fontSize: 13, color: Colors.inkFaint },
-  switchLink: { color: Colors.ink, fontWeight: '600' },
+const localStyles = StyleSheet.create({
+  hint: { fontSize: 12, marginTop: 10, lineHeight: 17 },
 });

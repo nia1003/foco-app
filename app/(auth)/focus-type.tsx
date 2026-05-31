@@ -15,7 +15,9 @@ import { useSound } from '@/components/SoundProvider';
 import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { createAuthSimpleStyles } from '@/styles/authForm.styles';
 
 const FOCUS_TYPES = [
   { id: 'student', emoji: '🎓', title: '學生 / 備考族', sub: 'Study & Exams' },
@@ -27,6 +29,8 @@ const FOCUS_TYPES = [
 type FocusTypeId = (typeof FOCUS_TYPES)[number]['id'];
 
 export default function FocusTypeScreen() {
+  const { screenBg, colors } = useAppTheme();
+  const styles = useThemedStyles(createAuthSimpleStyles);
   const router = useRouter();
   const { play } = useSound();
   const [selected, setSelected] = useState<FocusTypeId | null>(null);
@@ -43,34 +47,37 @@ export default function FocusTypeScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
       <View style={styles.content}>
         <FocoBar back />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={localStyles.scrollContent}>
           <FrostCard radius={32}>
             <Text style={styles.heading}>你的專注風格？</Text>
-            <Text style={styles.sub}>幫助我們為你個人化體驗</Text>
+            <Text style={[styles.sub, localStyles.subSpaced]}>幫助我們為你個人化體驗</Text>
 
-            <View style={styles.tiles}>
+            <View style={localStyles.tiles}>
               {FOCUS_TYPES.map((item) => {
                 const active = selected === item.id;
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.tile, active && styles.tileActive]}
+                    style={[
+                      localStyles.tile,
+                      active && { borderColor: colors.ink, backgroundColor: 'rgba(20,16,28,0.05)' },
+                    ]}
                     onPress={() => handleSelect(item.id)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.tileEmoji}>{item.emoji}</Text>
-                    <View style={styles.tileText}>
-                      <Text style={[styles.tileTitle, active && styles.tileTitleActive]}>
+                    <Text style={localStyles.tileEmoji}>{item.emoji}</Text>
+                    <View style={localStyles.tileText}>
+                      <Text style={[localStyles.tileTitle, { color: colors.ink }]}>
                         {item.title}
                       </Text>
-                      <Text style={styles.tileSub}>{item.sub}</Text>
+                      <Text style={[localStyles.tileSub, { color: colors.inkFaint }]}>{item.sub}</Text>
                     </View>
-                    <View style={[styles.radio, active && styles.radioActive]}>
-                      {active && <View style={styles.radioDot} />}
+                    <View style={[localStyles.radio, active && { borderColor: colors.ink }]}>
+                      {active && <View style={[localStyles.radioDot, { backgroundColor: colors.ink }]} />}
                     </View>
                   </TouchableOpacity>
                 );
@@ -92,15 +99,9 @@ export default function FocusTypeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
-  content: { flex: 1, paddingHorizontal: 22, paddingTop: 54 },
+const localStyles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
-  heading: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 26, fontWeight: '500', color: Colors.ink, letterSpacing: -0.3,
-  },
-  sub: { fontSize: 14, color: Colors.inkSoft, marginTop: 6, marginBottom: 24 },
+  subSpaced: { marginBottom: 24 },
   tiles: { gap: 12 },
   tile: {
     flexDirection: 'row', alignItems: 'center',
@@ -109,31 +110,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(20,16,28,0.12)',
     backgroundColor: 'rgba(255,255,255,0.5)',
   },
-  tileActive: {
-    borderColor: Colors.ink,
-    backgroundColor: 'rgba(20,16,28,0.05)',
-  },
   tileEmoji: { fontSize: 26, marginRight: 14 },
   tileText: { flex: 1 },
-  tileTitle: { fontSize: 15, fontWeight: '600', color: Colors.ink },
-  tileTitleActive: { color: Colors.ink },
-  tileSub: { fontSize: 12, color: Colors.inkFaint, marginTop: 2 },
+  tileTitle: { fontSize: 15, fontWeight: '600' },
+  tileSub: { fontSize: 12, marginTop: 2 },
   radio: {
     width: 20, height: 20, borderRadius: 10,
     borderWidth: 1.5, borderColor: 'rgba(20,16,28,0.25)',
     alignItems: 'center', justifyContent: 'center',
   },
-  radioActive: { borderColor: Colors.ink },
   radioDot: {
     width: 10, height: 10, borderRadius: 5,
-    backgroundColor: Colors.ink,
   },
-  continueBtn: {
-    marginTop: 28, paddingVertical: 16, borderRadius: 9999,
-    backgroundColor: Colors.ink, alignItems: 'center',
-    shadowColor: Colors.ink, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18, shadowRadius: 24, elevation: 6,
-  },
-  continueBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 3 },
-  disabled: { opacity: 0.4 },
 });

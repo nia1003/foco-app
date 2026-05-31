@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Trash2 } from 'lucide-react-native';
+import { AppBackground } from '@/components/ui/AppBackground';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
@@ -15,6 +15,8 @@ import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useSound } from '@/components/SoundProvider';
 import { useFocusLaunch } from '@/hooks/useFocusLaunch';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import type { FocusQuickSetupValue } from '@/components/home/FocusQuickSetup';
 import { deleteTask } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
@@ -22,12 +24,11 @@ import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { TaskIcon } from '@/components/tasks/TaskIcon';
 import { TaskDetailModal } from '../../../components/tasks/TaskDetailModal';
 import { resolveTaskIcon } from '@/lib/taskIcon';
+import {
+  createMissionGridStyles,
+  type MissionGridStyles,
+} from '@/styles/missionsScreen.styles';
 import type { Task } from '@/types';
-
-const BG   = '#FFFFFF';
-const INK  = '#1a1622';
-const CARD = '#F2F2F2';
-const BTN_SIZE = 36;
 
 type TabType = 'task' | 'daily';
 
@@ -42,15 +43,18 @@ function formatDeadline(deadlineAt: string | null | undefined): { label: string;
 
 function MissionTaskCard({
   task,
+  styles: s,
   onOpen,
   onStart,
   onDelete,
 }: {
   task: Task;
+  styles: MissionGridStyles;
   onOpen: () => void;
   onStart: () => void;
   onDelete: () => void;
 }) {
+  const { colors } = useAppTheme();
   const deadline = formatDeadline(task.deadline_at);
 
   return (
@@ -92,6 +96,7 @@ function MissionTaskCard({
 }
 
 export default function MissionsScreen() {
+  const s = useThemedStyles(createMissionGridStyles);
   const [tab, setTab]                 = useState<TabType>('task');
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -151,6 +156,7 @@ export default function MissionsScreen() {
 
   return (
     <View style={s.root}>
+      <AppBackground />
       <FocoBar avatar={settingsAvatar} avatarUri={avatarUri} />
 
       <ScrollView
@@ -198,49 +204,12 @@ export default function MissionsScreen() {
           </View>
         )}
 
-        {false && tabTasks.map((task: Task) => (
-          <View key={task.id} style={s.taskCard}>
-            <TouchableOpacity
-              style={s.taskInfoPressable}
-              onPress={() => { play('tap'); setSelectedTaskId(task.id); }}
-              activeOpacity={0.78}
-            >
-              <View style={s.taskIconWrap}>
-                <Text style={s.taskIconText}>📌</Text>
-              </View>
-              <View style={s.taskInfo}>
-                <Text style={s.taskTitle}>{task.title}</Text>
-                <Text style={s.taskSub}>{task.duration_min} min</Text>
-                {task.memo ? (
-                  <Text style={s.taskMemo} numberOfLines={1}>{task.memo}</Text>
-                ) : null}
-              </View>
-            </TouchableOpacity>
-            <View style={s.taskActions}>
-              <TouchableOpacity
-                style={s.startBtn}
-                onPress={() => startFocus({ taskMode: 'existing', selectedTaskId: task.id })}
-                activeOpacity={0.8}
-              >
-                <Text style={s.startIcon}>→</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={s.deleteBtn}
-                onPress={() => { play('tap'); handleDeleteTask(task.id, task.title); }}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Trash2 size={16} color="rgba(26,22,34,0.40)" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-
         {tabTasks.length > 0 && (
           <View style={s.taskGrid}>
             {tabTasks.map((task: Task) => (
               <MissionTaskCard
                 key={task.id}
+                styles={s}
                 task={task}
                 onOpen={() => { play('tap'); setSelectedTaskId(task.id); }}
                 onStart={() => startFocus({ taskMode: 'existing', selectedTaskId: task.id })}
@@ -267,137 +236,3 @@ export default function MissionsScreen() {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingBottom: 120 },
-
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  title: {
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 42,
-    fontWeight: '500',
-    color: INK,
-    letterSpacing: -0.5,
-  },
-  addBtn: {
-    height: BTN_SIZE,
-    backgroundColor: '#111111',
-    borderRadius: 9999,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-
-  tabs: { flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 4 },
-  tabPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    backgroundColor: CARD,
-  },
-  tabPillActive: { backgroundColor: '#111111' },
-  tabLabel: { fontSize: 13, fontWeight: '500', color: 'rgba(26,22,34,0.55)' },
-  tabLabelActive: { color: '#ffffff', fontWeight: '600' },
-
-  sectionLabel: {
-    fontSize: 13,
-    color: 'rgba(26,22,34,0.55)',
-    letterSpacing: 0.2,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-
-  taskCard: {
-    width: '48%',
-    height: 135,
-    backgroundColor: CARD,
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    position: 'relative',
-  },
-  taskGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  emptyCard: { width: '100%', height: 'auto', justifyContent: 'center', paddingHorizontal: 18, paddingVertical: 16 },
-  taskOpenArea: {
-    flex: 1,
-  },
-  taskTextBlock: {
-    paddingRight: 24,
-    alignItems: 'flex-start',
-  },
-  taskInfoPressable: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  taskIconWrap: {
-    position: 'absolute',
-    left: 16,
-    bottom: 16,
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(26,22,34,0.07)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  taskIconText: { fontSize: 18 },
-  taskInfo: { flex: 1 },
-  taskTitle: { fontSize: 13, fontWeight: '700', color: INK, lineHeight: 17 },
-  taskSub: { fontSize: 12, color: 'rgba(26,22,34,0.45)', marginTop: 2 },
-  taskMemo: {
-    fontSize: 11,
-    color: 'rgba(26,22,34,0.40)',
-    marginTop: 2,
-    fontStyle: 'italic',
-  },
-  emptyText: { fontSize: 13, color: 'rgba(26,22,34,0.40)', textAlign: 'center', paddingVertical: 8 },
-
-  taskActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  startBtn: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: BTN_SIZE,
-    height: BTN_SIZE,
-    borderRadius: BTN_SIZE / 2,
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startIcon: { fontSize: 16, color: '#ffffff', fontWeight: '700' },
-  deleteBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    padding: 4,
-  },
-  deadlineBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7C4DCC',
-    letterSpacing: 0.1,
-    marginTop: 4,
-  },
-  deadlineOverdue: {
-    color: '#CC4D4D',
-  },
-});

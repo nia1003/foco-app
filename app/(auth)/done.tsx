@@ -9,68 +9,72 @@ import { AppBackground } from '@/components/ui/AppBackground';
 import { FrostCard } from '@/components/ui/FrostCard';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import { useThemedStyles } from '@/hooks/useThemedStyles';
+import { createAuthSimpleStyles } from '@/styles/authForm.styles';
 
 export default function DoneScreen() {
+  const { screenBg, colors } = useAppTheme();
+  const styles = useThemedStyles(createAuthSimpleStyles);
   const router = useRouter();
   const { play } = useSound();
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
       <AppBackground />
       <FocoBar back />
 
-      <View style={styles.content}>
+      <View style={localStyles.content}>
         {/* Halo + sparkle */}
-        <View style={styles.heroWrap}>
-          <View style={styles.halo} />
-          <Text style={styles.heroEmoji}>✦</Text>
-          <View style={styles.sparkles}>
-            <Text style={[styles.sparkle, { top: -10, left: 10, fontSize: 14 }]}>✦</Text>
-            <Text style={[styles.sparkle, { top: 10, right: 10, fontSize: 10 }]}>✦</Text>
-            <Text style={[styles.sparkle, { bottom: 0, left: 30, fontSize: 18 }]}>✦</Text>
+        <View style={localStyles.heroWrap}>
+          <View style={localStyles.halo} />
+          <Text style={localStyles.heroEmoji}>✦</Text>
+          <View style={localStyles.sparkles}>
+            <Text style={[localStyles.sparkle, { top: -10, left: 10, fontSize: 14 }]}>✦</Text>
+            <Text style={[localStyles.sparkle, { top: 10, right: 10, fontSize: 10 }]}>✦</Text>
+            <Text style={[localStyles.sparkle, { bottom: 0, left: 30, fontSize: 18 }]}>✦</Text>
           </View>
         </View>
 
-        <Text style={styles.heading}>You're all set!</Text>
-        <Text style={styles.sub}>
+        <Text style={[localStyles.heading, { color: colors.ink }]}>You're all set!</Text>
+        <Text style={[localStyles.sub, { color: colors.inkSoft }]}>
           Your account is ready.{'\n'}Time to start focusing.
         </Text>
 
-        <View style={styles.cardWrap}>
+        <View style={localStyles.cardWrap}>
           <FrostCard radius={24}>
-            <View style={styles.statRow}>
-              <View style={styles.stat}>
-                <Text style={styles.statNum}>0</Text>
-                <Text style={styles.statLabel}>Sessions</Text>
+            <View style={localStyles.statRow}>
+              <View style={localStyles.stat}>
+                <Text style={[localStyles.statNum, { color: colors.ink }]}>0</Text>
+                <Text style={[localStyles.statLabel, { color: colors.inkFaint }]}>Sessions</Text>
               </View>
-              <View style={styles.statDivider} />
-              <View style={styles.stat}>
-                <Text style={styles.statNum}>Lv.1</Text>
-                <Text style={styles.statLabel}>Pet</Text>
+              <View style={localStyles.statDivider} />
+              <View style={localStyles.stat}>
+                <Text style={[localStyles.statNum, { color: colors.ink }]}>Lv.1</Text>
+                <Text style={[localStyles.statLabel, { color: colors.inkFaint }]}>Pet</Text>
               </View>
-              <View style={styles.statDivider} />
-              <View style={styles.stat}>
-                <Text style={styles.statNum}>0</Text>
-                <Text style={styles.statLabel}>Day streak</Text>
+              <View style={localStyles.statDivider} />
+              <View style={localStyles.stat}>
+                <Text style={[localStyles.statNum, { color: colors.ink }]}>0</Text>
+                <Text style={[localStyles.statLabel, { color: colors.inkFaint }]}>Day streak</Text>
               </View>
             </View>
           </FrostCard>
         </View>
 
         <TouchableOpacity
-          style={styles.startBtn}
+          style={styles.continueBtn}
           onPress={() => { play('transition_up'); router.replace('/(app)/home'); }}
           activeOpacity={0.85}
         >
-          <Text style={styles.startBtnText}>START FOCUSING</Text>
+          <Text style={styles.continueBtnText}>START FOCUSING</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f4f4' },
+const localStyles = StyleSheet.create({
   content: {
     flex: 1, paddingHorizontal: 22, paddingTop: 40,
     alignItems: 'center',
@@ -89,24 +93,17 @@ const styles = StyleSheet.create({
   sparkle: { position: 'absolute', color: Colors.pinkHot },
   heading: {
     fontFamily: 'Fraunces_600SemiBold',
-    fontSize: 32, fontWeight: '600', color: Colors.ink,
+    fontSize: 32, fontWeight: '600',
     letterSpacing: -0.5, textAlign: 'center',
   },
   sub: {
-    fontSize: 15, color: Colors.inkSoft, marginTop: 10,
+    fontSize: 15, marginTop: 10,
     textAlign: 'center', lineHeight: 22,
   },
   cardWrap: { width: '100%', marginTop: 32 },
   statRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   stat: { alignItems: 'center', flex: 1 },
-  statNum: { fontSize: 22, fontWeight: '700', color: Colors.ink },
-  statLabel: { fontSize: 11, color: Colors.inkFaint, marginTop: 2, letterSpacing: 0.5 },
+  statNum: { fontSize: 22, fontWeight: '700' },
+  statLabel: { fontSize: 11, marginTop: 2, letterSpacing: 0.5 },
   statDivider: { width: 0.5, height: 32, backgroundColor: 'rgba(20,16,28,0.1)' },
-  startBtn: {
-    marginTop: 32, width: '100%', paddingVertical: 18, borderRadius: 9999,
-    backgroundColor: Colors.ink, alignItems: 'center',
-    shadowColor: Colors.ink, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18, shadowRadius: 24, elevation: 6,
-  },
-  startBtnText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 3 },
 });

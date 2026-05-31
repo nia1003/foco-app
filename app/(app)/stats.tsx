@@ -18,6 +18,7 @@ import Svg, {
 import { useRouter } from 'expo-router';
 // AppBackground and FrostCard replaced with flat #EFE8E0 / #E6E6E6 styling
 import { FocoBar } from '@/components/layout/FocoBar';
+import { AppBackground } from '@/components/ui/AppBackground';
 import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { FocusCalendar } from '@/components/FocusCalendar';
@@ -835,6 +836,7 @@ export default function StatsScreen() {
   if (loading) {
     return (
       <View style={styles.root}>
+        <AppBackground />
         <FocoBar avatar={settingsAvatar} avatarUri={avatarUri} />
       </View>
     );
@@ -842,6 +844,7 @@ export default function StatsScreen() {
 
   return (
     <View style={styles.root}>
+      <AppBackground />
       <FocoBar avatar={settingsAvatar} avatarUri={avatarUri} />
 
       <ScrollView

@@ -21,10 +21,7 @@ import {
   createSettingsStyles,
   type SettingsStyles,
 } from '@/styles/settingsScreen.styles';
-import {
-  APP_STYLE_OPTIONS,
-  usePreferencesStore,
-} from '@/stores/preferencesStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
 import { audioService } from '@/services/audioService';
@@ -39,11 +36,9 @@ export default function SettingsScreen() {
 
   const soundEnabled = usePreferencesStore((s) => s.soundEnabled);
   const darkMode = usePreferencesStore((s) => s.darkMode);
-  const appStyleId = usePreferencesStore((s) => s.appStyleId);
   const avatarUri = usePreferencesStore((s) => s.avatarUri);
   const setSoundEnabled = usePreferencesStore((s) => s.setSoundEnabled);
   const setDarkMode = usePreferencesStore((s) => s.setDarkMode);
-  const setAppStyleId = usePreferencesStore((s) => s.setAppStyleId);
   const setAvatarUri = usePreferencesStore((s) => s.setAvatarUri);
 
   const [nameDraft, setNameDraft] = useState(userName ?? '');
@@ -150,39 +145,6 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
                 <Text style={styles.profileEmail}>{userEmail ?? '—'}</Text>
               </View>
-            </View>
-          </FrostCard>
-        </Section>
-
-        <Section label="APP 樣式" styles={styles}>
-          <FrostCard radius={20} padded={false}>
-            <View style={styles.styleRow}>
-              {APP_STYLE_OPTIONS.map((opt) => {
-                const active = appStyleId === opt.id;
-                return (
-                  <TouchableOpacity
-                    key={opt.id}
-                    style={[styles.styleChip, active && styles.styleChipActive]}
-                    onPress={() => {
-                      play('tap');
-                      void setAppStyleId(opt.id);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View
-                      style={[styles.swatch, { backgroundColor: opt.swatch }]}
-                    />
-                    <Text
-                      style={[
-                        styles.styleLabel,
-                        active && styles.styleLabelActive,
-                      ]}
-                    >
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
             </View>
           </FrostCard>
         </Section>

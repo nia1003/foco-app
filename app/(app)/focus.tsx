@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FocoBar } from '@/components/layout/FocoBar';
+import { AppBackground } from '@/components/ui/AppBackground';
 import { WavyTimer } from '@/components/ui/WavyTimer';
-import { Colors } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { PETS } from '@/constants/pets';
 import { PetRenderer } from '@/components/pets/PetRenderer';
@@ -54,7 +54,7 @@ export default function FocusScreen() {
       : PETS.find((p) => p.id === 'xingwang')) ?? PETS[0];
 
   const { play, playToggle } = useSound();
-  const { surfaces } = useAppTheme();
+  const { screenBg, colors, surfaces } = useAppTheme();
   const [showQuitModal, setShowQuitModal] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -197,14 +197,15 @@ export default function FocusScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: screenBg }]}>
+      <AppBackground />
       <FocoBar />
 
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Flow State · {durationMin}m</Text>
-          {taskTitle ? <Text style={styles.taskName}>{taskTitle}</Text> : null}
+          <Text style={[styles.headerTitle, { color: colors.inkSoft }]}>Flow State · {durationMin}m</Text>
+          {taskTitle ? <Text style={[styles.taskName, { color: colors.ink }]}>{taskTitle}</Text> : null}
         </View>
 
         {/* Wavy ring + pet + countdown */}
@@ -236,8 +237,8 @@ export default function FocusScreen() {
             disabled={submitting}
             activeOpacity={0.75}
           >
-            <Text style={styles.controlIcon}>✕</Text>
-            <Text style={styles.controlLabel}>Quit</Text>
+            <Text style={[styles.controlIcon, { color: colors.inkSoft }]}>✕</Text>
+            <Text style={[styles.controlLabel, { color: colors.inkFaint }]}>Quit</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -271,11 +272,11 @@ export default function FocusScreen() {
             disabled={submitting}
             activeOpacity={0.75}
           >
-            <Text style={styles.controlIcon}>✓</Text>
-            <Text style={styles.controlLabel}>Done</Text>
+            <Text style={[styles.controlIcon, { color: colors.inkSoft }]}>✓</Text>
+            <Text style={[styles.controlLabel, { color: colors.inkFaint }]}>Done</Text>
           </TouchableOpacity>
         </View>
-        {submitting ? <Text style={styles.savingText}>Saving session...</Text> : null}
+        {submitting ? <Text style={[styles.savingText, { color: colors.inkFaint }]}>Saving session...</Text> : null}
       </View>
 
       {/* Quit modal */}
@@ -295,8 +296,8 @@ export default function FocusScreen() {
               },
             ]}
           >
-            <Text style={styles.modalTitle}>提前結束？</Text>
-            <Text style={styles.modalSub}>放棄會影響你的 DISC 分析結果。</Text>
+            <Text style={[styles.modalTitle, { color: colors.ink }]}>提前結束？</Text>
+            <Text style={[styles.modalSub, { color: colors.inkSoft }]}>放棄會影響你的 DISC 分析結果。</Text>
             <TouchableOpacity
               style={styles.modalQuitBtn}
               onPress={() => {
@@ -317,7 +318,7 @@ export default function FocusScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.modalKeepText}>繼續專注</Text>
+              <Text style={[styles.modalKeepText, { color: colors.inkSoft }]}>繼續專注</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -327,7 +328,7 @@ export default function FocusScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FFFFFF' },
+  root: { flex: 1 },
   content: { flex: 1, paddingBottom: 90 },
 
   header: {
@@ -337,12 +338,11 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 6,
   },
-  headerTitle: { fontSize: 15, fontWeight: '600', color: Colors.inkSoft },
+  headerTitle: { fontSize: 15, fontWeight: '600' },
   taskName: {
     fontFamily: 'Fraunces_500Medium',
     fontSize: 28,
     fontWeight: '500',
-    color: Colors.ink,
     letterSpacing: -0.5,
     textAlign: 'center',
   },
@@ -365,14 +365,13 @@ const styles = StyleSheet.create({
   },
   controlBtn: { alignItems: 'center', gap: 4 },
   controlBtnDisabled: { opacity: 0.45 },
-  controlIcon: { fontSize: 22, color: Colors.ink },
-  controlLabel: { fontSize: 11, color: Colors.inkFaint, letterSpacing: 0.5 },
+  controlIcon: { fontSize: 22 },
+  controlLabel: { fontSize: 11, letterSpacing: 0.5 },
   savingText: {
     marginTop: -10,
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.inkFaint,
   },
   mainBtn: {
     paddingHorizontal: 40,
@@ -409,12 +408,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Fraunces_500Medium',
     fontSize: 22,
     fontWeight: '500',
-    color: Colors.ink,
     marginBottom: 10,
   },
   modalSub: {
     fontSize: 14,
-    color: Colors.inkSoft,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
@@ -434,5 +431,5 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     alignItems: 'center',
   },
-  modalKeepText: { fontSize: 14, fontWeight: '600', color: Colors.inkSoft },
+  modalKeepText: { fontSize: 14, fontWeight: '600' },
 });

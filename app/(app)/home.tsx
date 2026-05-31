@@ -7,7 +7,7 @@
  * translateY that moves the page stack, giving heavy rubber-band damping.
  * Page 2 never bleeds into Page 1 at rest.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -30,6 +30,8 @@ import Reanimated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSound } from '@/components/SoundProvider';
+import { AppBackground } from '@/components/ui/AppBackground';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { FocoBar } from '@/components/layout/FocoBar';
 import { PetRenderer } from '@/components/pets/PetRenderer';
 import { TimerGauge } from '@/components/home/TimerGauge';
@@ -88,7 +90,70 @@ function TaskCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { colors, surfaces } = useAppTheme();
   const deadline = formatDeadline(task.deadline_at);
+  const taskStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          width: 137,
+          height: 135,
+          borderRadius: 16,
+          backgroundColor: surfaces.panelBg,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: surfaces.panelBorder,
+          paddingHorizontal: 18,
+          paddingVertical: 16,
+          position: 'relative',
+        },
+        menuBtn: { position: 'absolute', top: 10, right: 12, padding: 4 },
+        menuDots: {
+          fontSize: 18,
+          color: colors.inkFaint,
+          fontWeight: '700',
+          lineHeight: 20,
+        },
+        textBlock: { paddingRight: 24, alignItems: 'flex-start' },
+        title: { fontSize: 13, fontWeight: '700', color: colors.ink, lineHeight: 17 },
+        iconWrap: {
+          position: 'absolute',
+          left: 16,
+          bottom: 16,
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          backgroundColor: surfaces.emojiCellBg,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        btn: {
+          position: 'absolute',
+          right: 16,
+          bottom: 16,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: surfaces.ctaBg,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        arrow: {
+          fontSize: 16,
+          color: surfaces.ctaText,
+          fontWeight: '700',
+          letterSpacing: 2,
+        },
+        deadlineBadge: {
+          fontSize: 12,
+          fontWeight: '700',
+          color: colors.pinkText,
+          letterSpacing: 0.1,
+          marginTop: 4,
+        },
+        deadlineOverdue: { color: colors.error },
+      }),
+    [colors, surfaces],
+  );
 
   const handleMenu = () => {
     Alert.alert(task.title, undefined, [
@@ -137,78 +202,6 @@ function TaskCard({
   );
 }
 
-const taskStyles = StyleSheet.create({
-  card: {
-    width: 137,
-    height: 135,
-    borderRadius: 16,
-    backgroundColor: '#E6E6E6',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    position: 'relative',
-  },
-  menuBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    padding: 4,
-  },
-  menuDots: {
-    fontSize: 18,
-    color: 'rgba(26,22,34,0.45)',
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  textBlock: {
-    paddingRight: 24,
-    alignItems: 'flex-start',
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: INK,
-    lineHeight: 17,
-  },
-  iconWrap: {
-    position: 'absolute',
-    left: 16,
-    bottom: 16,
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(26,22,34,0.07)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btn: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrow: {
-    fontSize: 16,
-    color: '#ffffff',
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  deadlineBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7C4DCC',
-    letterSpacing: 0.1,
-    marginTop: 4,
-  },
-  deadlineOverdue: {
-    color: '#CC4D4D',
-  },
-});
-
 // ── EmbeddedTabBar ────────────────────────────────────────────────────────────
 // Physically lives inside the dark card — moves WITH it, never floats globally.
 interface EmbeddedTabBarProps {
@@ -216,6 +209,7 @@ interface EmbeddedTabBarProps {
   onPress: (tab: Page2Tab) => void;
 }
 function EmbeddedTabBar({ active, onPress }: EmbeddedTabBarProps) {
+  const { colors, surfaces } = useAppTheme();
   const tabs: Array<{ id: Page2Tab; label: string; icon: string }> = [
     { id: 'home',  label: 'Home',  icon: '⌂' },
     { id: 'tasks', label: 'Tasks', icon: '☑' },
@@ -223,7 +217,15 @@ function EmbeddedTabBar({ active, onPress }: EmbeddedTabBarProps) {
   ];
   return (
     <View style={etbStyles.wrapper} pointerEvents="box-none">
-      <View style={etbStyles.pill}>
+      <View
+        style={[
+          etbStyles.pill,
+          {
+            backgroundColor: surfaces.panelBg,
+            borderColor: surfaces.panelBorder,
+          },
+        ]}
+      >
         {tabs.map((tab) => {
           const isActive = tab.id === active;
           return (
@@ -233,11 +235,33 @@ function EmbeddedTabBar({ active, onPress }: EmbeddedTabBarProps) {
               onPress={() => onPress(tab.id)}
               activeOpacity={0.7}
             >
-              {isActive && <View style={etbStyles.activeHighlight} />}
-              <Text style={[etbStyles.icon, isActive && etbStyles.iconActive]}>
+              {isActive && (
+                <View
+                  style={[
+                    etbStyles.activeHighlight,
+                    {
+                      backgroundColor: surfaces.rowActive,
+                      borderColor: surfaces.pillActiveBorder,
+                    },
+                  ]}
+                />
+              )}
+              <Text
+                style={[
+                  etbStyles.icon,
+                  { color: colors.inkFaint },
+                  isActive && { color: colors.pinkText },
+                ]}
+              >
                 {tab.icon}
               </Text>
-              <Text style={[etbStyles.label, isActive && etbStyles.labelActive]}>
+              <Text
+                style={[
+                  etbStyles.label,
+                  { color: colors.inkSoft },
+                  isActive && { color: colors.pinkText, fontWeight: '600' },
+                ]}
+              >
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -605,26 +629,33 @@ export default function HomeScreen() {
   }, [removeTask]);
 
   // ── Render ──────────────────────────────────────────────────────
+  const { screenBg, colors, surfaces, isDark } = useAppTheme();
+  const page1Bg = isDark ? screenBg : LIGHT_BG;
+  const page2Bg = isDark ? surfaces.modalInsetBg : DARK_BG;
+
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: page1Bg }]}>
+      <AppBackground />
       <GestureDetector gesture={panGesture}>
         <Reanimated.View style={[styles.pageStack, animStyle]}>
 
           {/* ═══════════════ PAGE 1: light cover ═══════════════════ */}
-          <View style={styles.page1}>
+          <View style={[styles.page1, { backgroundColor: page1Bg }]}>
 
             {/* Hero section: FocoBar + headline + CTA button */}
-            <View style={styles.heroSection}>
+            <View style={[styles.heroSection, { backgroundColor: page1Bg }]}>
               <FocoBar avatar={displayName[0]?.toUpperCase() ?? '?'} />
               <View style={styles.heroArea}>
-                <Text style={styles.heroLine}>{'Welcome\nback\nStart Focus.'}</Text>
+                <Text style={[styles.heroLine, { color: colors.ink }]}>
+                  {'Welcome\nback\nStart Focus.'}
+                </Text>
               </View>
               <TouchableOpacity
-                style={styles.pinkCircleBtn}
+                style={[styles.pinkCircleBtn, { backgroundColor: surfaces.ctaBg }]}
                 onPress={() => { play('tap'); goFocus(); }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.pinkCircleArrow}>→</Text>
+                <Text style={[styles.pinkCircleArrow, { color: surfaces.ctaText }]}>→</Text>
               </TouchableOpacity>
             </View>
 
@@ -690,17 +721,17 @@ export default function HomeScreen() {
               {chat.visible && (
                 <View style={styles.chatOverlay} pointerEvents="box-none">
                   {(chat.loading || chat.msg || chat.err) ? (
-                    <Text style={styles.chatReplyText}>
+                    <Text style={[styles.chatReplyText, { color: colors.ink }]}>
                       {chat.loading ? '···' : chat.err ? chat.err : chat.msg}
                     </Text>
                   ) : null}
                   <TextInput
                     ref={chatInputRef}
-                    style={styles.chatInputText}
+                    style={[styles.chatInputText, { color: colors.ink }]}
                     value={chat.text}
                     onChangeText={(t) => setChat((p) => ({ ...p, text: t }))}
                     placeholder="say something…"
-                    placeholderTextColor="rgba(26,22,34,0.35)"
+                    placeholderTextColor={colors.inkFaint}
                     returnKeyType="send"
                     multiline={false}
                     onSubmitEditing={handleChatSubmit}
@@ -716,14 +747,14 @@ export default function HomeScreen() {
                 activeOpacity={0.75}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.chatDotIcon}>···</Text>
+                <Text style={[styles.chatDotIcon, { color: colors.ink }]}>···</Text>
               </TouchableOpacity>
             </View>
 
           </View>{/* /PAGE 1 */}
 
           {/* ═══════════════ PAGE 2: light dashboard ═══════════════ */}
-          <View style={styles.page2}>
+          <View style={[styles.page2, { backgroundColor: page2Bg }]}>
 
             {/* Page 2 top bar — reuse FocoBar so safe-area + style match Tasks/Stats */}
             <FocoBar
@@ -735,7 +766,7 @@ export default function HomeScreen() {
             />
 
             <Reanimated.ScrollView
-              style={styles.page2Scroll}
+              style={[styles.page2Scroll, { backgroundColor: page2Bg }]}
               contentContainerStyle={styles.page2Content}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -744,8 +775,10 @@ export default function HomeScreen() {
               {/* ── Home tab: Dashboard ─────────────────────── */}
               {activePage2Tab === 'home' && (
                 <>
-                  <Text style={styles.greetName}>Hi {displayName},</Text>
-                  <Text style={styles.greetSub}>welcome to the headspace.</Text>
+                  <Text style={[styles.greetName, { color: colors.ink }]}>Hi {displayName},</Text>
+                  <Text style={[styles.greetSub, { color: colors.inkSoft }]}>
+                    welcome to the headspace.
+                  </Text>
 
                   {/* Stats preview row */}
                   <View style={styles.statsRow}>
@@ -767,16 +800,16 @@ export default function HomeScreen() {
                         lbl: 'streak\ndays',
                       },
                     ] as { val: string; lbl: string }[]).map((item) => (
-                      <View key={item.lbl} style={styles.statsTile}>
-                        <Text style={styles.statsTileVal}>{item.val}</Text>
-                        <Text style={styles.statsTileLbl}>{item.lbl}</Text>
+                      <View key={item.lbl} style={[styles.statsTile, { backgroundColor: surfaces.panelBg }]}>
+                        <Text style={[styles.statsTileVal, { color: colors.ink }]}>{item.val}</Text>
+                        <Text style={[styles.statsTileLbl, { color: colors.inkSoft }]}>{item.lbl}</Text>
                       </View>
                     ))}
                   </View>
 
                   {/* Daily tasks preview */}
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionLabelInHeader}>daily tasks</Text>
+                    <Text style={[styles.sectionLabelInHeader, { color: colors.inkSoft }]}>daily tasks</Text>
                   </View>
                   {dailyTasks.length > 0 && (
                     <ScrollView
@@ -800,7 +833,7 @@ export default function HomeScreen() {
 
                   {/* Deadline tasks preview */}
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionLabelInHeader}>deadlines</Text>
+                    <Text style={[styles.sectionLabelInHeader, { color: colors.inkSoft }]}>deadlines</Text>
                   </View>
                   {deadlineTasks.length > 0 && (
                     <ScrollView
@@ -823,7 +856,9 @@ export default function HomeScreen() {
                   )}
 
                   {dailyTasks.length === 0 && deadlineTasks.length === 0 && (
-                    <Text style={styles.emptyTasks}>No pending tasks — you're all clear 🎉</Text>
+                    <Text style={[styles.emptyTasks, { color: colors.inkSoft }]}>
+                      No pending tasks — you're all clear 🎉
+                    </Text>
                   )}
 
                   <TouchableOpacity
@@ -835,7 +870,7 @@ export default function HomeScreen() {
                   </TouchableOpacity>
 
                   {/* Timer */}
-                  <Text style={styles.sectionLabel}>timer</Text>
+                  <Text style={[styles.sectionLabel, { color: colors.inkSoft }]}>timer</Text>
                   <TimerGauge
                     value={durationMin}
                     onChange={handleHomeTimerChange}

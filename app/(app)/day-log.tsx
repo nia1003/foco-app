@@ -18,6 +18,7 @@ import { Colors } from '@/constants/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { getWeekSessions } from '@/services/focoService';
 import { getMockCalendarData } from '@/data/mockData';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import type { DayData } from '@/types';
 
 const WEEK_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -64,6 +65,7 @@ function buildMockWeekData(weekStart: string): DayData[] {
 }
 
 export default function DayLogScreen() {
+  const { screenBg } = useAppTheme();
   const router = useRouter();
   const { userId } = useAuthStore();
   const params = useLocalSearchParams<{ weekStart?: string; focusDate?: string }>();
@@ -134,7 +136,7 @@ export default function DayLogScreen() {
   ).current;
 
   return (
-    <View style={styles.root} {...panResponder.panHandlers}>
+    <View style={[styles.root, { backgroundColor: screenBg }]} {...panResponder.panHandlers}>
       <AppBackground />
 
       {/* Header */}
@@ -233,7 +235,7 @@ export default function DayLogScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fbfaf7' },
+  root: { flex: 1 },
 
   header: {
     flexDirection: 'row',

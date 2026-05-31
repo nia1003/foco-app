@@ -2,11 +2,13 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 export default function NotFound() {
+  const { screenBg } = useAppTheme();
   const router = useRouter();
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: screenBg }]}>
       <View style={styles.container}>
         <Text style={{ fontSize: 64 }}>🌫️</Text>
         <Text style={styles.title}>Page not found</Text>
@@ -20,7 +22,7 @@ export default function NotFound() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f6f4f4' },
+  safe: { flex: 1 },
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg, gap: Spacing.md },
   title: { fontSize: FontSize.xxl, fontWeight: '700' as const, color: Colors.ink },
   sub: { fontSize: FontSize.md, color: Colors.inkSoft },

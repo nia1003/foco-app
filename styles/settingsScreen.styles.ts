@@ -74,22 +74,6 @@ export function createSettingsStyles({ colors, surfaces }: AppTheme) {
     saveBtnDisabled: { opacity: 0.5 },
     saveBtnText: { fontSize: 12, fontWeight: '700', color: surfaces.ctaText },
     profileEmail: { fontSize: 12, color: colors.inkSoft, marginTop: 10 },
-    styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 16 },
-    styleChip: {
-      alignItems: 'center',
-      padding: 10,
-      borderRadius: 14,
-      borderWidth: 1.5,
-      borderColor: 'transparent',
-      minWidth: 72,
-    },
-    styleChipActive: {
-      borderColor: colors.ink,
-      backgroundColor: surfaces.rowActive,
-    },
-    swatch: { width: 32, height: 32, borderRadius: 16, marginBottom: 6 },
-    styleLabel: { fontSize: 11, color: colors.inkSoft, fontWeight: '500' },
-    styleLabelActive: { color: colors.ink, fontWeight: '700' },
     divider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: surfaces.dividerStrong,
