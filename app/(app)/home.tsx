@@ -35,6 +35,7 @@ import { PetRenderer } from '@/components/pets/PetRenderer';
 import { TimerGauge } from '@/components/home/TimerGauge';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
+import { TaskIcon } from '@/components/tasks/TaskIcon';
 import { PETS } from '@/constants/pets';
 import { useAuthStore } from '@/stores/authStore';
 import { usePetStore } from '@/stores/petStore';
@@ -44,6 +45,7 @@ import { chatWithPet, getPets, deleteTask, fetchHomeStats } from '@/services/foc
 import type { HomeStats } from '@/services/focoService';
 import { mockPets } from '@/data/mockData';
 import { isMockPetId, resolveLaunchPetId } from '@/lib/focusSession';
+import { resolveTaskIcon } from '@/lib/taskIcon';
 import type { Task } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -108,6 +110,10 @@ function TaskCard({
         <Text style={taskStyles.menuDots}>⋮</Text>
       </TouchableOpacity>
 
+      <View style={taskStyles.iconWrap}>
+        <TaskIcon icon={resolveTaskIcon(task)} size={22} />
+      </View>
+
       <Text style={taskStyles.title} numberOfLines={2}>{task.title}</Text>
 
       {/* Deadline badge */}
@@ -158,7 +164,15 @@ const taskStyles = StyleSheet.create({
     color: INK,
     lineHeight: 16,
     alignSelf: 'flex-start',
-    marginTop: 18,
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(26,22,34,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
   },
   btn: {
     width: 36,

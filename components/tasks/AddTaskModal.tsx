@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { useSound } from '@/components/SoundProvider';
 import { TimerGauge } from '@/components/home/TimerGauge';
+import { TaskIcon } from '@/components/tasks/TaskIcon';
+import { TaskIconPickerContent } from '@/components/tasks/TaskIconPickerContent';
+import { DEFAULT_TASK_ICON, type TaskIconValue } from '@/lib/taskIcon';
 import { createTask } from '@/services/focoService';
 import type { Task } from '@/types';
 
@@ -273,6 +276,8 @@ export function AddTaskModal({
 
   const [title, setTitle] = useState('');
   const [memo, setMemo] = useState('');
+  const [icon, setIcon] = useState<TaskIconValue>(DEFAULT_TASK_ICON);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
@@ -319,6 +324,8 @@ export function AddTaskModal({
   const resetForm = useCallback(() => {
     setTitle('');
     setMemo('');
+    setIcon(DEFAULT_TASK_ICON);
+    setIconPickerOpen(false);
     setDurationMin(defaultDurationMin);
     setHasDeadline(false);
     setDeadlineAt(null);
@@ -402,6 +409,8 @@ export function AddTaskModal({
           status: 'pending',
           category,
           created_at: new Date().toISOString(),
+          icon_type: icon.type,
+          icon_value: icon.value,
           deadline_at: deadlineValue,
           ...(trimmedMemo ? { memo: trimmedMemo } : {}),
         };
@@ -413,6 +422,8 @@ export function AddTaskModal({
 
       const created = await createTask(userId, trimmed, durationMin, {
         category,
+        icon_type: icon.type,
+        icon_value: icon.value,
         deadline_at: deadlineValue,
         ...(trimmedMemo ? { memo: trimmedMemo } : {}),
       });
@@ -437,6 +448,29 @@ export function AddTaskModal({
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
           >
+            {iconPickerOpen ? (
+              <>
+                <TouchableOpacity
+                  style={styles.backRow}
+                  onPress={() => {
+                    play('tap');
+                    setIconPickerOpen(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.backText}>{'< Back'}</Text>
+                </TouchableOpacity>
+                <TaskIconPickerContent
+                  value={icon}
+                  onChange={setIcon}
+                  onDone={() => {
+                    play('tap');
+                    setIconPickerOpen(false);
+                  }}
+                />
+              </>
+            ) : (
+              <>
             <View style={styles.headerRow}>
               <View style={styles.headerCopy}>
                 <Text style={styles.title}>+ Task</Text>
@@ -454,6 +488,23 @@ export function AddTaskModal({
                 />
               </View>
             </View>
+
+            <TouchableOpacity
+              style={styles.iconRow}
+              onPress={() => {
+                play('tap');
+                setIconPickerOpen(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.iconPreview}>
+                <TaskIcon icon={icon} size={26} />
+              </View>
+              <View style={styles.iconCopy}>
+                <Text style={styles.iconLabel}>Task icon</Text>
+                <Text style={styles.iconHint}>Tap to choose an emoji or icon</Text>
+              </View>
+            </TouchableOpacity>
 
             <TextInput
               style={styles.input}
@@ -529,6 +580,8 @@ export function AddTaskModal({
                 <Text style={styles.createText}>{saving ? 'Saving...' : 'Create'}</Text>
               </TouchableOpacity>
             </View>
+              </>
+            )}
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -579,6 +632,48 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: 'rgba(26,22,34,0.55)',
     letterSpacing: 0.2,
+  },
+  backRow: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  backText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7C4DCC',
+  },
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#F0EAF8',
+    borderWidth: 1,
+    borderColor: 'rgba(124,77,204,0.15)',
+    marginBottom: 16,
+  },
+  iconPreview: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  iconCopy: {
+    flex: 1,
+  },
+  iconLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: INK,
+  },
+  iconHint: {
+    fontSize: 12,
+    color: 'rgba(26,22,34,0.45)',
+    marginTop: 2,
   },
   input: {
     fontSize: 16,
